@@ -1,4 +1,4 @@
-import { Activity, Cog, Cpu, FolderKanban, Lightbulb, MonitorPlay, Radio, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Activity, AlertTriangle, Cog, Cpu, FolderKanban, Lightbulb, MonitorPlay, Radio, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import * as React from 'react';
 
 import { type AppLinkRenderer } from '@/components/ui/app-bar';
@@ -75,6 +75,16 @@ export function App() {
   const { projects, loaded, refresh, use, create, remove } = useProjects();
   const presets = usePresets();
 
+  // Bumped whenever the store changes underneath the panels (project in use,
+  // import, clear-all) so every project-scoped panel refetches — a panel bound
+  // to the same project name would otherwise keep its mount-time data.
+  const [dataRev, setDataRev] = React.useState(0);
+  const invalidateProjectData = React.useCallback(() => setDataRev((n) => n + 1), []);
+
+  // The action that just failed, if any. Store writes can refuse (the last admin,
+  // a name clash), and a silently swallowed rejection looks like a dead button.
+  const [actionError, setActionError] = React.useState<string | null>(null);
+
   // Boot splash: keep the cube loader up until the project registry has landed
   // AND one full animation cycle has played, so it never flashes for a frame.
   const [splashCycleDone, setSplashCycleDone] = React.useState(false);
@@ -85,27 +95,35 @@ export function App() {
   const showSplash = !loaded || !splashCycleDone;
 
   const activeProject = projects.find((p) => p.active)?.name ?? status.project ?? null;
+  const activeScope = React.useMemo(
+    () => ({ project: activeProject, rev: dataRev }),
+    [activeProject, dataRev]
+  );
   const { devices, refresh: refreshDevices, rename: renameDevice, assignShard } =
-    useDevices(activeProject);
+    useDevices(activeScope);
 
   // The project whose config the editor is bound to — defaults to the active one,
   // overridden when the operator clicks "Config" on a specific project row.
   const [configProject, setConfigProject] = React.useState<string | null>(null);
   const editingProject = configProject ?? activeProject;
+  const editingScope = React.useMemo(
+    () => ({ project: editingProject, rev: dataRev }),
+    [editingProject, dataRev]
+  );
   const { config, loading: configLoading, refresh: refreshConfig, save: saveConfig } =
-    useProjectConfig(editingProject);
+    useProjectConfig(editingScope);
   const {
     users,
     refresh: refreshUsers,
     add: addUser,
     remove: removeUser,
     setRole: setUserRole
-  } = useProjectUsers(editingProject);
+  } = useProjectUsers(editingScope);
   const {
     sessions,
     refresh: refreshSessions,
     revoke: revokeSession
-  } = useSessions(editingProject);
+  } = useSessions(editingScope);
   const {
     keys,
     refresh: refreshKeys,
@@ -114,12 +132,12 @@ export function App() {
     setRole: setKeyRole,
     remove: removeKey,
     removeAll: removeAllKeys
-  } = useAccessKeys(editingProject);
+  } = useAccessKeys(editingScope);
   const {
     secrets,
     refresh: refreshSecrets,
     generate: generateSecrets
-  } = useProjectSecrets(editingProject);
+  } = useProjectSecrets(editingScope);
   const {
     view: lightMap,
     loading: lightMapLoading,
@@ -130,17 +148,22 @@ export function App() {
     autoMap: autoMapLights,
     identify: identifyLight,
     identifyClear: identifyClearLights
-  } = useLightMap(editingProject);
+  } = useLightMap(editingScope);
   const { info: storeInfo, refresh: refreshStore, clear: clearStore } = useStore();
   const {
     report: doctorReport,
     loading: doctorLoading,
     error: doctorError,
     refresh: refreshDoctor
-  } = useDoctor(activeProject);
-  const { target: oscTarget, refresh: refreshOsc, save: saveOsc } = useOscTarget(editingProject);
+  } = useDoctor(activeScope);
+  const { target: oscTarget, refresh: refreshOsc, save: saveOsc } = useOscTarget(editingScope);
   const discovery = useDiscovery();
-  const { exportProject, importProject } = useTransfer(refresh);
+  const { exportProject, importProject } = useTransfer(
+    React.useCallback(async () => {
+      await refresh();
+      invalidateProjectData();
+    }, [refresh, invalidateProjectData])
+  );
 
   // A failed start is reported through `status.lastError` (pushed by the main
   // process), so the rejection here is expected and not re-thrown.
@@ -177,6 +200,7 @@ export function App() {
         // panel (config, lights, devices, access) follows the project in use
         // instead of the one last inspected.
         setConfigProject(null);
+        invalidateProjectData();
         if (status.running && status.project !== name) {
           await window.wavegrid.brain.start(name).catch(() => undefined);
         }
@@ -184,7 +208,7 @@ export function App() {
         setBusy(false);
       }
     },
-    [use, status.running, status.project]
+    [use, invalidateProjectData, status.running, status.project]
   );
 
   const onCreate = React.useCallback(
@@ -192,11 +216,12 @@ export function App() {
       setBusy(true);
       try {
         await create(input);
+        invalidateProjectData();
       } finally {
         setBusy(false);
       }
     },
-    [create]
+    [create, invalidateProjectData]
   );
 
   const onRemove = React.useCallback(
@@ -205,11 +230,12 @@ export function App() {
       try {
         await remove(name);
         setConfigProject((cur) => (cur === name ? null : cur));
+        invalidateProjectData();
       } finally {
         setBusy(false);
       }
     },
-    [remove]
+    [remove, invalidateProjectData]
   );
 
   const onEditConfig = React.useCallback((name: string) => {
@@ -217,14 +243,33 @@ export function App() {
     setRoute('config');
   }, []);
 
+  /**
+   * Run a store write with the busy flag held, surfacing a refusal instead of
+   * losing it: the store rejects some writes on purpose (removing the last
+   * admin, an unknown user), and an unhandled rejection here reads as a button
+   * that does nothing.
+   */
   const withBusy = React.useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
     setBusy(true);
+    setActionError(null);
     try {
       return await fn();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+      throw e;
     } finally {
       setBusy(false);
     }
   }, []);
+
+  /** Fire-and-forget variant for buttons that don't consume a result — the
+   *  failure is already on screen, so the rejection is deliberately dropped. */
+  const runAction = React.useCallback(
+    (fn: () => Promise<unknown>) => {
+      void withBusy(fn).catch(() => undefined);
+    },
+    [withBusy]
+  );
 
   // A live brain resolved its config at startup, so a layout/port change only
   // reaches the artist UI (and the light map derived from it) on a restart.
@@ -359,6 +404,22 @@ export function App() {
       }}
       breadcrumbs={[{ id: route, label: ROUTE_LABEL[route], current: true }]}
     >
+      {actionError && (
+        <div className='text-destructive mb-4 flex items-start gap-2 rounded-lg border border-current/30 px-3 py-2 text-sm'>
+          <AlertTriangle className='mt-0.5 size-4 shrink-0' />
+          <span className='flex-1'>
+            <span className='font-medium'>That didn’t work.</span> {actionError}
+          </span>
+          <button
+            type='button'
+            aria-label='Dismiss'
+            className='hover:opacity-70'
+            onClick={() => setActionError(null)}
+          >
+            <X className='size-4' />
+          </button>
+        </div>
+      )}
       {route === 'show' && (
         <ShowRoute
           status={status}
@@ -377,11 +438,11 @@ export function App() {
           onRefresh={() => void refreshDoctor()}
           brainLive={status.running && status.project === activeProject}
           receiverRunning={status.receiverRunning && status.project === activeProject}
-          onStartReceiver={() => void withBusy(async () => {
+          onStartReceiver={() => runAction(async () => {
             await window.wavegrid.brain.startReceiver();
             await refreshDoctor();
           })}
-          onStopReceiver={() => void withBusy(async () => {
+          onStopReceiver={() => runAction(async () => {
             await window.wavegrid.brain.stopReceiver();
             await refreshDoctor();
           })}
@@ -419,17 +480,17 @@ export function App() {
           sessions={sessions}
           secrets={secrets}
           onAddUser={(u, p, r) => withBusy(() => addUser(u, p, r))}
-          onRemoveUser={(u) => void withBusy(() => removeUser(u))}
-          onSetUserRole={(u, r) => void withBusy(() => setUserRole(u, r))}
-          onRevokeSession={(id) => void withBusy(() => revokeSession(id))}
+          onRemoveUser={(u) => runAction(() => removeUser(u))}
+          onSetUserRole={(u, r) => runAction(() => setUserRole(u, r))}
+          onRevokeSession={(id) => runAction(() => revokeSession(id))}
           onRefreshSessions={() => void refreshSessions()}
           keys={keys}
           onMintKey={(name, role) => withBusy(() => mintKey(name, role))}
-          onSetKeyEnabled={(name, enabled) => void withBusy(() => setKeyEnabled(name, enabled))}
-          onSetKeyRole={(name, role) => void withBusy(() => setKeyRole(name, role))}
-          onRemoveKey={(name) => void withBusy(() => removeKey(name))}
-          onRemoveAllKeys={() => void withBusy(() => removeAllKeys())}
-          onGenerateSecrets={(force) => void withBusy(() => generateSecrets(force))}
+          onSetKeyEnabled={(name, enabled) => runAction(() => setKeyEnabled(name, enabled))}
+          onSetKeyRole={(name, role) => runAction(() => setKeyRole(name, role))}
+          onRemoveKey={(name) => runAction(() => removeKey(name))}
+          onRemoveAllKeys={() => runAction(() => removeAllKeys())}
+          onGenerateSecrets={(force) => runAction(() => generateSecrets(force))}
           busy={busy}
         />
       )}
@@ -438,9 +499,9 @@ export function App() {
           project={editingProject}
           view={lightMap}
           loading={lightMapLoading}
-          onSaveMap={(name, pl) => void withBusy(() => saveLightMap(name, pl))}
-          onActivate={(name) => void withBusy(() => activateLightMap(name))}
-          onDeleteMap={(name) => void withBusy(() => deleteLightMap(name))}
+          onSaveMap={(name, pl) => runAction(() => saveLightMap(name, pl))}
+          onActivate={(name) => runAction(() => activateLightMap(name))}
+          onDeleteMap={(name) => runAction(() => deleteLightMap(name))}
           onAutoMap={autoMapLights}
           onIdentify={identifyLight}
           onIdentifyClear={identifyClearLights}
@@ -482,6 +543,7 @@ export function App() {
               // so no route keeps showing a project that no longer exists.
               setConfigProject(null);
               await refresh();
+              invalidateProjectData();
               return result;
             } finally {
               setBusy(false);

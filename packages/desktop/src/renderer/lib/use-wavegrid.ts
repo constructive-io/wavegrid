@@ -107,9 +107,23 @@ export function usePresets(): string[] {
   return presets;
 }
 
+/**
+ * What a project-scoped panel reads: a project name plus a revision counter.
+ *
+ * Keying a refetch on the project name alone isn't enough — switching the
+ * project *in use* can leave a panel bound to the same name (or to a project
+ * whose contents changed underneath it, e.g. after an import or a clear), and
+ * the panel would then keep showing what it fetched on mount. Bumping `rev`
+ * refetches every panel regardless of the name.
+ */
+export interface ProjectScope {
+  project: string | null;
+  rev: number;
+}
+
 /** The active project's editable config, mirrored from the store. `save` folds
  *  the edited fields back in (osc/sync/etc. preserved) and returns the result. */
-export function useProjectConfig(project: string | null): {
+export function useProjectConfig({ project, rev }: ProjectScope): {
   config: EditableConfig | null;
   loading: boolean;
   refresh: () => Promise<void>;
@@ -129,7 +143,7 @@ export function useProjectConfig(project: string | null): {
     } finally {
       setLoading(false);
     }
-  }, [project]);
+  }, [project, rev]);
 
   const save = React.useCallback(
     async (next: EditableConfig) => {
@@ -173,7 +187,7 @@ export function useTransfer(onChanged: () => Promise<void>): {
 }
 
 /** A project's laser output target (BEYOND / FB4 / routing file / none). */
-export function useOscTarget(project: string | null): {
+export function useOscTarget({ project, rev }: ProjectScope): {
   target: OscTarget | null;
   refresh: () => Promise<void>;
   save: (target: OscTarget) => Promise<void>;
@@ -182,7 +196,7 @@ export function useOscTarget(project: string | null): {
 
   const refresh = React.useCallback(async () => {
     setTarget(project ? await window.wavegrid.osc.get(project) : null);
-  }, [project]);
+  }, [project, rev]);
 
   const save = React.useCallback(
     async (next: OscTarget) => {
@@ -227,7 +241,7 @@ export function useDiscovery(): {
 
 /** UI login users for a project (username + role — password hashes never leave
  *  main). add/remove/setRole write straight through to the scrypt-backed store. */
-export function useProjectUsers(project: string | null): {
+export function useProjectUsers({ project, rev }: ProjectScope): {
   users: UserAccount[];
   refresh: () => Promise<void>;
   add: (username: string, password: string, role: UserRole) => Promise<void>;
@@ -242,7 +256,7 @@ export function useProjectUsers(project: string | null): {
       return;
     }
     setUsers(await window.wavegrid.users.list(project));
-  }, [project]);
+  }, [project, rev]);
 
   const add = React.useCallback(
     async (username: string, password: string, role: UserRole) => {
@@ -278,7 +292,7 @@ export function useProjectUsers(project: string | null): {
 /** Active UI login sessions for a project (who's logged in). Local admin reads
  *  straight from the shared store; revoke removes the row (the client loses
  *  access on its next token refresh — sockets are untouched). */
-export function useSessions(project: string | null): {
+export function useSessions({ project, rev }: ProjectScope): {
   sessions: SessionInfo[];
   refresh: () => Promise<void>;
   revoke: (id: string) => Promise<void>;
@@ -287,7 +301,7 @@ export function useSessions(project: string | null): {
 
   const refresh = React.useCallback(async () => {
     setSessions(project ? await window.wavegrid.sessions.list(project) : []);
-  }, [project]);
+  }, [project, rev]);
 
   const revoke = React.useCallback(
     async (id: string) => {
@@ -307,7 +321,7 @@ export function useSessions(project: string | null): {
 /** A project's access keys + controls. `mint` creates (or replaces) a named key
  *  and returns its cleartext once, for the admin to copy; the store keeps only a
  *  hash. Every other action just reshapes the list. */
-export function useAccessKeys(project: string | null): {
+export function useAccessKeys({ project, rev }: ProjectScope): {
   keys: AccessKeyInfo[];
   refresh: () => Promise<void>;
   mint: (name: string, role: UserRole) => Promise<string>;
@@ -324,7 +338,7 @@ export function useAccessKeys(project: string | null): {
       return;
     }
     setKeys(await window.wavegrid.keys.list(project));
-  }, [project]);
+  }, [project, rev]);
 
   const mint = React.useCallback(
     async (name: string, role: UserRole) => {
@@ -374,7 +388,7 @@ export function useAccessKeys(project: string | null): {
 
 /** Required-secret status for a project (name/description/set only). `generate`
  *  triggers one-time generation, or rotation with force=true. */
-export function useProjectSecrets(project: string | null): {
+export function useProjectSecrets({ project, rev }: ProjectScope): {
   secrets: RequiredSecretInfo[];
   refresh: () => Promise<void>;
   generate: (force: boolean) => Promise<void>;
@@ -387,7 +401,7 @@ export function useProjectSecrets(project: string | null): {
       return;
     }
     setSecrets(await window.wavegrid.secrets.status(project));
-  }, [project]);
+  }, [project, rev]);
 
   const generate = React.useCallback(
     async (force: boolean) => {
@@ -408,7 +422,7 @@ export function useProjectSecrets(project: string | null): {
  *  raw `physicalLights` the editor mutates, and the named-map library. Saving
  *  writes a named correction map; activating one materializes it into the same
  *  light-map.json the running brain reads (null = identity / no correction). */
-export function useLightMap(project: string | null): {
+export function useLightMap({ project, rev }: ProjectScope): {
   view: LightMapView | null;
   loading: boolean;
   refresh: () => Promise<void>;
@@ -433,7 +447,7 @@ export function useLightMap(project: string | null): {
     } finally {
       setLoading(false);
     }
-  }, [project]);
+  }, [project, rev]);
 
   const saveMap = React.useCallback(
     async (name: string, physicalLights: number[]) => {
@@ -483,7 +497,7 @@ export function useLightMap(project: string | null): {
 /** The project-scoped device registry, mirrored from the shared appstash store.
  *  Renaming and shard assignment write straight through to the store — the same
  *  records the CLI's `devices` commands manage. */
-export function useDevices(project: string | null): {
+export function useDevices({ project, rev }: ProjectScope): {
   devices: DeviceInfo[];
   refresh: () => Promise<void>;
   rename: (idOrName: string, newName: string) => Promise<void>;
@@ -493,7 +507,7 @@ export function useDevices(project: string | null): {
 
   const refresh = React.useCallback(async () => {
     setDevices(project ? await window.wavegrid.devices.list(project) : []);
-  }, [project]);
+  }, [project, rev]);
 
   const rename = React.useCallback(
     async (idOrName: string, newName: string) => {
@@ -523,7 +537,7 @@ export function useDevices(project: string | null): {
  * prints. Each collection probes the brain, so refresh is explicit (or on an
  * interval the Status screen owns) rather than on every render.
  */
-export function useDoctor(project: string | null): {
+export function useDoctor({ project, rev }: ProjectScope): {
   report: DoctorReport | null;
   loading: boolean;
   error: string | null;
@@ -547,7 +561,7 @@ export function useDoctor(project: string | null): {
     } finally {
       setLoading(false);
     }
-  }, [project]);
+  }, [project, rev]);
 
   return { report, loading, error, refresh };
 }
