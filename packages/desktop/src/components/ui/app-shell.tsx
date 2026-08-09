@@ -135,6 +135,8 @@ type AppShellProps = Omit<AppShellRootProps, 'children'> & {
 	/** CSS length for the expanded desktop sidebar (default upstream token). */
 	sidebarWidth?: string;
 	sidebarProps?: Omit<SidebarProps, 'children'>;
+	/** Rendered in the sidebar header under the brand (e.g. a workspace switcher). */
+	sidebarHeader?: React.ReactNode;
 	sidebarFooter?: React.ReactNode;
 	/** Optional sticky footer below main content (e.g. mobile feature tabs). */
 	contentFooter?: React.ReactNode;
@@ -423,6 +425,7 @@ function AppShell({
 	headerHeight = '3.5rem',
 	sidebarWidth,
 	sidebarProps,
+	sidebarHeader,
 	sidebarFooter,
 	contentFooter,
 	defaultSidebarOpen = true,
@@ -463,9 +466,10 @@ function AppShell({
 				sidebarClassName,
 			)}
 		>
-			{brand && (
+			{(brand || sidebarHeader) && (
 				<SidebarHeader className={contentBar ? 'pt-5 pb-2' : undefined}>
-					<Brand brand={brand} renderLink={renderLink} />
+					{brand && <Brand brand={brand} renderLink={renderLink} />}
+					{sidebarHeader}
 				</SidebarHeader>
 			)}
 			<SidebarContent className={contentBar ? 'px-1' : undefined}>

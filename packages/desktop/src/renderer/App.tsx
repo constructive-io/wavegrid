@@ -5,6 +5,7 @@ import { type AppLinkRenderer } from '@/components/ui/app-bar';
 import { type AppNavigationGroup,AppShell } from '@/components/ui/app-shell';
 import { AppSplash } from '@/components/ui/app-splash';
 import { ConstructiveIcon } from '@/components/ui/constructive-icon';
+import { isRoute, NAV_GROUPS, type Route,ROUTE_GROUP, ROUTE_LABEL } from '@/renderer/lib/navigation';
 import {
   useAccessKeys,
   useBrainStatus,
@@ -28,45 +29,26 @@ import { ConfigRoute } from '@/renderer/routes/config-route';
 import { DevicesRoute } from '@/renderer/routes/devices-route';
 import { LightsRoute } from '@/renderer/routes/lights-route';
 import { OutputRoute } from '@/renderer/routes/output-route';
+import { ProjectSwitcher } from '@/renderer/routes/project-switcher';
 import { ProjectsRoute } from '@/renderer/routes/projects-route';
 import { SettingsRoute } from '@/renderer/routes/settings-route';
 import { ShowRoute } from '@/renderer/routes/show-route';
 import { StatusRoute } from '@/renderer/routes/status-route';
+import { SwitchProjectDialog } from '@/renderer/routes/switch-project-dialog';
 
-type Route =
-  | 'show'
-  | 'status'
-  | 'projects'
-  | 'config'
-  | 'access'
-  | 'lights'
-  | 'output'
-  | 'devices'
-  | 'settings';
+type AppIcon = React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
 
-const ROUTE_LABEL: Record<Route, string> = {
-  show: 'Show',
-  status: 'Status',
-  projects: 'Projects',
-  config: 'Config',
-  access: 'Users & Secrets',
-  lights: 'Lights',
-  output: 'Output',
-  devices: 'Devices',
-  settings: 'Settings'
+const ROUTE_ICON: Record<Route, AppIcon> = {
+  show: MonitorPlay,
+  status: Activity,
+  projects: FolderKanban,
+  config: SlidersHorizontal,
+  access: ShieldCheck,
+  lights: Lightbulb,
+  output: Radio,
+  devices: Cpu,
+  settings: Cog
 };
-
-const ROUTES: Route[] = [
-  'show',
-  'status',
-  'projects',
-  'config',
-  'access',
-  'lights',
-  'output',
-  'devices',
-  'settings'
-];
 
 export function App() {
   const [route, setRoute] = React.useState<Route>('show');
@@ -103,10 +85,10 @@ export function App() {
   const { devices, refresh: refreshDevices, rename: renameDevice, assignShard } =
     useDevices(activeScope);
 
-  // The project whose config the editor is bound to — defaults to the active one,
-  // overridden when the operator clicks "Config" on a specific project row.
-  const [configProject, setConfigProject] = React.useState<string | null>(null);
-  const editingProject = configProject ?? activeProject;
+  // There is exactly one current project: the one in use. Panels used to be
+  // able to pin a *different* project for editing, which meant the screen and
+  // the stage could silently disagree about what you were changing.
+  const editingProject = activeProject;
   const editingScope = React.useMemo(
     () => ({ project: editingProject, rev: dataRev }),
     [editingProject, dataRev]
@@ -202,10 +184,6 @@ export function App() {
       setBusy(true);
       try {
         await use(name);
-        // Drop any project pinned by "Config" on a row, so every project-scoped
-        // panel (config, lights, devices, access) follows the project in use
-        // instead of the one last inspected.
-        setConfigProject(null);
         invalidateProjectData();
         if (status.running && status.project !== name) {
           await window.wavegrid.brain.start(name).catch(() => undefined);
@@ -215,6 +193,24 @@ export function App() {
       }
     },
     [use, invalidateProjectData, status.running, status.project]
+  );
+
+  /**
+   * Every path that changes the current project goes through here, so none of
+   * them can skip the warning: a switch mid-show restarts the brain, which
+   * darkens the lasers for a moment.
+   */
+  const [pendingProject, setPendingProject] = React.useState<string | null>(null);
+  const requestProjectSwitch = React.useCallback(
+    (name: string) => {
+      if (name === activeProject) return;
+      if (status.running) {
+        setPendingProject(name);
+        return;
+      }
+      void onUse(name);
+    },
+    [activeProject, status.running, onUse]
   );
 
   const onCreate = React.useCallback(
@@ -235,7 +231,6 @@ export function App() {
       setBusy(true);
       try {
         await remove(name);
-        setConfigProject((cur) => (cur === name ? null : cur));
         invalidateProjectData();
       } finally {
         setBusy(false);
@@ -244,10 +239,14 @@ export function App() {
     [remove, invalidateProjectData]
   );
 
-  const onEditConfig = React.useCallback((name: string) => {
-    setConfigProject(name);
-    setRoute('config');
-  }, []);
+  /** Editing a project's layout means working *in* it — switch, then open it. */
+  const onEditConfig = React.useCallback(
+    (name: string) => {
+      requestProjectSwitch(name);
+      setRoute('config');
+    },
+    [requestProjectSwitch]
+  );
 
   /**
    * Run a store write with the busy flag held, surfacing a refusal instead of
@@ -302,86 +301,26 @@ export function App() {
       href={href}
       onClick={(e) => {
         e.preventDefault();
-        const next = href.replace(/^#/, '') as Route;
-        if (ROUTES.includes(next)) setRoute(next);
+        const next = href.replace(/^#/, '');
+        if (isRoute(next)) setRoute(next);
         onClick?.(e);
       }}
       {...props}
     />
   );
 
-  const navigation: AppNavigationGroup[] = [
-    {
-      id: 'main',
-      items: [
-        {
-          id: 'show',
-          label: 'Show',
-          href: '#show',
-          icon: MonitorPlay,
-          isActive: route === 'show'
-        },
-        {
-          id: 'status',
-          label: 'Status',
-          href: '#status',
-          icon: Activity,
-          isActive: route === 'status'
-        },
-        {
-          id: 'projects',
-          label: 'Projects',
-          href: '#projects',
-          icon: FolderKanban,
-          isActive: route === 'projects',
-          badge: projects.length || undefined
-        },
-        {
-          id: 'config',
-          label: 'Config',
-          href: '#config',
-          icon: SlidersHorizontal,
-          isActive: route === 'config'
-        },
-        {
-          id: 'access',
-          label: 'Users & Secrets',
-          href: '#access',
-          icon: ShieldCheck,
-          isActive: route === 'access'
-        },
-        {
-          id: 'lights',
-          label: 'Lights',
-          href: '#lights',
-          icon: Lightbulb,
-          isActive: route === 'lights'
-        },
-        {
-          id: 'output',
-          label: 'Output',
-          href: '#output',
-          icon: Radio,
-          isActive: route === 'output'
-        },
-        {
-          id: 'devices',
-          label: 'Devices',
-          href: '#devices',
-          icon: Cpu,
-          isActive: route === 'devices',
-          badge: devices.length || undefined
-        },
-        {
-          id: 'settings',
-          label: 'Settings',
-          href: '#settings',
-          icon: Cog,
-          isActive: route === 'settings'
-        }
-      ]
-    }
-  ];
+  const navigation: AppNavigationGroup[] = NAV_GROUPS.map((group) => ({
+    id: group.id,
+    label: group.id === 'setup' && activeProject ? `Set up · ${activeProject}` : group.label,
+    items: group.routes.map((r) => ({
+      id: r,
+      label: ROUTE_LABEL[r],
+      href: `#${r}`,
+      icon: ROUTE_ICON[r],
+      isActive: route === r,
+      badge: r === 'devices' ? devices.length || undefined : undefined
+    }))
+  }));
 
   React.useEffect(() => {
     if (route === 'projects') void refresh();
@@ -406,9 +345,22 @@ export function App() {
       brand={{
         name: 'Wavegrid',
         logo: <ConstructiveIcon className='size-5' />,
-        description: activeProject ? `Project · ${activeProject}` : 'No active project'
+        description: status.running ? 'Show running' : 'Show stopped'
       }}
-      breadcrumbs={[{ id: route, label: ROUTE_LABEL[route], current: true }]}
+      sidebarHeader={
+        <ProjectSwitcher
+          projects={projects}
+          current={activeProject}
+          onSelect={requestProjectSwitch}
+          onManage={() => setRoute('projects')}
+        />
+      }
+      breadcrumbs={[
+        ...(ROUTE_GROUP[route]
+          ? [{ id: `group-${route}`, label: ROUTE_GROUP[route] as string }]
+          : []),
+        { id: route, label: ROUTE_LABEL[route], current: true }
+      ]}
     >
       {actionError && (
         <div className='text-destructive mb-4 flex items-start gap-2 rounded-lg border border-current/30 px-3 py-2 text-sm'>
@@ -462,7 +414,7 @@ export function App() {
         <ProjectsRoute
           projects={projects}
           presets={presets}
-          onUse={onUse}
+          onUse={requestProjectSwitch}
           onCreate={onCreate}
           onRemove={(name) => void onRemove(name)}
           onEditConfig={onEditConfig}
@@ -550,7 +502,6 @@ export function App() {
               const result = await clearStore(keepDevice);
               // Everything the other screens mirror just vanished — re-read it all
               // so no route keeps showing a project that no longer exists.
-              setConfigProject(null);
               await refresh();
               invalidateProjectData();
               return result;
@@ -561,6 +512,15 @@ export function App() {
           busy={busy}
         />
       )}
+      <SwitchProjectDialog
+        pending={pendingProject}
+        current={activeProject}
+        onCancel={() => setPendingProject(null)}
+        onConfirm={() => {
+          if (pendingProject) void onUse(pendingProject);
+          setPendingProject(null);
+        }}
+      />
       {showSplash && <AppSplash />}
     </AppShell>
   );
