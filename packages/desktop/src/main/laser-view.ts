@@ -21,6 +21,16 @@ export function resetLaserView(): void {
   loadedUrl = null;
 }
 
+/**
+ * Drop the loaded-URL memo so the next sync reloads the page. The brain serves
+ * a different project on the same origin after a project switch, so without
+ * this the embedded UI keeps rendering the previous project's layout.
+ */
+export function invalidateLaserView(): void {
+  loadedUrl = null;
+  if (view && !view.webContents.isDestroyed()) void view.webContents.reload();
+}
+
 function ensureView(): WebContentsView | null {
   const win = runtime.mainWindow;
   if (!win || win.isDestroyed()) return null;
@@ -33,6 +43,11 @@ function ensureView(): WebContentsView | null {
   created.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: 'deny' };
+  });
+  // A load that failed (brain not listening yet) must not count as loaded, or
+  // the URL gate below would never retry and the panel would stay blank.
+  created.webContents.on('did-fail-load', () => {
+    loadedUrl = null;
   });
   win.contentView.addChildView(created);
   view = created;

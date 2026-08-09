@@ -16,7 +16,7 @@ import c from 'yanse';
 
 import { type Flags, getStore, resolveProjectName } from '../project';
 import { coordinate } from './coordinate';
-import { applyReceiverEnv, applyServerEnv, applyShardFlag } from './runtime';
+import { applyReceiverEnv, applyServerEnv, applyShardFlag, awaitBind } from './runtime';
 
 /** Turn a discovered brain into the ws:// URL the receiver dials. */
 export function brainToWsUrl(brain: DiscoveredBrain): string {
@@ -179,8 +179,8 @@ async function promoteToBrain(ctx: {
   const serverHandle = startServer(resolved, {
     advertise: { project, deviceId: device.id, deviceName: device.name, transient: true }
   });
-  // Let the server bind before the local receiver dials in.
-  await new Promise((r) => setTimeout(r, 250));
+  // The receiver dials in only once the port is actually bound.
+  await awaitBind(serverHandle);
   const receiverHandle = startReceiver(resolved);
 
   let stopped = false;

@@ -1,4 +1,4 @@
-import { Radio } from 'lucide-react';
+import { HelpCircle, Radio } from 'lucide-react';
 import * as React from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,14 @@ interface OutputRouteProps {
 
 type Kind = OscTarget['kind'];
 
+/** OSC is UDP: `localhost` can resolve to IPv6 ::1 while BEYOND/FB4 listens on
+ *  IPv4, and packets then vanish with no error — so the loopback default is the
+ *  literal IPv4 address. */
+const THIS_MACHINE = '127.0.0.1';
+
+const HOST_HELP =
+  'Where the laser software is listening. Same laptop as Wavegrid → 127.0.0.1. Another machine → its LAN IP (e.g. 192.168.1.50). Avoid “localhost”: OSC is UDP and localhost can resolve to IPv6 while the target listens on IPv4, so the packets are silently dropped.';
+
 const KINDS: { id: Kind; label: string; blurb: string }[] = [
   { id: 'beyond', label: 'BEYOND', blurb: 'Pangolin BEYOND over OSC — the usual choice' },
   { id: 'fb4', label: 'FB4', blurb: 'Pangolin FB4 over OSC' },
@@ -40,6 +48,7 @@ export function OutputRoute({ activeProject, target, onSave, busy }: OutputRoute
   const [draft, setDraft] = React.useState<OscTarget | null>(target);
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
+  const [hostHelp, setHostHelp] = React.useState(false);
 
   // Re-seed whenever the stored target changes (project switch, or a save).
   React.useEffect(() => {
@@ -118,17 +127,37 @@ export function OutputRoute({ activeProject, target, onSave, busy }: OutputRoute
         {(draft.kind === 'beyond' || draft.kind === 'fb4') && (
           <div className='flex flex-wrap items-end gap-3'>
             <div className='flex flex-col gap-1'>
-              <Label htmlFor='osc-host' className='text-xs'>
+              <Label htmlFor='osc-host' className='flex items-center gap-1 text-xs'>
                 {draft.kind === 'beyond' ? 'BEYOND host' : 'FB4 host'}
+                <button
+                  type='button'
+                  aria-label='What goes here?'
+                  title={HOST_HELP}
+                  onClick={() => setHostHelp((v) => !v)}
+                  className='text-muted-foreground hover:text-foreground'
+                >
+                  <HelpCircle className='size-3.5' />
+                </button>
               </Label>
-              <Input
-                id='osc-host'
-                value={draft.host}
-                placeholder='192.168.1.50'
-                disabled={busy}
-                onChange={(ev) => set({ host: ev.target.value })}
-                className='h-9 w-48'
-              />
+              <div className='flex items-center gap-2'>
+                <Input
+                  id='osc-host'
+                  value={draft.host}
+                  placeholder={THIS_MACHINE}
+                  disabled={busy}
+                  onChange={(ev) => set({ host: ev.target.value })}
+                  className='h-9 w-48'
+                />
+                <Button
+                  size='sm'
+                  variant='outline'
+                  disabled={busy || draft.host === THIS_MACHINE}
+                  title={`Set the host to ${THIS_MACHINE} — the laser software runs on this laptop.`}
+                  onClick={() => set({ host: THIS_MACHINE })}
+                >
+                  This machine
+                </Button>
+              </div>
             </div>
             <div className='flex flex-col gap-1'>
               <Label htmlFor='osc-port' className='text-xs'>
@@ -162,6 +191,10 @@ export function OutputRoute({ activeProject, target, onSave, busy }: OutputRoute
               </div>
             )}
           </div>
+        )}
+
+        {(draft.kind === 'beyond' || draft.kind === 'fb4') && hostHelp && (
+          <p className='text-muted-foreground max-w-prose text-xs'>{HOST_HELP}</p>
         )}
 
         {draft.kind === 'routing' && (

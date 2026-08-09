@@ -25,9 +25,14 @@ interface RunningBrain {
   runMode: BrainStatus['runMode'];
   server: ServerHandle;
   receiver: ReceiverHandle | null;
+  /** Why the output stage isn't running, when the brain came up without it. */
+  receiverError: string | null;
 }
 
 let current: RunningBrain | null = null;
+
+/** Why the last start attempt failed — kept so the UI can explain a red brain. */
+let lastError: string | null = null;
 
 /** IPv4 LAN addresses — the URLs operators point iPads / receivers at. */
 function lanAddresses(): string[] {
@@ -82,9 +87,20 @@ export function status(): BrainStatus {
       project: current.project,
       runMode: current.runMode,
       receiverRunning: current.receiver != null,
-      lanUrls: lanAddresses().map((ip) => `http://${ip}:${new URL(current!.url).port}`)
+      lanUrls: lanAddresses().map((ip) => `http://${ip}:${new URL(current!.url).port}`),
+      receiverError: current.receiverError,
+      lastError: null
     }
-    : { running: false, url: null, project: null, runMode: null, receiverRunning: false, lanUrls: [] };
+    : {
+      running: false,
+      url: null,
+      project: null,
+      runMode: null,
+      receiverRunning: false,
+      lanUrls: [],
+      receiverError: null,
+      lastError
+    };
   runtime.lastStatus = s;
   return s;
 }
@@ -97,7 +113,17 @@ function broadcast(): BrainStatus {
 
 export async function startBrain(project: string): Promise<BrainStatus> {
   if (current) await stopBrain();
+  lastError = null;
+  try {
+    return await start(project);
+  } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err);
+    broadcast();
+    throw err;
+  }
+}
 
+async function start(project: string): Promise<BrainStatus> {
   const store = openStore();
   if (!store.hasProject(project)) throw new Error(`Unknown project: ${project}`);
   if (store.getActiveProject() !== project) store.setActiveProject(project);
@@ -108,16 +134,25 @@ export async function startBrain(project: string): Promise<BrainStatus> {
 
   const { startServer } = await import('@wavegrid/server');
   const server = startServer(resolved);
-  // Let the server bind before the receiver dials in.
-  await new Promise((r) => setTimeout(r, 250));
+  // Wait for the actual bind: a port clash surfaces here rather than leaving
+  // the UI reporting a running show with nothing listening.
+  try {
+    await server.ready;
+  } catch (err) {
+    server.stop();
+    throw err;
+  }
 
   let receiver: ReceiverHandle | null = null;
+  let receiverError: string | null = null;
   try {
     const { startReceiver } = await import('@wavegrid/receiver');
     receiver = startReceiver(resolved);
   } catch (err) {
     // A receiver failure (no OSC target, network) must not take down the show:
-    // the brain + laser UI still run console-only.
+    // the brain + laser UI still run console-only. Reported, not just logged —
+    // otherwise the show looks healthy while nothing reaches the lasers.
+    receiverError = err instanceof Error ? err.message : String(err);
     console.error('[brain] receiver failed to start:', err);
   }
 
@@ -127,7 +162,8 @@ export async function startBrain(project: string): Promise<BrainStatus> {
     url: `http://127.0.0.1:${port}`,
     runMode: resolved.runMode,
     server,
-    receiver
+    receiver,
+    receiverError
   };
   return broadcast();
 }
@@ -150,7 +186,14 @@ export async function startLocalReceiver(): Promise<BrainStatus> {
   const store = openStore();
   applyReceiverEnv(store, current.project);
   const { startReceiver } = await import('@wavegrid/receiver');
-  current.receiver = startReceiver(loadWavegridConfig());
+  try {
+    current.receiver = startReceiver(loadWavegridConfig());
+    current.receiverError = null;
+  } catch (err) {
+    current.receiverError = err instanceof Error ? err.message : String(err);
+    broadcast();
+    throw err;
+  }
   return broadcast();
 }
 

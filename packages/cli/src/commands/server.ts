@@ -11,7 +11,7 @@ import type { Inquirerer, Question } from 'inquirerer';
 import c from 'yanse';
 
 import { type Flags, getStore, resolveProjectName } from '../project';
-import { applyServerEnv, printLanUrls } from './runtime';
+import { applyServerEnv, awaitBind, printLanUrls } from './runtime';
 
 export interface ServerOptions {
   cwd?: string;
@@ -73,6 +73,7 @@ export async function runServer(opts: ServerOptions = {}): Promise<ServerResult>
   const serverHandle = startServer(resolved, {
     advertise: { project, deviceId: device.id, deviceName: device.name }
   });
+  await awaitBind(serverHandle);
 
   let stopped = false;
   const stop = () => {

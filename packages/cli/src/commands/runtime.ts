@@ -105,6 +105,23 @@ export function applyGeneratedRouting(
   }
 }
 
+/**
+ * Wait for the brain to actually bind its port, and fail with the bind error
+ * rather than a stack trace from an unhandled `error` event. Without this a
+ * clashing port left the CLI printing "brain up" while nothing listened.
+ */
+export async function awaitBind(handle: { ready: Promise<void>; stop: () => void }): Promise<void> {
+  try {
+    await handle.ready;
+  } catch (e) {
+    handle.stop();
+    console.log('');
+    console.log(c.red(`  ✗ ${e instanceof Error ? e.message : String(e)}`));
+    console.log('');
+    throw e;
+  }
+}
+
 /** IPv4 LAN addresses of this machine — the URLs operators point iPads/receivers at. */
 export function lanAddresses(): string[] {
   const out: string[] = [];

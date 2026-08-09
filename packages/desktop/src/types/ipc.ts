@@ -14,6 +14,12 @@ export interface BrainStatus {
   receiverRunning: boolean;
   /** LAN URLs receivers / iPads can point at while the brain is running. */
   lanUrls: string[];
+  /** Why the output stage isn't running while the brain is up (OSC target,
+   *  network) — the show plays on screen but nothing reaches the lasers. */
+  receiverError: string | null;
+  /** Why the last start attempt failed, while the brain is down. Cleared by a
+   *  successful start. */
+  lastError: string | null;
 }
 
 export interface ProjectSummary {

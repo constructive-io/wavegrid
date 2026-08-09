@@ -1,4 +1,4 @@
-import type { OscConfig, WavegridConfig } from '@wavegrid/layout';
+import { LOOPBACK_HOST, normalizeOscHost, type OscConfig, type WavegridConfig } from '@wavegrid/layout';
 import type { Inquirerer, Question } from 'inquirerer';
 import c from 'yanse';
 
@@ -53,7 +53,7 @@ function num(flags: Flags, key: string): number | undefined {
 /** Non-interactive setters (no TTY / scripted). Return true on success. */
 function applyFromFlags(flags: Flags, kind: string): boolean {
   if (kind === 'beyond') {
-    const host = str(flags, 'host');
+    const host = normalizeOscHost(str(flags, 'host') ?? '');
     if (!host) return false;
     const port = num(flags, 'port') ?? 7001;
     const gridOrder = str(flags, 'grid-order') === 'column' ? 'column' : 'row';
@@ -64,7 +64,7 @@ function applyFromFlags(flags: Flags, kind: string): boolean {
     return true;
   }
   if (kind === 'fb4') {
-    const host = str(flags, 'host');
+    const host = normalizeOscHost(str(flags, 'host') ?? '');
     if (!host) return false;
     const port = num(flags, 'port') ?? 8000;
     const project = save(flags, (config) => {
@@ -90,8 +90,8 @@ async function wizardBeyond(prompter: Inquirerer, current?: OscConfig): Promise<
     {
       type: 'text',
       name: 'host',
-      message: 'BEYOND host (the machine running BEYOND, e.g. 192.168.1.50)',
-      default: current?.beyond?.host,
+      message: `BEYOND host \u2014 ${LOOPBACK_HOST} for this machine, or the LAN IP of the PC running BEYOND`,
+      default: current?.beyond?.host ?? LOOPBACK_HOST,
       required: true
     } as Question,
     {
@@ -110,7 +110,13 @@ async function wizardBeyond(prompter: Inquirerer, current?: OscConfig): Promise<
       required: true
     } as Question
   ])) as unknown as { host: string; port: number; gridOrder: 'row' | 'column' };
-  return { beyond: { host: answers.host.trim(), port: Number(answers.port), gridOrder: answers.gridOrder } };
+  return {
+    beyond: {
+      host: normalizeOscHost(answers.host),
+      port: Number(answers.port),
+      gridOrder: answers.gridOrder
+    }
+  };
 }
 
 async function wizardFb4(prompter: Inquirerer, current?: OscConfig): Promise<OscConfig> {
@@ -118,7 +124,7 @@ async function wizardFb4(prompter: Inquirerer, current?: OscConfig): Promise<Osc
     { type: 'text', name: 'host', message: 'FB4 host', default: current?.fb4?.host, required: true } as Question,
     { type: 'number', name: 'port', message: 'FB4 OSC port', default: current?.fb4?.port ?? 8000, required: true } as Question
   ])) as unknown as { host: string; port: number };
-  return { fb4: { host: answers.host.trim(), port: Number(answers.port) } };
+  return { fb4: { host: normalizeOscHost(answers.host), port: Number(answers.port) } };
 }
 
 async function wizardRouting(prompter: Inquirerer, current?: OscConfig): Promise<OscConfig> {

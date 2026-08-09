@@ -142,11 +142,13 @@ export function App() {
   const discovery = useDiscovery();
   const { exportProject, importProject } = useTransfer(refresh);
 
+  // A failed start is reported through `status.lastError` (pushed by the main
+  // process), so the rejection here is expected and not re-thrown.
   const onStart = React.useCallback(async () => {
     if (!activeProject) return;
     setBusy(true);
     try {
-      await window.wavegrid.brain.start(activeProject);
+      await window.wavegrid.brain.start(activeProject).catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -161,16 +163,28 @@ export function App() {
     }
   }, []);
 
+  /**
+   * Switching the active project has to move every project-scoped panel with it
+   * — and a brain still serving the previous project would keep the artist UI
+   * (and its light map) on the old layout, so it is restarted onto the new one.
+   */
   const onUse = React.useCallback(
     async (name: string) => {
       setBusy(true);
       try {
         await use(name);
+        // Drop any project pinned by "Config" on a row, so every project-scoped
+        // panel (config, lights, devices, access) follows the project in use
+        // instead of the one last inspected.
+        setConfigProject(null);
+        if (status.running && status.project !== name) {
+          await window.wavegrid.brain.start(name).catch(() => undefined);
+        }
       } finally {
         setBusy(false);
       }
     },
-    [use]
+    [use, status.running, status.project]
   );
 
   const onCreate = React.useCallback(
@@ -212,16 +226,22 @@ export function App() {
     }
   }, []);
 
+  // A live brain resolved its config at startup, so a layout/port change only
+  // reaches the artist UI (and the light map derived from it) on a restart.
   const onSaveConfig = React.useCallback(
     async (next: Parameters<typeof saveConfig>[0]) => {
       setBusy(true);
       try {
         await saveConfig(next);
+        if (editingProject && status.running && status.project === editingProject) {
+          await window.wavegrid.brain.start(editingProject).catch(() => undefined);
+        }
+        await refreshLightMap();
       } finally {
         setBusy(false);
       }
     },
-    [saveConfig]
+    [saveConfig, refreshLightMap, editingProject, status.running, status.project]
   );
 
   // Hash links drive an in-app route switch (no real navigation — the window

@@ -1,7 +1,7 @@
 // Pure helpers translating between the stored OscConfig and the flat
 // OscTarget the renderer binds to. Same four choices as the CLI's
 // `wavegrid projects osc` wizard: BEYOND, FB4, a routing file, or none.
-import type { OscConfig } from '@wavegrid/layout';
+import { normalizeOscHost, type OscConfig } from '@wavegrid/layout';
 import type { ProjectConfig } from '@wavegrid/settings';
 
 import type { OscTarget } from '@/types/ipc';
@@ -67,8 +67,10 @@ export function applyOscTarget(existing: ProjectConfig | null, target: OscTarget
   const keep = routing ? { routing } : {};
 
   if (target.kind === 'beyond') {
-    const host = target.host.trim();
-    if (!host) throw new Error('BEYOND needs the host running BEYOND (e.g. 192.168.1.50).');
+    const host = normalizeOscHost(target.host);
+    if (!host) {
+      throw new Error('BEYOND needs the host running BEYOND — 127.0.0.1 for this laptop, or its LAN IP.');
+    }
     return {
       ...prev,
       osc: {
@@ -82,8 +84,8 @@ export function applyOscTarget(existing: ProjectConfig | null, target: OscTarget
     };
   }
   if (target.kind === 'fb4') {
-    const host = target.host.trim();
-    if (!host) throw new Error('FB4 needs a host address.');
+    const host = normalizeOscHost(target.host);
+    if (!host) throw new Error('FB4 needs a host address — the FB4 device’s IP.');
     return {
       ...prev,
       osc: { ...keep, fb4: { host, port: validPort(target.port, DEFAULT_FB4_PORT) } }

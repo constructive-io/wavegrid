@@ -29,7 +29,9 @@ const EMPTY_STATUS: BrainStatus = {
   project: null,
   runMode: null,
   receiverRunning: false,
-  lanUrls: []
+  lanUrls: [],
+  receiverError: null,
+  lastError: null
 };
 
 /** Live brain status: seeded from the main process, then kept fresh via the
