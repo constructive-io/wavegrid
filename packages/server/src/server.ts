@@ -11,7 +11,7 @@ import { animations } from './animations';
 import { computeCoverage } from './coverage';
 import type { BlendMode, CannonState, Orientation, Rotation } from './grid';
 import {compositeLayer, createGrid, DEFAULT_ALPHA, defaultOrientation, mapUiToGrid, remapGridForUi, resetGrid, setAllTargets, setCannonTarget, shiftGrid, tickGrid } from './grid';
-import { createHttpApp, resolveUiDir } from './http-app';
+import { createHttpApp, lanVisitors, resolveUiDir } from './http-app';
 import { verifyJwt } from './jwt';
 import { ServerPatternEngine } from './pattern-engine';
 import { compilePlaylist, type PlaylistDef, type PlaylistStep } from './playlist-compiler';
@@ -523,6 +523,7 @@ function buildSystemStatus(): SystemStatus {
     receivers,
     uiClients,
     coverage,
+    lanVisitors: lanVisitors(),
     sync: buildSyncStatus()
   };
 }

@@ -168,6 +168,17 @@ async function start(project: string): Promise<BrainStatus> {
   return broadcast();
 }
 
+/** What the running server bound to, or null when the brain is down. Network
+ *  diagnostics need the bind host, which the status object deliberately hides
+ *  (it reports the loopback URL the embedded UI loads). */
+export function runningBind(): { host: string; port: number } | null {
+  if (!current) return null;
+  return {
+    host: loadWavegridConfig().config.server.host,
+    port: Number(new URL(current.url).port)
+  };
+}
+
 /** Whether this machine's in-process receiver is driving `project` right now. */
 export function receiverRunning(project: string): boolean {
   return current?.project === project && current.receiver != null;

@@ -11,6 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@/components/ui/empty';
+import { ShareShow } from '@/renderer/routes/share-show';
 import type { BrainStatus } from '@/types/ipc';
 
 interface ShowRouteProps {
@@ -29,6 +30,9 @@ interface ShowRouteProps {
  */
 export function ShowRoute({ status, activeProject, onStart, onStop, busy }: ShowRouteProps) {
   const slotRef = React.useRef<HTMLDivElement>(null);
+  // The laser UI is a native view stacked above the page, so any popover that
+  // overlaps it would be invisible. Hide it while the QR is open.
+  const [sharing, setSharing] = React.useState(false);
 
   const running = status.running;
   const url = status.url;
@@ -36,7 +40,7 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
   // Report the laser view's target bounds to the main process on every layout
   // change while the show is running; hide it whenever we leave this route.
   React.useEffect(() => {
-    if (!running || !url) {
+    if (!running || !url || sharing) {
       window.wavegridLaser.sync({ url: null, bounds: { x: 0, y: 0, width: 0, height: 0 }, visible: false });
       return;
     }
@@ -59,7 +63,7 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
       window.removeEventListener('resize', sync);
       window.wavegridLaser.sync({ url: null, bounds: { x: 0, y: 0, width: 0, height: 0 }, visible: false });
     };
-  }, [running, url]);
+  }, [running, url, sharing]);
 
   return (
     <div className='flex h-full flex-col gap-4 p-4'>
@@ -74,10 +78,8 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
         {status.url && (
           <span className='text-muted-foreground font-mono text-sm'>{status.url}</span>
         )}
-        {status.lanUrls.length > 0 && (
-          <span className='text-muted-foreground text-xs'>
-            LAN: {status.lanUrls.join('  ·  ')}
-          </span>
+        {running && status.lanUrls.length > 0 && (
+          <ShareShow lanUrls={status.lanUrls} onOpenChange={setSharing} />
         )}
       </div>
 

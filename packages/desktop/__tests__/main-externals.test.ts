@@ -16,7 +16,13 @@ const DESKTOP = join(__dirname, '..');
 function mainImports(): string[] {
   // Read the source rather than importing it: this must reflect what Rollup
   // sees, not what a test bundler resolves.
-  const files = ['src/main.ts', 'src/main/brain.ts', 'src/main/doctor.ts', 'src/main/ipc.ts'];
+  const files = [
+    'src/main.ts',
+    'src/main/brain.ts',
+    'src/main/doctor.ts',
+    'src/main/ipc.ts',
+    'src/main/network.ts'
+  ];
   const found = new Set<string>();
   for (const file of files) {
     const src = readFileSync(join(DESKTOP, file), 'utf8');

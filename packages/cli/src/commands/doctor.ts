@@ -3,7 +3,9 @@ import {
   checkEnvHijack,
   collectDiagnostics,
   type Diagnostics,
-  overallStatus
+  type NetworkReport,
+  overallStatus,
+  probeNetwork
 } from '@wavegrid/doctor';
 import { loadWavegridConfig } from '@wavegrid/layout';
 import { formatRanges, type SystemStatus } from '@wavegrid/server';
@@ -93,6 +95,25 @@ function renderSync(diag: Diagnostics): void {
   }
 }
 
+/**
+ * Can anything else on the wifi reach this brain? Only printed while the show
+ * is up, because every line of it is a live probe of the running server.
+ */
+function renderNetwork(net: NetworkReport): void {
+  console.log('');
+  console.log(c.bold('  Network'));
+  const tone = net.verdict === 'proven-reachable' ? c.green : net.verdict === 'unproven' || net.verdict === 'isolation-likely' ? c.yellow : c.red;
+  console.log(`  ${tone('●')} ${net.summary}`);
+  if (net.hint) console.log(`      ${c.gray('↳ ' + net.hint)}`);
+  for (const p of net.selfProbes) {
+    const mark = p.reachable ? c.green('✓') : c.red('✗');
+    console.log(`      ${mark} ${c.cyan(p.url)} ${c.gray(p.reachable ? 'open from this machine' : 'blocked from this machine')}`);
+  }
+  for (const v of net.visitors) {
+    console.log(`      • ${c.cyan(v.address)} ${c.gray(seenAgo(v.lastSeen))}`);
+  }
+}
+
 function seenAgo(lastSeen: number): string {
   const secs = Math.round((Date.now() - lastSeen) / 1000);
   if (secs < 60) return `seen ${secs}s ago`;
@@ -160,6 +181,13 @@ export async function runDoctor(flags: Flags = {}, cwd = process.cwd()): Promise
 
   if (diag.server) {
     renderSystem(diag.server);
+    renderNetwork(
+      await probeNetwork({
+        bindHost: diag.server.server.host,
+        port: diag.server.server.port,
+        visitors: diag.server.lanVisitors
+      })
+    );
   } else if (diag.serverError === 'not-running') {
     console.log('');
     console.log(c.gray(`  Server not running at ${diag.serverUrl} (start it with \`wavegrid start\`).`));

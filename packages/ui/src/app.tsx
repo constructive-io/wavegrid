@@ -342,18 +342,18 @@ function ToolPanel({
 
   return (
     <div
-      className={isRight ? 'flex flex-col h-full' : ''}
+      className='flex min-h-0 flex-col'
       style={{
         background: '#0c0c12',
         ...(isRight
-          ? { borderLeft: '1px solid #1a1a25', width: 380 }
+          ? { height: '100%', borderLeft: '1px solid #1a1a25', width: 380 }
           : { borderTop: '1px solid #1a1a25' })
       }}
     >
       <TabStrip tab={tab} setTab={setTab} variant={isRight ? 'right' : 'bottom'} />
 
       <div
-        className={isRight ? 'flex-1 overflow-y-auto' : ''}
+        className='flex-1 overflow-y-auto'
         style={{ padding: isRight ? '10px 16px 16px' : '10px 20px 24px', minHeight: isRight ? 0 : 140 }}
       >
         <ToolContent tab={tab} {...toolContentProps} />
@@ -1136,8 +1136,13 @@ export default function Home() {
           />
         </div>
 
-        {/* Tool Panel */}
-        <div className={layout === 'right' ? 'shrink-0 h-full' : 'shrink-0'}>
+        {/* Tool Panel — capped at half the height under the canvas, so a tall
+            tab (Patterns) scrolls inside itself instead of squeezing the grid
+            out of the window. */}
+        <div
+          className={layout === 'right' ? 'shrink-0 h-full' : 'shrink-0 flex flex-col'}
+          style={layout === 'right' ? undefined : { maxHeight: '50%', minHeight: 0 }}
+        >
           <ToolPanel
             tab={tab}
             setTab={handleTabChange}
