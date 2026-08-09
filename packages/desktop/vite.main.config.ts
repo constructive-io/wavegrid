@@ -6,6 +6,10 @@ import { defineConfig } from 'vite';
 // @wavegrid/receiver). Those pull Node-only deps (ws, bonjour-service, fs) that
 // must stay external — bundling them into the main chunk breaks their native /
 // dynamic requires.
+//
+// Every workspace package with such a dep must be listed here, not just the ones
+// whose own imports are: a bundled package's `import 'ws'` becomes a
+// `require('ws')` resolved from *this* package, which pnpm never installed.
 export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') }
@@ -18,6 +22,7 @@ export default defineConfig({
         '@wavegrid/settings',
         '@wavegrid/layout',
         '@wavegrid/discovery',
+        '@wavegrid/doctor',
         'ws',
         'bonjour-service'
       ]
