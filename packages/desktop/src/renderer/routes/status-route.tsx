@@ -2,6 +2,8 @@ import {
   Activity,
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Cpu,
   Play,
   RefreshCw,
@@ -29,7 +31,8 @@ import {
   serverErrorMessage,
   tally
 } from '@/renderer/lib/doctor-format';
-import type { DoctorCheck, DoctorReport } from '@/types/ipc';
+import { NetworkPanel } from '@/renderer/routes/network-panel';
+import type { DoctorCheck, DoctorReport, NetworkReport } from '@/types/ipc';
 
 interface StatusRouteProps {
   project: string | null;
@@ -43,6 +46,10 @@ interface StatusRouteProps {
   onStartReceiver: () => void;
   onStopReceiver: () => void;
   busy: boolean;
+  /** Advanced → Network: probed on demand, never on the live interval. */
+  network: NetworkReport | null;
+  networkLoading: boolean;
+  onProbeNetwork: () => void;
 }
 
 const REFRESH_MS = 5000;
@@ -87,9 +94,13 @@ export function StatusRoute({
   receiverRunning,
   onStartReceiver,
   onStopReceiver,
-  busy
+  busy,
+  network,
+  networkLoading,
+  onProbeNetwork
 }: StatusRouteProps) {
   const [live, setLive] = React.useState(true);
+  const [advanced, setAdvanced] = React.useState(false);
 
   React.useEffect(() => {
     if (!live || !project) return;
@@ -277,6 +288,27 @@ export function StatusRoute({
               </ul>
             </Card>
           )}
+
+          {/* Advanced — diagnostics an operator opens when something is wrong,
+              not part of the at-a-glance show status. */}
+          <div className='flex flex-col gap-2'>
+            <Button
+              variant='ghost'
+              size='sm'
+              className='self-start'
+              onClick={() => {
+                const next = !advanced;
+                setAdvanced(next);
+                if (next && !network) onProbeNetwork();
+              }}
+            >
+              {advanced ? <ChevronDown className='size-3.5' /> : <ChevronRight className='size-3.5' />}
+              Advanced
+            </Button>
+            {advanced && (
+              <NetworkPanel report={network} loading={networkLoading} onRefresh={onProbeNetwork} />
+            )}
+          </div>
 
           {report && (!report.sync.enabled || report.sync.relevant) && (
             <Card

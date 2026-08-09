@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { AccessKeyInfo, BrainStatus, DeviceInfo, DiscoveredBrainInfo, DoctorReport, EditableConfig, ExportResult, ImportRequest, ImportSummary, LaserSyncState, LightMapView, NewProjectInput, OscTarget, ProjectSummary, RequiredSecretInfo, SessionInfo, ShardRange, StoreClearResult, StoreInfo, UserAccount, UserRole, WavegridApi, WavegridLaser } from '@/types/ipc';
+import type { AccessKeyInfo, BrainStatus, DeviceInfo, DiscoveredBrainInfo, DoctorReport, EditableConfig, ExportResult, ImportRequest, ImportSummary, LaserSyncState, LightMapView, NetworkReport, NewProjectInput, OscTarget, ProjectSummary, RequiredSecretInfo, SessionInfo, ShardRange, StoreClearResult, StoreInfo, UserAccount, UserRole, WavegridApi, WavegridLaser } from '@/types/ipc';
 
 // The single, narrow bridge exposed to the renderer. The renderer never imports
 // @wavegrid/settings or `fs`; everything goes through these typed calls.
@@ -18,7 +18,8 @@ const api: WavegridApi = {
     }
   },
   doctor: {
-    report: (project) => ipcRenderer.invoke('doctor:report', project) as Promise<DoctorReport | null>
+    report: (project) => ipcRenderer.invoke('doctor:report', project) as Promise<DoctorReport | null>,
+    network: () => ipcRenderer.invoke('doctor:network') as Promise<NetworkReport | null>
   },
   projects: {
     list: () => ipcRenderer.invoke('projects:list') as Promise<ProjectSummary[]>,

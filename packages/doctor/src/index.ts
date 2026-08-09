@@ -18,6 +18,18 @@ export {
   type ServerError
 } from './collect';
 export {
+  type LanInterface,
+  lanInterfaces,
+  type Neighbour,
+  neighbours,
+  type NetworkProbeInput,
+  type NetworkReport,
+  type NetworkVerdict,
+  probeNetwork,
+  type SelfProbe,
+  verdictFor
+} from './network';
+export {
   type PortState,
   type ProbeError,
   querySystemStatus,

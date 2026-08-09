@@ -11,6 +11,7 @@ import type {
   ImportRequest,
   ImportSummary,
   LightMapView,
+  NetworkReport,
   NewProjectInput,
   OscTarget,
   ProjectSummary,
@@ -564,6 +565,31 @@ export function useDoctor({ project, rev }: ProjectScope): {
   }, [project, rev]);
 
   return { report, loading, error, refresh };
+}
+
+/**
+ * The network probe behind Status → Advanced. Not on the Status refresh
+ * interval: it opens sockets and reads the neighbour table, which is worth
+ * doing when an operator asks, not five times a minute.
+ */
+export function useNetwork(): {
+  report: NetworkReport | null;
+  loading: boolean;
+  refresh: () => Promise<void>;
+  } {
+  const [report, setReport] = React.useState<NetworkReport | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const refresh = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      setReport(await window.wavegrid.doctor.network());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { report, loading, refresh };
 }
 
 /** The global store: where it lives, what it holds, and clear-all. */

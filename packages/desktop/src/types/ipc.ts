@@ -324,6 +324,36 @@ export interface DoctorReport {
   generatedAt: number;
 }
 
+/** How confident the app is that other devices can reach this show, and why.
+ *  Only `proven-reachable` is evidence rather than deduction. */
+export type NetworkVerdict =
+  | 'proven-reachable'
+  | 'loopback-only'
+  | 'blocked-locally'
+  | 'no-network'
+  | 'isolation-likely'
+  | 'unproven';
+
+/** The Advanced → Network panel's read model. Entirely runtime state: nothing
+ *  here is stored, and it is null whenever the brain is down. */
+export interface NetworkReport {
+  bindHost: string;
+  port: number;
+  interfaces: { name: string; address: string; netmask: string }[];
+  selfProbes: { address: string; url: string; reachable: boolean }[];
+  /** Devices seen on the local segment (ARP). One or none suggests the network
+   *  isolates its clients. */
+  neighbourCount: number;
+  /** False when the platform wouldn't give up its neighbour table — unknown,
+   *  not zero. */
+  neighboursKnown: boolean;
+  visitors: { address: string; userAgent: string; lastSeen: number }[];
+  verdict: NetworkVerdict;
+  summary: string;
+  hint: string | null;
+  generatedAt: number;
+}
+
 export interface LaserBounds {
   x: number;
   y: number;
@@ -353,6 +383,8 @@ export interface WavegridApi {
     /** Collect the full health snapshot for a project (probes the brain, so it
      *  can take up to a few seconds when nothing is listening). */
     report(project: string): Promise<DoctorReport | null>;
+    /** Probe the network the show is served on. Null while the brain is down. */
+    network(): Promise<NetworkReport | null>;
   };
   projects: {
     list(): Promise<ProjectSummary[]>;

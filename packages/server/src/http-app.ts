@@ -66,6 +66,58 @@ function clientIp(req: IncomingMessage): string {
   return first || req.socket.remoteAddress || 'unknown';
 }
 
+/** A device other than this machine that has loaded something from the brain. */
+export interface LanVisitor {
+  address: string;
+  userAgent: string;
+  firstSeen: number;
+  lastSeen: number;
+  requests: number;
+}
+
+const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
+const MAX_VISITORS = 20;
+const visitors = new Map<string, LanVisitor>();
+
+/**
+ * Devices that actually reached the brain over the network. This is the only
+ * *positive* proof that a LAN URL works: a self-probe says the socket is open
+ * on this machine, but a venue's wifi can still isolate clients from each
+ * other, and nothing on this laptop can observe that from the inside.
+ */
+export function lanVisitors(): LanVisitor[] {
+  return [...visitors.values()].sort((a, b) => b.lastSeen - a.lastSeen);
+}
+
+/** Forget every recorded visitor — lets an operator re-run the check cleanly. */
+export function clearLanVisitors(): void {
+  visitors.clear();
+}
+
+function recordVisitor(req: IncomingMessage): void {
+  const address = clientIp(req);
+  if (address === 'unknown' || LOOPBACK.test(address)) return;
+  const now = Date.now();
+  const existing = visitors.get(address);
+  if (existing) {
+    existing.lastSeen = now;
+    existing.requests += 1;
+    return;
+  }
+  // Bounded: a busy LAN must not grow this map without limit.
+  if (visitors.size >= MAX_VISITORS) {
+    const oldest = [...visitors.values()].sort((a, b) => a.lastSeen - b.lastSeen)[0];
+    if (oldest) visitors.delete(oldest.address);
+  }
+  visitors.set(address, {
+    address,
+    userAgent: String(req.headers['user-agent'] ?? 'unknown'),
+    firstSeen: now,
+    lastSeen: now,
+    requests: 1
+  });
+}
+
 /** Extract the bearer token from an Authorization header or `?token=` query. */
 function bearerToken(req: IncomingMessage, url: URL): string | null {
   const auth = req.headers.authorization;
@@ -199,6 +251,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
   }
 
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    recordVisitor(req);
     const host = req.headers.host || 'localhost';
     const url = new URL(req.url || '/', `http://${host}`);
     const pathname = url.pathname;

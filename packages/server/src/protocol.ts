@@ -9,6 +9,7 @@
 import type { DivergentDevice, SyncEntry, SyncState } from '@wavegrid/settings';
 
 import type { CoverageResult, ShardRange } from './coverage';
+import type { LanVisitor } from './http-app';
 
 export type ClientRole = 'receiver' | 'ui' | 'unknown';
 
@@ -51,6 +52,9 @@ export interface SystemStatus {
   receivers: ClientInfo[];
   uiClients: number;
   coverage: CoverageResult;
+  /** Devices that reached this brain over the network (never loopback) — the
+   *  only proof from inside the show that the LAN URL is actually usable. */
+  lanVisitors: LanVisitor[];
   /** Config-sync summary (absent for a fresh project with no synced edits). */
   sync?: {
     revision: number;

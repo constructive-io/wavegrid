@@ -14,6 +14,7 @@ import {
 import { buildDoctorReport } from '@/main/doctor';
 import { invalidateLaserView, type LaserSyncState, syncLaser } from '@/main/laser-view';
 import { buildLightMapView } from '@/main/light-map';
+import { buildNetworkReport } from '@/main/network';
 import { applyOscTarget, toOscTarget } from '@/main/osc-target';
 import {
   applyEditable,
@@ -115,6 +116,7 @@ export function registerAllIpc(): void {
   ipcMain.handle('brain:stopReceiver', () => stopLocalReceiver());
 
   ipcMain.handle('doctor:report', (_e, project: string) => buildDoctorReport(project));
+  ipcMain.handle('doctor:network', () => buildNetworkReport());
 
   ipcMain.handle('projects:list', () => projectSummaries());
   ipcMain.handle('projects:active', () => openStore().getActiveProject());

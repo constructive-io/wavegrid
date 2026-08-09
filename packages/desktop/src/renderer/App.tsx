@@ -12,6 +12,7 @@ import {
   useDiscovery,
   useDoctor,
   useLightMap,
+  useNetwork,
   useOscTarget,
   usePresets,
   useProjectConfig,
@@ -156,6 +157,11 @@ export function App() {
     error: doctorError,
     refresh: refreshDoctor
   } = useDoctor(activeScope);
+  const {
+    report: networkReport,
+    loading: networkLoading,
+    refresh: probeNetwork
+  } = useNetwork();
   const { target: oscTarget, refresh: refreshOsc, save: saveOsc } = useOscTarget(editingScope);
   const discovery = useDiscovery();
   const { exportProject, importProject } = useTransfer(
@@ -447,6 +453,9 @@ export function App() {
             await refreshDoctor();
           })}
           busy={busy}
+          network={networkReport}
+          networkLoading={networkLoading}
+          onProbeNetwork={() => void probeNetwork()}
         />
       )}
       {route === 'projects' && (
