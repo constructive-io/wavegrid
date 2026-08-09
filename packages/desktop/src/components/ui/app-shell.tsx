@@ -373,12 +373,17 @@ function AccountMenu({ account, renderLink }: { account: AppAccount; renderLink?
 function Brand({ brand, renderLink }: { brand: AppShellBrand; renderLink?: AppLinkRenderer }) {
 	const content = (
 		<>
+			{/* Collapsed, the button keeps its 8px padding but the tile is the full
+			    32px rail width, so it hangs off to the right; pulling it back by the
+			    padding puts it on the same centre line as the nav icons. */}
 			{brand.logo && (
-				<div className='bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg shadow-xs'>
+				<div className='bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg shadow-xs group-data-[collapsible=icon]:-ml-2'>
 					{brand.logo}
 				</div>
 			)}
-			<div className='grid min-w-0 flex-1 text-left text-sm leading-tight'>
+			{/* Collapsed to the icon rail there is only room for the logo tile; leaving
+			    the text in the flex row pushes the tile off the rail's centre line. */}
+			<div className='grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden'>
 				<span className='truncate font-medium' title={typeof brand.name === 'string' ? brand.name : undefined}>
 					{brand.name}
 				</span>

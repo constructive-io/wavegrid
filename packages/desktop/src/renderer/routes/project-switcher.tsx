@@ -37,16 +37,20 @@ export function ProjectSwitcher({ projects, current, onSelect, onManage }: Proje
               />
             }
           >
-            <div className='bg-sidebar-accent text-sidebar-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-lg'>
+            {/* Pulled back by the button's collapsed padding so the tile lands on the
+                same centre line as the nav icons below it. */}
+            <div className='bg-sidebar-accent text-sidebar-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-lg group-data-[collapsible=icon]:-ml-2'>
               <FolderOpen className='size-4' />
             </div>
-            <div className='grid min-w-0 flex-1 text-left text-sm leading-tight'>
+            {/* Collapsed, only the tile fits: keeping the label and chevron in the
+                flex row would shove the icon off the rail's centre line. */}
+            <div className='grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden'>
               <span className='text-muted-foreground truncate text-xs'>Project</span>
               <span className='truncate font-medium' title={current ?? undefined}>
                 {current ?? 'None yet'}
               </span>
             </div>
-            <ChevronsUpDown className='ml-auto size-4' />
+            <ChevronsUpDown className='ml-auto size-4 group-data-[collapsible=icon]:hidden' />
           </DropdownMenuTrigger>
           <DropdownMenuContent className='min-w-56 rounded-lg' side='bottom' align='start' sideOffset={4}>
             <DropdownMenuLabel>Switch project</DropdownMenuLabel>
