@@ -8,6 +8,8 @@
  */
 import { shell, WebContentsView } from 'electron';
 
+import { status } from '@/main/brain';
+import { embeddedUrl } from '@/main/operator-session';
 import { runtime } from '@/main/runtime';
 import type { LaserSyncState } from '@/types/ipc';
 
@@ -27,8 +29,15 @@ export function resetLaserView(): void {
  * this the embedded UI keeps rendering the previous project's layout.
  */
 export function invalidateLaserView(): void {
+  const previous = loadedUrl;
   loadedUrl = null;
-  if (view && !view.webContents.isDestroyed()) void view.webContents.reload();
+  if (!view || view.webContents.isDestroyed() || !previous) return;
+  // Not `reload()`: the UI strips the session token out of the address once it
+  // has consumed it, so reloading would land on the new project's login screen.
+  void view.webContents.loadURL(embeddedUrl(previous, status().project)).catch(() => {
+    // Brain restarting — the next sync loads it.
+  });
+  loadedUrl = previous;
 }
 
 function ensureView(): WebContentsView | null {
@@ -65,7 +74,9 @@ export function syncLaser(state: LaserSyncState): void {
   if (!v) return;
   if (loadedUrl !== url) {
     loadedUrl = url;
-    void v.webContents.loadURL(url).catch(() => {
+    // Carries a session for the active project, so a project switch doesn't
+    // strand the operator on a login screen inside their own app.
+    void v.webContents.loadURL(embeddedUrl(url, status().project)).catch(() => {
       // Brain not up yet / refused — the renderer shows its own empty state.
     });
   }

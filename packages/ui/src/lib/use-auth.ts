@@ -14,6 +14,23 @@ function decodePayload(token: string): { sub: string } | null {
   }
 }
 
+/**
+ * A session handed to us in the address fragment by a trusted embedder (the
+ * desktop app, which owns the store this token was minted from). Consumed once
+ * and erased from the address — the token stays the only credential, so this is
+ * transport, not a privilege: the server validates it exactly as it would a
+ * token from the login form.
+ */
+export function takeTokenFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash.replace(/^#/, '');
+  const match = /(?:^|&)wg_token=([^&]+)/.exec(hash);
+  if (!match) return null;
+  const rest = hash.replace(/(?:^|&)wg_token=[^&]+/, '').replace(/^&/, '');
+  window.history.replaceState(null, '', window.location.pathname + window.location.search + (rest ? `#${rest}` : ''));
+  return decodeURIComponent(match[1]);
+}
+
 /** Last username signed in on this device — prefilled after a session ends so
  *  getting back in is one field, not two. */
 const LAST_USER_KEY = 'wg_last_user';
@@ -27,6 +44,18 @@ export function useAuth() {
   const [endedSession, setEndedSession] = useState(false);
 
   useEffect(() => {
+    const handed = takeTokenFromUrl();
+    if (handed) {
+      const payload = decodePayload(handed);
+      if (payload) {
+        localStorage.setItem('wg_token', handed);
+        localStorage.setItem(LAST_USER_KEY, payload.sub);
+        setUser(payload.sub);
+        setToken(handed);
+        setChecked(true);
+        return;
+      }
+    }
     const stored = localStorage.getItem('wg_token');
     if (stored) {
       const payload = decodePayload(stored);
