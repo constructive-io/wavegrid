@@ -50,6 +50,9 @@ export {
   normalizeLightMap
 } from './light-map';
 
+// OSC target hosts (loopback normalization — UDP fails silently otherwise)
+export { isLoopbackHost, LOOPBACK_HOST, normalizeOscHost } from './osc-host';
+
 // Unified → per-device routing generation (shard + zone re-basing, validation)
 export {
   type DeviceCannon,

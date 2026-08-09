@@ -30,6 +30,10 @@ import { applyScene, scenes } from './scenes';
 export interface ServerHandle {
   server: http.Server;
   grid: ReturnType<typeof createGrid>;
+  /** Resolves once the port is bound, rejects with the bind error (e.g. a port
+   *  already in use). `listen` is async, so without awaiting this a caller
+   *  would report a healthy show while nothing is listening. */
+  ready: Promise<void>;
   stop: () => void;
   /**
    * Inject a command in-process, exactly as if an authenticated client had sent
@@ -934,6 +938,21 @@ const tickTimer = setInterval(() => {
 
 let advertiseHandle: AdvertiseHandle | null = null;
 
+const ready = new Promise<void>((resolveReady, rejectReady) => {
+  server.once('listening', () => resolveReady());
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      rejectReady(
+        new Error(
+          `Port ${PORT} is already in use — another Wavegrid (or app) is on it. Stop it, or change the project's server port.`
+        )
+      );
+      return;
+    }
+    rejectReady(err);
+  });
+});
+
 server.listen(PORT, resolved.config.server.host, () => {
   console.log('');
   console.log('╔══════════════════════════════════════════╗');
@@ -965,7 +984,7 @@ const send = (cmd: Record<string, unknown>) => {
   handleMessage(cmd);
 };
 
-return { server, grid, stop, send };
+return { server, grid, ready, stop, send };
 }
 
 // Run directly (dev script / node bin). The CLI imports startServer instead.

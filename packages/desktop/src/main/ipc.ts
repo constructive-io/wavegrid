@@ -12,7 +12,7 @@ import {
   stopLocalReceiver
 } from '@/main/brain';
 import { buildDoctorReport } from '@/main/doctor';
-import { type LaserSyncState, syncLaser } from '@/main/laser-view';
+import { invalidateLaserView, type LaserSyncState, syncLaser } from '@/main/laser-view';
 import { buildLightMapView } from '@/main/light-map';
 import { applyOscTarget, toOscTarget } from '@/main/osc-target';
 import {
@@ -99,7 +99,14 @@ function devices(project: string): DeviceInfo[] {
  *  store / brain — the renderer never touches the store or `fs` directly. */
 export function registerAllIpc(): void {
   ipcMain.handle('brain:status', () => status());
-  ipcMain.handle('brain:start', (_e, project: string) => startBrain(project));
+  // The embedded artist UI is served on the same origin whichever project runs,
+  // so it has to be reloaded explicitly or it keeps the previous project's
+  // layout and light map.
+  ipcMain.handle('brain:start', async (_e, project: string) => {
+    const s = await startBrain(project);
+    invalidateLaserView();
+    return s;
+  });
   ipcMain.handle('brain:stop', () => stopBrain());
   // Receiver-only controls: the output stage reads its OSC target, shard, and
   // light map at startup, so restarting just the receiver applies a config

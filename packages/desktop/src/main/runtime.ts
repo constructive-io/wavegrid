@@ -16,7 +16,9 @@ export const runtime: Runtime = {
     project: null,
     runMode: null,
     receiverRunning: false,
-    lanUrls: []
+    lanUrls: [],
+    receiverError: null,
+    lastError: null
   }
 };
 

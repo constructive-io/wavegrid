@@ -1,4 +1,4 @@
-import { MonitorPlay, Play, Square } from 'lucide-react';
+import { AlertTriangle, MonitorPlay, Play, Square } from 'lucide-react';
 import * as React from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +80,26 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
           </span>
         )}
       </div>
+
+      {/* Why the show isn't up (or is up without output) — a red dot with no
+          reason is the thing operators can't act on. */}
+      {status.lastError && !running && (
+        <div className='text-destructive flex items-start gap-2 rounded-lg border border-current/30 px-3 py-2 text-sm'>
+          <AlertTriangle className='mt-0.5 size-4 shrink-0' />
+          <span>
+            <span className='font-medium'>The show didn’t start.</span> {status.lastError}
+          </span>
+        </div>
+      )}
+      {running && status.receiverError && (
+        <div className='flex items-start gap-2 rounded-lg border px-3 py-2 text-sm text-amber-600 dark:text-amber-400'>
+          <AlertTriangle className='mt-0.5 size-4 shrink-0' />
+          <span>
+            <span className='font-medium'>No laser output.</span> The brain and UI are running, but
+            this machine’s receiver failed to start: {status.receiverError}
+          </span>
+        </div>
+      )}
 
       <div className='bg-muted/30 relative flex-1 overflow-hidden rounded-lg border'>
         {running ? (

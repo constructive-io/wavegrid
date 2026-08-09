@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  type ConnectionInfo,
+  diagnoseConnection,
+  OPEN_CONNECTION,
+  retryDelay
+} from '@/lib/connection';
+
 export interface CannonColor {
   h: number;
   s: number;
@@ -39,7 +46,13 @@ export function useSocket(
   // Keep the latest callback without re-subscribing the socket on every render.
   const onSyncConfigRef = useRef(onSyncConfig);
   onSyncConfigRef.current = onSyncConfig;
-  const [connected, setConnected] = useState(false);
+  const [connection, setConnection] = useState<ConnectionInfo>({
+    state: 'connecting',
+    cause: 'unknown',
+    detail: '',
+    code: null,
+    attempts: 0
+  });
   const [grid, setGrid] = useState<CannonColor[]>([]);
   const [orientation, setOrientation] = useState<Orientation>({ rotation: 0, flipH: false, flipV: false });
   const [playlistState, setPlaylistState] = useState<PlaylistState | null>(null);
@@ -48,49 +61,74 @@ export function useSocket(
   useEffect(() => {
     if (!token || !url) return;
 
-    const wsUrl = new URL(url);
-    wsUrl.searchParams.set('token', token);
-    const ws = new WebSocket(wsUrl.toString());
-    wsRef.current = ws;
+    let disposed = false;
+    let attempts = 0;
+    let retry: ReturnType<typeof setTimeout> | null = null;
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => {
-      setConnected(false);
-      setTimeout(() => {
-        if (wsRef.current === ws) {
-          wsRef.current = null;
-        }
-      }, 2000);
+    const probe = async (path: string) => {
+      const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+      return { ok: res.ok, status: res.status };
     };
-    ws.onerror = () => ws.close();
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'state' && Array.isArray(msg.grid)) {
-          setGrid(msg.grid);
-        } else if (msg.type === 'orientation') {
-          setOrientation({ rotation: msg.rotation ?? 0, flipH: !!msg.flipH, flipV: !!msg.flipV });
-        } else if (msg.type === 'playlist_state') {
-          setPlaylistState({ active: !!msg.active, currentStep: msg.currentStep ?? 0, playlist: msg.playlist ?? null });
-        } else if (msg.type === 'settings') {
-          setSettings({
-            alpha: msg.alpha ?? 0.06,
-            attack: msg.attack ?? 1.0,
-            speed: msg.speed ?? 1.0,
-            animation: msg.animation ?? null
-          });
-        } else if (msg.type === 'sync_update' || msg.type === 'sync_state') {
-          // A config change was replicated from another device — refetch it so
-          // the browser reflects the new layout/light-map without a reload.
-          onSyncConfigRef.current?.();
+
+    const connect = () => {
+      const wsUrl = new URL(url);
+      wsUrl.searchParams.set('token', token);
+      const ws = new WebSocket(wsUrl.toString());
+      wsRef.current = ws;
+      setConnection((prev) => ({ ...prev, state: 'connecting', attempts }));
+
+      ws.onopen = () => {
+        attempts = 0;
+        setConnection(OPEN_CONNECTION);
+      };
+
+      // A rejected handshake and a dropped connection both land here; the cause
+      // comes from probing the origin, since the browser only reports 1006.
+      ws.onclose = (e) => {
+        if (wsRef.current === ws) wsRef.current = null;
+        if (disposed) return;
+        attempts += 1;
+        setConnection({ state: 'down', cause: 'unknown', detail: '', code: e.code, attempts });
+        void diagnoseConnection(probe, e.code, token).then(({ cause, detail }) => {
+          if (!disposed) setConnection({ state: 'down', cause, detail, code: e.code, attempts });
+        });
+        retry = setTimeout(connect, retryDelay(attempts));
+      };
+
+      ws.onerror = () => ws.close();
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'state' && Array.isArray(msg.grid)) {
+            setGrid(msg.grid);
+          } else if (msg.type === 'orientation') {
+            setOrientation({ rotation: msg.rotation ?? 0, flipH: !!msg.flipH, flipV: !!msg.flipV });
+          } else if (msg.type === 'playlist_state') {
+            setPlaylistState({ active: !!msg.active, currentStep: msg.currentStep ?? 0, playlist: msg.playlist ?? null });
+          } else if (msg.type === 'settings') {
+            setSettings({
+              alpha: msg.alpha ?? 0.06,
+              attack: msg.attack ?? 1.0,
+              speed: msg.speed ?? 1.0,
+              animation: msg.animation ?? null
+            });
+          } else if (msg.type === 'sync_update' || msg.type === 'sync_state') {
+            // A config change was replicated from another device — refetch it so
+            // the browser reflects the new layout/light-map without a reload.
+            onSyncConfigRef.current?.();
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
-      }
+      };
     };
+
+    connect();
 
     return () => {
-      ws.close();
+      disposed = true;
+      if (retry) clearTimeout(retry);
+      wsRef.current?.close();
       wsRef.current = null;
     };
   }, [url, token]);
@@ -101,5 +139,13 @@ export function useSocket(
     }
   }, []);
 
-  return { connected, grid, orientation, playlistState, settings, send };
+  return {
+    connected: connection.state === 'open',
+    connection,
+    grid,
+    orientation,
+    playlistState,
+    settings,
+    send
+  };
 }

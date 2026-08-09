@@ -4,7 +4,7 @@ import c from 'yanse';
 
 import { findConfigFile } from '../config-file';
 import { type Flags, getStore, resolveProjectName } from '../project';
-import { applyReceiverEnv, applyServerEnv } from './runtime';
+import { applyReceiverEnv, applyServerEnv, awaitBind } from './runtime';
 
 export interface StartOptions {
   cwd?: string;
@@ -107,8 +107,8 @@ export async function runStart(opts: StartOptions = {}): Promise<StartResult> {
   const { startReceiver } = await import('@wavegrid/receiver');
 
   const serverHandle = startServer(resolved);
-  // Let the server bind before the receiver dials in.
-  await new Promise((r) => setTimeout(r, 250));
+  // The receiver dials in only once the port is actually bound.
+  await awaitBind(serverHandle);
   const receiverHandle = startReceiver(resolved);
 
   let stopped = false;

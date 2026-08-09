@@ -20,6 +20,7 @@ import { PrideTab } from '@/components/pride-tab';
 import { SequencesTab } from '@/components/sequences-tab';
 import { SettingsTab } from '@/components/settings-tab';
 import { ShiftDial } from '@/components/shift-dial';
+import { StatusDot } from '@/components/status-dot';
 import { UsaTab } from '@/components/usa-tab';
 import { VideoTab } from '@/components/video-tab';
 import { useAudio } from '@/lib/use-audio';
@@ -444,7 +445,7 @@ export default function Home() {
   const [configRev, setConfigRev] = useState(0);
   const config = useConfig(configRev);
   const { user, token, checked, login } = useAuth();
-  const { connected, grid, orientation, playlistState, settings, send } = useSocket(
+  const { connection, grid, orientation, playlistState, settings, send } = useSocket(
     config?.simulatorUrl ?? null,
     token,
     useCallback(() => setConfigRev((n) => n + 1), [])
@@ -786,10 +787,7 @@ export default function Home() {
         >
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium" style={{ color: '#888898' }}>Wavegrid</span>
-            <span
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ background: connected ? '#4a4' : '#d44' }}
-            />
+            <StatusDot info={connection} compact />
             {(audio.state.playing || audio.state.micActive) && (
               <span className="text-sm animate-pulse" style={{ color: '#4a7cff' }}>{audio.state.micActive ? '🎤' : '♪'}</span>
             )}
@@ -1020,10 +1018,7 @@ export default function Home() {
             >
               Wavegrid
             </span>
-            <span
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ background: connected ? '#4a4' : '#d44' }}
-            />
+            <StatusDot info={connection} />
             {(audio.state.playing || audio.state.micActive) && (
               <span className="text-sm animate-pulse" style={{ color: '#4a7cff' }}>{audio.state.micActive ? '🎤' : '♪'}</span>
             )}
