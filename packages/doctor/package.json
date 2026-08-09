@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/doctor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "Wavegrid diagnostics — the checks behind `wavegrid doctor`, collected as data so the CLI and the desktop app report the same health",
   "main": "index.js",

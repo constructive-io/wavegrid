@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/server",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "7×7 RGB grid simulator with smooth transitions",
   "main": "index.js",

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/receiver@1.1.0...@wavegrid/receiver@1.2.0) (2026-08-09)
+
+### Bug Fixes
+
+- **receiver:** read light-map from WG_STATE_DIR, resolve routing config from cwd ([75144ea](https://github.com/constructive-io/wavegrid/commit/75144ea5262810170ca8ea2997b4a9e040c26d0f))
+
+### Features
+
+- **discovery:** machine-local device identity + mDNS brain discovery ([b15fded](https://github.com/constructive-io/wavegrid/commit/b15fdedf1725b8c18ed5334277f0ea978ec608c0))
+- **routing:** one unified routing spec, per-device configs generated from it ([7399ef9](https://github.com/constructive-io/wavegrid/commit/7399ef9e0e08a999c68ee5b8ce261f9beb60cb4d))
+
 # [1.1.0](https://github.com/constructive-io/Illuminate/compare/@wavegrid/receiver@1.0.0...@wavegrid/receiver@1.1.0) (2026-08-06)
 
 ### Features

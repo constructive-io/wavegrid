@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/webgl",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "WebGL 3D viewer for the 7×7 laser installation at SF Civic Center",
   "scripts": {

@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/settings",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "Centralized Wavegrid settings — appstash-backed projects, secrets, and users; one store shared by the CLI, server, receiver and UI",
   "main": "index.js",

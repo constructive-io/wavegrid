@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/layout",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "Config-driven fixture layouts — grids, rings, and filled rings — the single source of truth for cannon geometry",
   "main": "index.js",

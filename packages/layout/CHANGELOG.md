@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/layout@1.1.0...@wavegrid/layout@1.2.0) (2026-08-09)
+
+### Features
+
+- **desktop,settings:** named light-map library + active-selection ([b7cdf30](https://github.com/constructive-io/wavegrid/commit/b7cdf300eba314a4e2c03b56788bb4b003615490))
+- **desktop:** canvas light-map debugger — tap-to-map, identify, auto-map ([861fded](https://github.com/constructive-io/wavegrid/commit/861fded9dc52e9c51583f7e50b63dd406a3f3fa3))
+- **layout:** shared light-map helpers + deterministic auto-map heuristics ([17ce2d2](https://github.com/constructive-io/wavegrid/commit/17ce2d26acfa06f5b1f2a9096188d0fa5143d19e))
+- **routing:** one unified routing spec, per-device configs generated from it ([7399ef9](https://github.com/constructive-io/wavegrid/commit/7399ef9e0e08a999c68ee5b8ce261f9beb60cb4d))
+- **sync:** per-project sync.enabled toggle + secrets gate ([81e3225](https://github.com/constructive-io/wavegrid/commit/81e32256dbc3fac71546dd45a3cd05cfbf12b113))
+
 # [1.1.0](https://github.com/constructive-io/Illuminate/compare/@wavegrid/layout@1.0.0...@wavegrid/layout@1.1.0) (2026-08-06)
 
 ### Features

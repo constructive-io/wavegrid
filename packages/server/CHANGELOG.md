@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/server@1.1.0...@wavegrid/server@1.2.0) (2026-08-09)
+
+### Features
+
+- **access,desktop:** named access keys + two-column lights debugger ([933e088](https://github.com/constructive-io/wavegrid/commit/933e0880f6eeebf824727a8ba33cecd6be1ff8cf))
+- **access:** admin/operator roles + server-side login sessions ([e5b7156](https://github.com/constructive-io/wavegrid/commit/e5b7156b1fe6ec32c163e13de75ce724b4c35ed7))
+- **access:** shared guest passphrase — one low-privilege operator to hand out ([70cec2d](https://github.com/constructive-io/wavegrid/commit/70cec2d394e15a5ba190098e6053c0027e21f2d7))
+- **desktop:** canvas light-map debugger — tap-to-map, identify, auto-map ([861fded](https://github.com/constructive-io/wavegrid/commit/861fded9dc52e9c51583f7e50b63dd406a3f3fa3))
+- **devices:** authenticated self-registration + user-named device registry ([1b261ba](https://github.com/constructive-io/wavegrid/commit/1b261bafa833a2e3afbd4d7eff7f28071d877e2d))
+- **discovery:** machine-local device identity + mDNS brain discovery ([b15fded](https://github.com/constructive-io/wavegrid/commit/b15fdedf1725b8c18ed5334277f0ea978ec608c0))
+- **sync:** per-project sync.enabled toggle + secrets gate ([81e3225](https://github.com/constructive-io/wavegrid/commit/81e32256dbc3fac71546dd45a3cd05cfbf12b113))
+- **sync:** revisioned server-mediated config sync + replication (Phase D) ([cbe43c0](https://github.com/constructive-io/wavegrid/commit/cbe43c0b522ceb7bf1d92ed5513043b20a32a5f3))
+- **sync:** server-less coordinator election + sync_merge re-home ([8215bbb](https://github.com/constructive-io/wavegrid/commit/8215bbb64f2ef38491e87d6bf7ab1f88313499ec))
+- **sync:** validate scopes server-side + make UI a sync consumer ([f87d214](https://github.com/constructive-io/wavegrid/commit/f87d2146b36451214cade69b95d1dba587fc2912))
+
 # [1.1.0](https://github.com/constructive-io/Illuminate/compare/@wavegrid/server@1.0.0...@wavegrid/server@1.1.0) (2026-08-06)
 
 ### Features

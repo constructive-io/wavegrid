@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/cli",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "wavegrid CLI — scaffold a layout config and run an installation (server + receiver, in-process) from a single command",
   "main": "index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/discovery",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "Zero-config LAN discovery for Wavegrid brains — advertise and browse the _wavegrid._tcp mDNS service",
   "main": "index.js",

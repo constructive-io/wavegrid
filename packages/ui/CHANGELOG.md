@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/constructive-io/Illuminate/compare/@wavegrid/ui@1.1.0...@wavegrid/ui@1.2.0) (2026-08-09)
+
+### Features
+
+- **sync:** validate scopes server-side + make UI a sync consumer ([f87d214](https://github.com/constructive-io/Illuminate/commit/f87d2146b36451214cade69b95d1dba587fc2912))
+
 # [1.1.0](https://github.com/constructive-io/Illuminate/compare/@wavegrid/ui@1.0.0...@wavegrid/ui@1.1.0) (2026-08-06)
 
 ### Bug Fixes

@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/desktop",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "Wavegrid Desktop — a thin Electron shell around the one-brain runtime, with a Constructive Blocks admin UI wrapping the untouched laser UI",
   "private": true,

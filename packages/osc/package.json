@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/osc",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "OSC output adapters for Pangolin BEYOND and FB4 hardware — pluggable, configurable, and publishable independently",
   "main": "index.js",
