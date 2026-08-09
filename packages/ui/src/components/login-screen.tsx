@@ -2,10 +2,14 @@ import { FormEvent, useState } from 'react';
 
 interface LoginScreenProps {
   onLogin: (username: string, token: string) => void;
+  /** Why this screen appeared, when it wasn't the operator's own sign-out. */
+  notice?: string;
+  /** Prefilled username — whoever was signed in on this device last. */
+  defaultUsername?: string;
 }
 
-export function LoginScreen({ onLogin }: LoginScreenProps) {
-  const [username, setUsername] = useState('');
+export function LoginScreen({ onLogin, notice, defaultUsername = '' }: LoginScreenProps) {
+  const [username, setUsername] = useState(defaultUsername);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,6 +62,13 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             Painting the sky with light
           </p>
         </div>
+
+        {/* Why we're back here (session expired, revoked, or project switched) */}
+        {notice && (
+          <p className='text-center text-sm' style={{ color: '#d9a441' }}>
+            {notice}
+          </p>
+        )}
 
         {/* Username */}
         <input

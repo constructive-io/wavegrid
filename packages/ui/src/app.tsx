@@ -444,7 +444,7 @@ function MasterSliders({
 export default function Home() {
   const [configRev, setConfigRev] = useState(0);
   const config = useConfig(configRev);
-  const { user, token, checked, login } = useAuth();
+  const { user, token, checked, endedSession, lastUser, login, sessionEnded } = useAuth();
   const { connection, grid, orientation, playlistState, settings, send } = useSocket(
     config?.simulatorUrl ?? null,
     token,
@@ -489,6 +489,14 @@ export default function Home() {
       return next;
     });
   }, []);
+
+  // A token the server no longer accepts can only reconnect into the same
+  // error, so stop retrying against it and hand the operator the login screen.
+  useEffect(() => {
+    if (token && connection.state === 'down' && connection.cause === 'sessionExpired') {
+      sessionEnded();
+    }
+  }, [token, connection.state, connection.cause, sessionEnded]);
 
   // Sync slider state from server on initial connect
   const settingsSyncedRef = useRef(false);
@@ -773,7 +781,17 @@ export default function Home() {
   }
 
   if (!user) {
-    return <LoginScreen onLogin={login} />;
+    return (
+      <LoginScreen
+        onLogin={login}
+        defaultUsername={lastUser}
+        notice={
+          endedSession
+            ? 'Your session ended — it expired, was revoked, or the show switched project.'
+            : undefined
+        }
+      />
+    );
   }
 
   /* ---------- PHONE LAYOUT ---------- */
