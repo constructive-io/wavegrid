@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -16,12 +16,13 @@ const DESKTOP = join(__dirname, '..');
 function mainImports(): string[] {
   // Read the source rather than importing it: this must reflect what Rollup
   // sees, not what a test bundler resolves.
+  // Every main-process source, discovered rather than listed — a new file that
+  // imports a @wavegrid package is exactly the case this guards.
   const files = [
     'src/main.ts',
-    'src/main/brain.ts',
-    'src/main/doctor.ts',
-    'src/main/ipc.ts',
-    'src/main/network.ts'
+    ...readdirSync(join(DESKTOP, 'src/main'))
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => `src/main/${f}`)
   ];
   const found = new Set<string>();
   for (const file of files) {
