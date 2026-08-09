@@ -1,11 +1,11 @@
-import { getPresetNames, type LayoutSpec, resolveLayout, type WavegridConfig } from '@wavegrid/layout';
+import { getPresetNames, type LayoutSpec, parseLayoutSpec, resolveLayout, type WavegridConfig } from '@wavegrid/layout';
 import { existsSync, readFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 
 // confstash discovers `wavegrid.json` (and `.wavegridrc*`) via walk-up search.
 export const CONFIG_FILENAME = 'wavegrid.json';
 
-export type ShapeKind = 'preset' | 'grid' | 'ring' | 'filledRing';
+export type ShapeKind = 'preset' | 'grid' | 'ring' | 'filledRing' | 'annulus' | 'rings';
 
 export interface InitAnswers {
   shape: ShapeKind;
@@ -13,6 +13,10 @@ export interface InitAnswers {
   cols?: number;
   rows?: number;
   count?: number;
+  /** annulus: size of the hole in the middle, 0..1. */
+  innerRadius?: number;
+  /** rings: fixture counts outermost-first, e.g. "12,8,4,1". */
+  ringCounts?: string;
   id?: string;
   name?: string;
   mode: 'auto' | 'simple' | 'distributed';
@@ -41,6 +45,14 @@ export function buildLayoutSpec(a: InitAnswers): LayoutSpec {
   case 'filledRing':
     if (a.count == null) throw new Error('filledRing shape requires count');
     return { kind: 'filledRing', count: a.count, id: a.id, name: a.name };
+  case 'annulus': {
+    if (a.count == null) throw new Error('annulus shape requires count');
+    const inner = a.innerRadius ?? 0.5;
+    return { ...parseLayoutSpec(`annulus:${a.count}@${inner}`), id: a.id, name: a.name };
+  }
+  case 'rings':
+    if (!a.ringCounts) throw new Error('rings shape requires ringCounts');
+    return { ...parseLayoutSpec(`rings:${a.ringCounts}`), id: a.id, name: a.name };
   default:
     throw new Error(`unknown shape "${String(a.shape)}"`);
   }

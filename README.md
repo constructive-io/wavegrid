@@ -14,7 +14,7 @@
 
 **Wavegrid** is a modular, configuration-driven laser controller for arrays of Laser Space Cannons. It includes a grid state server, an artist-facing creative canvas, and OSC output adapters for BEYOND and FB4 hardware.
 
-Layouts are presets, not code: `grid-7x7`, `grid-7x2`, `ring-6`, `ring-25-filled`, or any custom shape. Everything — projects, config, secrets, users, state, logs — lives in one centralized store (`~/.wavegrid`), managed entirely through the CLI.
+Layouts are configuration, not code: `grid-7x7`, `grid-7x2`, `ring-6`, `ring-25-hollow`, or any custom shape. Everything — projects, config, secrets, users, state, logs — lives in one centralized store (`~/.wavegrid`), managed entirely through the CLI.
 
 ## Running a Show (operators)
 
@@ -54,7 +54,7 @@ pnpm build
 |---------|------|-------------|
 | `packages/server` | `@wavegrid/server` | Grid state engine and master controller UI |
 | `packages/ui` | `@wavegrid/ui` | Artist UI — Paint, Gradient, Drops, Motion, Scenes, Animations, Flags, Brightness, Audio |
-| `packages/layout` | `@wavegrid/layout` | Layout model — presets, fixture generators (grid/ring/filledRing), config resolution |
+| `packages/layout` | `@wavegrid/layout` | Layout model — presets, fixture generators (grid/ring/rings/filledRing), config resolution |
 | `packages/settings` | `@wavegrid/settings` | Centralized appstash store — projects, secrets, users, state, logs |
 | `packages/doctor` | `@wavegrid/doctor` | Diagnostics as data — the checks behind `wavegrid doctor` and the desktop Status screen |
 | `packages/cli` | `@wavegrid/cli` | `wavegrid` CLI — projects, settings, start, doctor |
@@ -104,11 +104,17 @@ Operators don't run these — they use `wavegrid start` (see [Running a Show](#r
 
 ## Layouts
 
-The physical arrangement is a **layout preset** stored in the project — never code. Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `ring-25-filled`. Pick one at `wavegrid projects create`, or change it later:
+The physical arrangement is a **layout** stored in the project — never code. Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `ring-25-filled`, `ring-25-hollow`, `disc-25`. Pick one at `wavegrid projects create`, or change it later:
 
 ```sh
-wavegrid projects config set layout grid-7x7   # or ring-6, ring-25-filled, …
+wavegrid projects config set layout grid-7x7        # a built-in preset
+wavegrid projects config set layout grid:9x4        # cols × rows
+wavegrid projects config set layout ring:6          # one ring
+wavegrid projects config set layout annulus:25@0.5  # rings with a hole in the middle
+wavegrid projects config set layout rings:12,8,4,1  # explicit rings, outermost first
 ```
+
+Round rigs are concentric rings: one ring is a ring, a ring plus smaller ones inside it is a ring with a hollow centre, and rings all the way in to a centre fixture is a symmetric disc. `annulus` picks the rings for you from a cannon count and the size of the hole (`0` = solid disc).
 
 The server resolves the layout once and broadcasts it; the UI and receiver render from it — no per-process `NUM_CANNONS`/`GRID_COLUMNS` to keep in sync. The project *name* is just a label — the preset controls the shape.
 

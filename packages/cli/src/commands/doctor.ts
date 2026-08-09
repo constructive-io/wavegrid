@@ -1,4 +1,3 @@
-import { loadWavegridConfig } from '@wavegrid/layout';
 import {
   type Check,
   checkEnvHijack,
@@ -6,6 +5,7 @@ import {
   type Diagnostics,
   overallStatus
 } from '@wavegrid/doctor';
+import { loadWavegridConfig } from '@wavegrid/layout';
 import { formatRanges, type SystemStatus } from '@wavegrid/server';
 import c from 'yanse';
 

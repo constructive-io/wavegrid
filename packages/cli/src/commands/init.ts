@@ -36,7 +36,7 @@ export async function runInit(argv: RawArgv, prompter: Inquirerer): Promise<stri
       type: 'list',
       name: 'shape',
       message: 'Layout shape',
-      options: ['preset', 'grid', 'ring', 'filledRing'],
+      options: ['preset', 'grid', 'ring', 'annulus', 'rings', 'filledRing'],
       default: 'preset'
     },
     {
@@ -66,7 +66,22 @@ export async function runInit(argv: RawArgv, prompter: Inquirerer): Promise<stri
       name: 'count',
       message: 'Number of cannons',
       default: 6,
-      when: (a: Partial<FullInitAnswers>) => a.shape === 'ring' || a.shape === 'filledRing'
+      when: (a: Partial<FullInitAnswers>) =>
+        a.shape === 'ring' || a.shape === 'filledRing' || a.shape === 'annulus'
+    },
+    {
+      type: 'number',
+      name: 'innerRadius',
+      message: 'Hole in the middle, 0–1 (0 = solid disc)',
+      default: 0.5,
+      when: (a: Partial<FullInitAnswers>) => a.shape === 'annulus'
+    },
+    {
+      type: 'text',
+      name: 'ringCounts',
+      message: 'Cannons per ring, outermost first (e.g. 12,8,4,1)',
+      default: '12,8,4,1',
+      when: (a: Partial<FullInitAnswers>) => a.shape === 'rings'
     },
     {
       type: 'list',

@@ -22,13 +22,18 @@ export interface ProjectSummary {
 }
 
 /** How a project's layout is chosen — a built-in preset id, or a generated
- *  shape (grid cols×rows, ring/filledRing count). Mirrors the CLI's LayoutSpec. */
+ *  shape (grid cols×rows, ring/filledRing/annulus count, explicit ring counts).
+ *  Mirrors the CLI's LayoutSpec. */
 export interface LayoutChoice {
   preset?: string;
-  kind?: 'grid' | 'ring' | 'filledRing';
+  kind?: 'grid' | 'ring' | 'filledRing' | 'annulus' | 'rings';
   cols?: number;
   rows?: number;
   count?: number;
+  /** annulus: size of the hole in the middle, 0..1. */
+  innerRadius?: number;
+  /** rings: cannons per ring, outermost first, e.g. "12,8,4,1". */
+  ringCounts?: string;
 }
 
 /** Input for the create-project wizard. Main turns this into a ProjectConfig,
@@ -209,7 +214,7 @@ export interface LightMapEntry {
 export interface LightMapView {
   project: string;
   layoutName: string;
-  topology: 'grid' | 'ring' | 'filledRing';
+  topology: 'grid' | 'ring' | 'filledRing' | 'rings';
   numCannons: number;
   gridColumns: number;
   physicalLights: number[];

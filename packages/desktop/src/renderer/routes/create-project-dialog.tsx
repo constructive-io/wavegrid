@@ -15,7 +15,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { LayoutChoice, NewProjectInput } from '@/types/ipc';
 
-type Shape = 'preset' | 'grid' | 'ring' | 'filledRing';
+type Shape = 'preset' | 'grid' | 'ring' | 'annulus' | 'rings' | 'filledRing';
+
+/** Cannons per ring, outermost first — "12,8,4,1". */
+function ringCountsValid(text: string): boolean {
+  const parts = text.split(',').map((p) => p.trim());
+  return parts.length > 0 && parts.every((p) => /^\d+$/.test(p) && Number(p) >= 1);
+}
 
 const NAME_RE = /^[a-zA-Z0-9._-]+$/;
 
@@ -99,6 +105,8 @@ export function CreateProjectDialog({
   const [cols, setCols] = React.useState('7');
   const [rows, setRows] = React.useState('7');
   const [count, setCount] = React.useState('6');
+  const [innerRadius, setInnerRadius] = React.useState('0.5');
+  const [ringCounts, setRingCounts] = React.useState('12,8,4,1');
 
   const [mode, setMode] = React.useState<NewProjectInput['mode']>('auto');
   const [serverHost, setServerHost] = React.useState('0.0.0.0');
@@ -119,6 +127,8 @@ export function CreateProjectDialog({
     setCols('7');
     setRows('7');
     setCount('6');
+    setInnerRadius('0.5');
+    setRingCounts('12,8,4,1');
     setMode('auto');
     setServerHost('0.0.0.0');
     setServerPort('3000');
@@ -144,6 +154,8 @@ export function CreateProjectDialog({
   const layoutChoice = (): LayoutChoice => {
     if (shape === 'preset') return { preset };
     if (shape === 'grid') return { kind: 'grid', cols: Number(cols), rows: Number(rows) };
+    if (shape === 'rings') return { kind: 'rings', ringCounts };
+    if (shape === 'annulus') return { kind: 'annulus', count: Number(count), innerRadius: Number(innerRadius) };
     return { kind: shape, count: Number(count) };
   };
 
@@ -152,7 +164,11 @@ export function CreateProjectDialog({
       ? preset !== ''
       : shape === 'grid'
         ? Number(cols) >= 1 && Number(rows) >= 1
-        : Number(count) >= 1;
+        : shape === 'rings'
+          ? ringCountsValid(ringCounts)
+          : shape === 'annulus'
+            ? Number(count) >= 1 && Number(innerRadius) >= 0 && Number(innerRadius) < 1
+            : Number(count) >= 1;
 
   const step1Valid = !nameError && layoutValid;
   const portsValid =
@@ -224,6 +240,8 @@ export function CreateProjectDialog({
                     { value: 'preset', label: 'Preset' },
                     { value: 'grid', label: 'Grid' },
                     { value: 'ring', label: 'Ring' },
+                    { value: 'annulus', label: 'Ring w/ hole' },
+                    { value: 'rings', label: 'Concentric rings' },
                     { value: 'filledRing', label: 'Filled ring' }
                   ]}
                 />
@@ -247,6 +265,32 @@ export function CreateProjectDialog({
               )}
               {(shape === 'ring' || shape === 'filledRing') && (
                 <NumberField id='wg-count' label='Cannons' value={count} onChange={setCount} />
+              )}
+              {shape === 'annulus' && (
+                <div className='flex gap-4'>
+                  <NumberField id='wg-count' label='Cannons' value={count} onChange={setCount} />
+                  <div className='flex flex-col gap-1.5'>
+                    <Label htmlFor='wg-inner'>Hole size (0–1)</Label>
+                    <Input
+                      id='wg-inner'
+                      inputMode='decimal'
+                      value={innerRadius}
+                      onChange={(e) => setInnerRadius(e.target.value)}
+                      className='w-32'
+                    />
+                  </div>
+                </div>
+              )}
+              {shape === 'rings' && (
+                <div className='flex flex-col gap-1.5'>
+                  <Label htmlFor='wg-rings'>Cannons per ring, outermost first</Label>
+                  <Input
+                    id='wg-rings'
+                    value={ringCounts}
+                    placeholder='12,8,4,1'
+                    onChange={(e) => setRingCounts(e.target.value)}
+                  />
+                </div>
               )}
             </>
           ) : (

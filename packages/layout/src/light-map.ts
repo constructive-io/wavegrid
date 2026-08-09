@@ -90,6 +90,23 @@ function gridTransform(
 
 const isFullGrid = (l: Layout): boolean => l.hasGridCoords && l.cols * l.rows === l.count;
 const isSquareGrid = (l: Layout): boolean => isFullGrid(l) && l.cols === l.rows;
+const isPolar = (l: Layout): boolean => !l.hasGridCoords && l.count > 1;
+const ringCount = (l: Layout): number => new Set(l.fixtures.map((f) => f.ring)).size;
+
+/** Fixtures grouped by ring, outermost ring first, each in layout order. */
+function ringGroups(layout: Layout): number[][] {
+  const rings = [...new Set(layout.fixtures.map((f) => f.ring))].sort((a, b) => b - a);
+  return rings.map((ring) => layout.fixtures.filter((f) => f.ring === ring).map((f) => f.index));
+}
+
+/** Map each logical fixture to the physical slot at the same spot in `order`. */
+function reorder(layout: Layout, order: number[]): number[] {
+  const map = identityMap(layout.count);
+  order.forEach((logical, physical) => {
+    map[logical] = physical;
+  });
+  return normalizeLightMap(map, layout.count);
+}
 
 export const autoMapStrategies: AutoMapStrategy[] = [
   {
@@ -162,6 +179,20 @@ export const autoMapStrategies: AutoMapStrategy[] = [
     description: 'Square grid mounted a quarter-turn counter-clockwise.',
     applies: isSquareGrid,
     build: (l) => gridTransform(l, (r, c, _rows, cols) => [cols - 1 - c, r])
+  },
+  {
+    id: 'ringCounterClockwise',
+    label: 'Rings wired counter-clockwise',
+    description: 'Each ring is wired the other way round from 12 o’clock.',
+    applies: isPolar,
+    build: (l) => reorder(l, ringGroups(l).flatMap((ring) => [ring[0], ...ring.slice(1).reverse()]))
+  },
+  {
+    id: 'ringsInnerFirst',
+    label: 'Innermost ring first',
+    description: 'Wiring starts at the centre and works outwards.',
+    applies: (l) => isPolar(l) && ringCount(l) > 1,
+    build: (l) => reorder(l, ringGroups(l).reverse().flat())
   }
 ];
 

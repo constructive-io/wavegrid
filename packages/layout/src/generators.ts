@@ -1,4 +1,4 @@
-import { Fixture, Layout, Topology } from './types';
+import { Fixture, Layout, RingSpec, Topology } from './types';
 
 interface RawFixture {
   x: number;
@@ -6,6 +6,8 @@ interface RawFixture {
   row: number;
   col: number;
   label: string;
+  /** Explicit concentric ring index; derived from the radius when omitted. */
+  ring?: number;
 }
 
 interface FinalizeMeta {
@@ -45,7 +47,7 @@ function finalize(raw: RawFixture[], meta: FinalizeMeta): Layout {
     y: f.y,
     angle: Math.atan2(f.y, f.x),
     radius: dists[i] / maxDist,
-    ring: Math.round(dists[i]),
+    ring: f.ring ?? Math.round(dists[i]),
     row: f.row,
     col: f.col,
     label: f.label
@@ -207,4 +209,155 @@ export function filledRingLayout({ count, id, name }: FilledRingParams): Layout 
     .map(f => f.index);
 
   return layout;
+}
+
+export interface RingsParams {
+  rings: RingSpec[];
+  id?: string;
+  name?: string;
+}
+
+/**
+ * Concentric rings — the general round layout. One ring is a plain ring; a ring
+ * plus a smaller one inside it is an annulus (a ring with a hole in the middle);
+ * rings all the way in to a centre fixture is a symmetric disc. Radii are
+ * relative (only their ratios matter), a radius of 0 is the centre fixture.
+ *
+ * Fixtures are emitted outermost ring first, each clockwise from 12 o'clock, so
+ * shard slices and light maps stay contiguous per ring. There are no grid
+ * coordinates — `radius`/`angle`/`ring` are the meaningful axes here.
+ */
+export function ringsLayout({ rings, id, name }: RingsParams): Layout {
+  if (rings.length < 1) throw new Error('ringsLayout requires at least one ring');
+  for (const ring of rings) {
+    if (!Number.isInteger(ring.count) || ring.count < 1) {
+      throw new Error(`ringsLayout requires an integer count >= 1 per ring, got ${ring.count}`);
+    }
+    if (!Number.isFinite(ring.radius) || ring.radius < 0) {
+      throw new Error(`ringsLayout requires a radius >= 0 per ring, got ${ring.radius}`);
+    }
+    if (ring.radius === 0 && ring.count !== 1) {
+      throw new Error('ringsLayout: the centre ring (radius 0) must have count 1');
+    }
+  }
+  const radii = rings.map(r => r.radius);
+  if (new Set(radii).size !== radii.length) {
+    throw new Error('ringsLayout requires a distinct radius per ring');
+  }
+  if (Math.max(...radii) <= 0) throw new Error('ringsLayout requires at least one ring with radius > 0');
+
+  // Outermost first; ring index counts from the inside out (0 = innermost).
+  const outerFirst = [...rings].sort((a, b) => b.radius - a.radius);
+  const ringIndexOf = (radius: number) => radii.filter(r => r < radius).length;
+
+  const raw: RawFixture[] = [];
+  for (let k = 0; k < outerFirst.length; k++) {
+    const { count, radius, phase = 0 } = outerFirst[k];
+    const offset = (phase * Math.PI) / 180;
+    for (let i = 0; i < count; i++) {
+      // Start at 12 o'clock, go clockwise — same convention as ringLayout.
+      const angle = -Math.PI / 2 + offset + (i / count) * Math.PI * 2;
+      raw.push({
+        x: radius * Math.cos(angle),
+        y: radius * Math.sin(angle),
+        row: -1,
+        col: -1,
+        ring: ringIndexOf(radius),
+        label: `${k + 1}:${i + 1}`
+      });
+    }
+  }
+
+  const total = raw.length;
+  const counts = outerFirst.map(r => r.count).join('+');
+  return finalize(raw, {
+    id: id ?? `rings-${counts}`,
+    name: name ?? `${total}-cannon rings (${counts})`,
+    topology: 'rings',
+    cols: 0,
+    rows: 0,
+    hasGridCoords: false,
+    perimeter: Array.from({ length: outerFirst[0].count }, (_, i) => i)
+  });
+}
+
+/**
+ * Spread `count` fixtures over concentric rings between `innerRadius` and the
+ * outer edge, keeping the spacing along a ring close to the spacing between
+ * rings. `innerRadius: 0` gives a symmetric disc (the innermost ring is the
+ * centre fixture); anything higher leaves a hole in the middle.
+ */
+export interface AnnulusParams {
+  count: number;
+  /** Radius of the hole, 0..1. Default 0.5. */
+  innerRadius?: number;
+  id?: string;
+  name?: string;
+}
+
+export function annulusLayout({ count, innerRadius = 0.5, id, name }: AnnulusParams): Layout {
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error(`annulusLayout requires an integer count >= 1, got ${count}`);
+  }
+  if (!Number.isFinite(innerRadius) || innerRadius < 0 || innerRadius >= 1) {
+    throw new Error(`annulusLayout requires 0 <= innerRadius < 1, got ${innerRadius}`);
+  }
+
+  const hollow = innerRadius > 0;
+  const label = hollow ? 'annulus' : 'disc';
+  return ringsLayout({
+    rings: annulusRings(count, innerRadius),
+    id: id ?? `${label}-${count}`,
+    name: name ?? `${count}-cannon ${label}`
+  });
+}
+
+/**
+ * Pick the rings for an annulus: the area per fixture gives an ideal spacing,
+ * which fixes how many rings fit across the band; each ring then takes a share
+ * of the count proportional to its circumference. Alternate rings are staggered
+ * by half a step so fixtures interleave instead of lining up radially.
+ */
+function annulusRings(count: number, innerRadius: number): RingSpec[] {
+  const area = Math.PI * (1 - innerRadius * innerRadius);
+  const spacing = Math.sqrt(area / count);
+  const band = 1 - innerRadius;
+  const ringCount = Math.max(1, Math.min(count, Math.round(band / spacing) + 1));
+
+  const radii = ringCount === 1
+    ? [1]
+    : Array.from({ length: ringCount }, (_, j) => 1 - (j * band) / (ringCount - 1));
+
+  const counts = share(count, radii);
+  return radii.map((radius, j) => ({
+    radius,
+    count: counts[j],
+    phase: j % 2 === 1 ? 180 / counts[j] : 0
+  }));
+}
+
+/** Split `count` across rings in proportion to their radius, each ring >= 1. */
+function share(count: number, radii: number[]): number[] {
+  const sum = radii.reduce((a, r) => a + r, 0);
+  const exact = radii.map(r => (sum > 0 ? (count * r) / sum : 0));
+  const alloc = exact.map(e => Math.max(1, Math.floor(e)));
+
+  const total = () => alloc.reduce((a, n) => a + n, 0);
+  while (total() < count) {
+    let best = 0;
+    for (let i = 1; i < alloc.length; i++) {
+      if (exact[i] - alloc[i] > exact[best] - alloc[best]) best = i;
+    }
+    alloc[best]++;
+  }
+  while (total() > count) {
+    let best = -1;
+    for (let i = 0; i < alloc.length; i++) {
+      if (alloc[i] <= 1) continue;
+      if (best === -1 || alloc[i] - exact[i] > alloc[best] - exact[best]) best = i;
+    }
+    if (best === -1) break;
+    alloc[best]--;
+  }
+  return alloc;
 }
