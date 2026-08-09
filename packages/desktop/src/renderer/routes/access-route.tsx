@@ -41,6 +41,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { roleChangeBlock, userRemovalBlock } from '@/renderer/lib/access-rules';
 import type { AccessKeyInfo, RequiredSecretInfo, SessionInfo, UserAccount, UserRole } from '@/types/ipc';
 
 const ROLE_STYLE = 'border-input bg-background h-8 rounded-md border px-2 text-sm';
@@ -200,7 +201,6 @@ function UsersTab({
   busy: boolean;
 }) {
   const names = users.map((u) => u.username);
-  const adminCount = users.filter((u) => u.role === 'admin').length;
 
   return (
     <div className='flex flex-col gap-3 pt-4'>
@@ -231,9 +231,8 @@ function UsersTab({
           </TableHeader>
           <TableBody>
             {users.map((u) => {
-              // Don't let the last admin be demoted or removed — that would lock
-              // administration out of the project.
-              const lastAdmin = u.role === 'admin' && adminCount <= 1;
+              const demoteBlock = roleChangeBlock(users, u, 'operator');
+              const removeBlock = userRemovalBlock(users, u);
               return (
                 <TableRow key={u.username}>
                   <TableCell className='font-medium'>{u.username}</TableCell>
@@ -241,8 +240,8 @@ function UsersTab({
                     <select
                       className={ROLE_STYLE}
                       value={u.role}
-                      disabled={busy || lastAdmin}
-                      title={lastAdmin ? 'The last admin cannot be demoted.' : undefined}
+                      disabled={busy || demoteBlock !== null}
+                      title={demoteBlock ?? undefined}
                       onChange={(e) => onSetRole(u.username, e.target.value as UserRole)}
                     >
                       <option value='operator'>operator</option>
@@ -255,8 +254,8 @@ function UsersTab({
                         <Button
                           variant='ghost'
                           size='sm'
-                          disabled={busy || lastAdmin}
-                          title={lastAdmin ? 'The last admin cannot be removed.' : 'Remove user'}
+                          disabled={busy || removeBlock !== null}
+                          title={removeBlock ?? 'Remove user'}
                         >
                           <Trash2 />
                         </Button>
@@ -267,6 +266,13 @@ function UsersTab({
                           <AlertDialogDescription>
                             This user will no longer be able to sign into the UI, and any active
                             session of theirs is revoked.
+                            {users.length === 1 && (
+                              <>
+                                {' '}
+                                This is the last account — nobody will be able to sign in until you
+                                add another.
+                              </>
+                            )}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
