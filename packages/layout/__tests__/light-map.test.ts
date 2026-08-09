@@ -12,6 +12,7 @@ import type { Layout } from '../src/types';
 const grid7x7 = (): Layout => resolveLayout({ preset: 'grid-7x7' });
 const grid7x2 = (): Layout => resolveLayout({ kind: 'grid', cols: 7, rows: 2 });
 const ring6 = (): Layout => resolveLayout({ preset: 'ring-6' });
+const hollow25 = (): Layout => resolveLayout({ preset: 'ring-25-hollow' });
 
 const isPermutation = (map: number[], count: number): boolean => {
   if (map.length !== count) return false;
@@ -87,9 +88,32 @@ describe('auto-map heuristics', () => {
     expect(availableStrategies(grid7x2()).some((s) => s.id === 'rotate90')).toBe(false);
   });
 
-  it('rings only get identity + reverse', () => {
+  it('a single ring gets the order strategies, not the grid ones', () => {
     const ids = availableStrategies(ring6()).map((s) => s.id);
-    expect(ids).toEqual(['identity', 'reverse']);
+    expect(ids).toEqual(['identity', 'reverse', 'ringCounterClockwise']);
+  });
+
+  it('concentric rings also offer innermost-first', () => {
+    const ids = availableStrategies(hollow25()).map((s) => s.id);
+    expect(ids).toEqual(['identity', 'reverse', 'ringCounterClockwise', 'ringsInnerFirst']);
+  });
+
+  it('ringCounterClockwise reverses each ring but keeps its 12 o\u2019clock start', () => {
+    const map = autoMap(ring6(), 'ringCounterClockwise');
+    expect(isPermutation(map, 6)).toBe(true);
+    expect(map[0]).toBe(0);
+    expect(map[1]).toBe(5);
+    expect(map[5]).toBe(1);
+  });
+
+  it('ringsInnerFirst drives the centre from physical output 0', () => {
+    const layout = hollow25();
+    const map = autoMap(layout, 'ringsInnerFirst');
+    expect(isPermutation(map, layout.count)).toBe(true);
+    const innermost = layout.fixtures.filter((f) => f.ring === 0).map((f) => f.index);
+    expect(innermost.map((i) => map[i])).toEqual(innermost.map((_, slot) => slot));
+    // the outermost ring lands at the end
+    expect(map[0]).toBe(layout.count - layout.perimeter.length);
   });
 
   it('unknown strategy id falls back to identity', () => {

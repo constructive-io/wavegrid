@@ -9,7 +9,19 @@
 
 import type { UnifiedRouting } from './routing';
 
-export type Topology = 'grid' | 'ring' | 'filledRing';
+export type Topology = 'grid' | 'ring' | 'filledRing' | 'rings';
+
+/**
+ * One concentric ring of a `rings` layout. `radius` is 0..1 (1 = outermost);
+ * `phase` rotates the ring in degrees so its fixtures can sit between the ones
+ * outside it instead of lining up radially. A ring at radius 0 is the centre
+ * fixture and must have `count: 1`.
+ */
+export interface RingSpec {
+  count: number;
+  radius: number;
+  phase?: number;
+}
 
 /**
  * A single cannon's position. `index` is the logical id used everywhere else
@@ -63,17 +75,27 @@ export interface Layout {
 
 export type RunMode = 'simple' | 'distributed';
 
+/**
+ * Layout kinds a config can ask for. `annulus` is sugar: it distributes a
+ * fixture count over concentric rings and resolves to a `rings` layout.
+ */
+export type LayoutKind = Topology | 'annulus';
+
 /** How a layout is described in a config file. */
 export interface LayoutSpec {
   /** Reference a built-in preset by id (takes precedence over `kind`). */
   preset?: string;
-  kind?: Topology;
+  kind?: LayoutKind;
   /** grid: number of columns. */
   cols?: number;
   /** grid: number of rows. */
   rows?: number;
-  /** ring / filledRing: number of cannons. */
+  /** ring / filledRing / annulus: number of cannons. */
   count?: number;
+  /** rings: the concentric rings, in any order (outer-first is the result). */
+  rings?: RingSpec[];
+  /** annulus: radius of the hole in the middle, 0..1 (0 = solid disc). */
+  innerRadius?: number;
   /** Override the generated id/name. */
   id?: string;
   name?: string;

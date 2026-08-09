@@ -51,12 +51,22 @@ describe('runConfigSet', () => {
     expect(store.getProjectConfig('p')?.server).toEqual({ host: '10.0.0.1', port: 3000 });
   });
 
-  it('rejects an unknown preset without writing', async () => {
+  it('accepts shorthand for a custom shape', async () => {
+    isolate();
+    const store = getStore();
+    store.createProject('p', { layout: { preset: 'grid-7x7' } });
+
+    await runConfigSet('layout', 'annulus:25@0.4', {});
+
+    expect(store.getProjectConfig('p')?.layout).toEqual({ kind: 'annulus', count: 25, innerRadius: 0.4 });
+  });
+
+  it('rejects an unknown layout without writing', async () => {
     isolate();
     const store = getStore();
     store.createProject('p', { layout: { preset: 'ring-6' } });
 
-    await expect(runConfigSet('layout', 'nope', {})).rejects.toThrow(/Unknown preset/);
+    await expect(runConfigSet('layout', 'nope', {})).rejects.toThrow(/Unknown layout/);
     expect(store.getProjectConfig('p')?.layout).toEqual({ preset: 'ring-6' });
   });
 

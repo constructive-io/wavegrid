@@ -15,7 +15,13 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { EditableConfig, LayoutChoice } from '@/types/ipc';
 
-type Shape = 'preset' | 'grid' | 'ring' | 'filledRing';
+type Shape = 'preset' | 'grid' | 'ring' | 'annulus' | 'rings' | 'filledRing';
+
+/** Cannons per ring, outermost first — "12,8,4,1". */
+function ringCountsValid(text: string | undefined): boolean {
+  const parts = (text ?? '').split(',').map((p) => p.trim());
+  return parts.length > 0 && parts.every((p) => /^\d+$/.test(p) && Number(p) >= 1);
+}
 
 function shapeOf(layout: LayoutChoice): Shape {
   if (layout.preset) return 'preset';
@@ -130,7 +136,13 @@ export function ConfigRoute({ project, config, loading, onSave, busy }: ConfigRo
       ? !!draft.layout.preset
       : shape === 'grid'
         ? Number(draft.layout.cols) >= 1 && Number(draft.layout.rows) >= 1
-        : Number(draft.layout.count) >= 1;
+        : shape === 'rings'
+          ? ringCountsValid(draft.layout.ringCounts)
+          : shape === 'annulus'
+            ? Number(draft.layout.count) >= 1 &&
+            Number(draft.layout.innerRadius) >= 0 &&
+            Number(draft.layout.innerRadius) < 1
+            : Number(draft.layout.count) >= 1;
   const valid =
     layoutValid &&
     Number.isInteger(numeric(String(draft.serverPort))) &&
@@ -193,12 +205,22 @@ export function ConfigRoute({ project, config, loading, onSave, busy }: ConfigRo
                 if (next === 'preset') setLayout({ preset: draft.layout.preset ?? '' });
                 else if (next === 'grid')
                   setLayout({ kind: 'grid', cols: draft.layout.cols ?? 7, rows: draft.layout.rows ?? 7 });
+                else if (next === 'rings')
+                  setLayout({ kind: 'rings', ringCounts: draft.layout.ringCounts ?? '12,8,4,1' });
+                else if (next === 'annulus')
+                  setLayout({
+                    kind: 'annulus',
+                    count: draft.layout.count ?? 25,
+                    innerRadius: draft.layout.innerRadius ?? 0.5
+                  });
                 else setLayout({ kind: next, count: draft.layout.count ?? 6 });
               }}
               options={[
                 { value: 'preset', label: 'Preset' },
                 { value: 'grid', label: 'Grid' },
                 { value: 'ring', label: 'Ring' },
+                { value: 'annulus', label: 'Ring w/ hole' },
+                { value: 'rings', label: 'Concentric rings' },
                 { value: 'filledRing', label: 'Filled ring' }
               ]}
             />
@@ -239,6 +261,38 @@ export function ConfigRoute({ project, config, loading, onSave, busy }: ConfigRo
               inputMode='numeric'
               value={String(draft.layout.count ?? '')}
               onChange={(v) => setLayout({ kind: shape, count: Number(v) })}
+            />
+          )}
+          {shape === 'annulus' && (
+            <div className='flex gap-4'>
+              <Field
+                id='cfg-count'
+                label='Cannons'
+                width='w-28'
+                inputMode='numeric'
+                value={String(draft.layout.count ?? '')}
+                onChange={(v) =>
+                  setLayout({ kind: 'annulus', count: Number(v), innerRadius: draft.layout.innerRadius ?? 0.5 })
+                }
+              />
+              <Field
+                id='cfg-inner'
+                label='Hole size (0–1)'
+                width='w-28'
+                inputMode='decimal'
+                value={String(draft.layout.innerRadius ?? '')}
+                onChange={(v) =>
+                  setLayout({ kind: 'annulus', count: draft.layout.count ?? 25, innerRadius: Number(v) })
+                }
+              />
+            </div>
+          )}
+          {shape === 'rings' && (
+            <Field
+              id='cfg-rings'
+              label='Cannons per ring, outermost first'
+              value={draft.layout.ringCounts ?? ''}
+              onChange={(v) => setLayout({ kind: 'rings', ringCounts: v })}
             />
           )}
           <div className='flex flex-col gap-1.5'>

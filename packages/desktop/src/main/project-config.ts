@@ -5,6 +5,7 @@ import {
   DEFAULT_CONFIG,
   getPresetNames,
   type LayoutSpec,
+  parseLayoutSpec,
   resolveLayout,
   type WavegridConfig
 } from '@wavegrid/layout';
@@ -32,6 +33,14 @@ export function buildLayoutSpec(choice: LayoutChoice): LayoutSpec {
       throw new Error(`A ${choice.kind} layout needs a cannon count.`);
     }
     spec = { kind: choice.kind, count: choice.count };
+  } else if (choice.kind === 'annulus') {
+    if (choice.count == null) throw new Error('An annulus layout needs a cannon count.');
+    spec = { kind: 'annulus', count: choice.count, innerRadius: choice.innerRadius ?? 0.5 };
+  } else if (choice.kind === 'rings') {
+    if (!choice.ringCounts?.trim()) {
+      throw new Error('A rings layout needs cannons per ring, e.g. 12,8,4,1.');
+    }
+    spec = parseLayoutSpec(`rings:${choice.ringCounts.trim()}`);
   } else {
     throw new Error('Pick a preset or a custom shape for the layout.');
   }
@@ -43,7 +52,21 @@ export function buildLayoutSpec(choice: LayoutChoice): LayoutSpec {
 function specToChoice(spec: LayoutSpec | undefined): LayoutChoice {
   if (!spec) return { preset: DEFAULT_CONFIG.layout.preset };
   if (spec.preset) return { preset: spec.preset };
-  return { kind: spec.kind, cols: spec.cols, rows: spec.rows, count: spec.count };
+  if (spec.kind === 'rings') {
+    // Round-trip the ring list back into the shorthand the editor binds to.
+    const counts = [...(spec.rings ?? [])]
+      .sort((a, b) => b.radius - a.radius)
+      .map(r => r.count)
+      .join(',');
+    return { kind: 'rings', ringCounts: counts };
+  }
+  return {
+    kind: spec.kind,
+    cols: spec.cols,
+    rows: spec.rows,
+    count: spec.count,
+    innerRadius: spec.innerRadius
+  };
 }
 
 /** Build the ProjectConfig persisted for a brand-new project. Mirrors the CLI's

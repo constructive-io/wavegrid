@@ -1,4 +1,4 @@
-import { resolveLayout, type WavegridConfig } from '@wavegrid/layout';
+import { LAYOUT_SPEC_FORMS, parseLayoutSpec, resolveLayout, type WavegridConfig } from '@wavegrid/layout';
 import type { Inquirerer, Question } from 'inquirerer';
 import c from 'yanse';
 
@@ -8,12 +8,11 @@ import { type Flags, getStore, resolveProjectName } from '../project';
 /** Settable config keys and how each maps into the stored project config. */
 const SETTERS: Record<string, (config: Partial<WavegridConfig>, value: string) => void> = {
   layout: (config, value) => {
-    if (!knownPresets().includes(value)) {
-      throw new Error(`Unknown preset "${value}". Known: ${knownPresets().join(', ')}.`);
-    }
-    // Validate the preset actually resolves before persisting.
-    resolveLayout({ preset: value });
-    config.layout = { preset: value };
+    // A preset id, or shorthand for a custom shape ("annulus:25@0.4").
+    const spec = parseLayoutSpec(value);
+    // Validate it actually resolves before persisting.
+    resolveLayout(spec);
+    config.layout = spec;
   },
   mode: (config, value) => {
     if (value !== 'auto' && value !== 'simple' && value !== 'distributed') {
@@ -41,7 +40,7 @@ SETTERS.preset = SETTERS.layout;
 
 /** Canonical, user-facing keys (aliases like `preset` are accepted but hidden). */
 const KEY_CHOICES = [
-  { value: 'layout', description: 'Layout preset (grid/ring/filled ring)' },
+  { value: 'layout', description: 'Layout: a preset id or shorthand (grid/ring/annulus/rings)' },
   { value: 'mode', description: 'Run mode: auto | simple | distributed' },
   { value: 'port', description: 'Server port' },
   { value: 'host', description: 'Server host/bind address' },
@@ -68,7 +67,13 @@ function intOrThrow(key: string, value: string): number {
 async function promptValue(prompter: Inquirerer, key: string): Promise<string> {
   let question: Question;
   if (key === 'layout' || key === 'preset') {
-    question = { type: 'autocomplete', name: 'value', message: 'Layout preset', options: knownPresets(), required: true };
+    question = {
+      type: 'autocomplete',
+      name: 'value',
+      message: `Layout (preset, or ${LAYOUT_SPEC_FORMS.slice(1).join(' | ')})`,
+      options: knownPresets(),
+      required: true
+    };
   } else if (key === 'mode') {
     question = { type: 'list', name: 'value', message: 'Run mode', options: ['auto', 'simple', 'distributed'], required: true };
   } else if (key === 'port' || key === 'ui-port') {

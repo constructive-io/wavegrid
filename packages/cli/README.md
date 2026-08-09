@@ -130,4 +130,13 @@ via walk-up search (`wavegrid.json`, `.wavegridrc`, `package.json` keys,
 }
 ```
 
-Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `ring-25-filled`.
+Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `ring-25-filled`, `ring-25-hollow`, `disc-25`.
+
+`layout` also takes shorthand for a custom shape, so a project can map its own rig without editing JSON:
+
+```sh
+wavegrid projects config set layout grid:9x4        # cols × rows
+wavegrid projects config set layout ring:6          # one ring
+wavegrid projects config set layout annulus:25@0.5  # concentric rings, hole in the middle (0 = solid disc)
+wavegrid projects config set layout rings:12,8,4,1  # explicit rings, outermost first
+```

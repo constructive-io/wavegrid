@@ -56,8 +56,8 @@ describe('buildLightMapView', () => {
     expect(view.rows[0].corrected).toBe(true);
     expect(view.rows[2].corrected).toBe(false);
     expect(view.identity).toBe(false);
-    // rings only ever get identity + reverse.
-    expect(view.strategies.map((s) => s.id)).toEqual(['identity', 'reverse']);
+    // a ring gets the order strategies, never the grid ones.
+    expect(view.strategies.map((s) => s.id)).toEqual(['identity', 'reverse', 'ringCounterClockwise']);
     // no OSC target configured → console.
     expect(view.rows[0].oscTarget).toMatch(/console/);
   });
