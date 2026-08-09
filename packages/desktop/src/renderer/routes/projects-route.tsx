@@ -109,10 +109,10 @@ export function ProjectsRoute({
                   size='sm'
                   disabled={busy}
                   onClick={() => onEditConfig(p.name)}
-                  title='Edit config'
+                  title='Switch to this project and edit its layout'
                 >
                   <Settings2 />
-                  Config
+                  Layout
                 </Button>
                 <Button
                   variant={p.active ? 'outline' : 'default'}
