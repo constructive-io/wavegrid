@@ -15,6 +15,29 @@ interface MiniGridPreviewProps {
   isPattern?: boolean;
   /** Render as a ring of N fixtures (matching @wavegrid/layout ringLayout) instead of a 7×7 grid. */
   ring?: number;
+  /**
+   * Render the installation's own fixtures instead of a ring or a grid — the
+   * only way to preview a concentric layout, where radius carries meaning.
+   * Takes precedence over `ring`.
+   */
+  fixtures?: PreviewFixture[];
+}
+
+/** The geometry a preview needs — a structural subset of a layout Fixture. */
+export interface PreviewFixture {
+  x: number;
+  y: number;
+  angle: number;
+  radius: number;
+}
+
+interface Dot {
+  x: number;
+  y: number;
+  u: number;
+  v: number;
+  angle: number;
+  radius: number;
 }
 
 function hsbToRgb(h: number, s: number, b: number): [number, number, number] {
@@ -55,18 +78,31 @@ function buildRenderFn(source: string, isPattern: boolean): ((ctx: Record<string
 }
 
 /** Fixture positions matching @wavegrid/layout ringLayout: 12 o'clock, clockwise. */
-function ringGeometry(count: number): { x: number; y: number; u: number; v: number; angle: number }[] {
-  const pts = [];
+function ringGeometry(count: number): Dot[] {
+  const pts: Dot[] = [];
   for (let i = 0; i < count; i++) {
     const angle = -Math.PI / 2 + (i / count) * Math.PI * 2;
     const x = Math.cos(angle);
     const y = Math.sin(angle);
-    pts.push({ x, y, u: (x + 1) / 2, v: (y + 1) / 2, angle: Math.atan2(y, x) });
+    pts.push({ x, y, u: (x + 1) / 2, v: (y + 1) / 2, angle: Math.atan2(y, x), radius: 1 });
   }
   return pts;
 }
 
-export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = false, ring }: MiniGridPreviewProps) {
+/** Fixture geometry as dots, normalized to the widest fixture. */
+function fixtureGeometry(fixtures: PreviewFixture[]): Dot[] {
+  const span = Math.max(1e-6, ...fixtures.map((f) => Math.hypot(f.x, f.y)));
+  return fixtures.map((f) => ({
+    x: f.x / span,
+    y: f.y / span,
+    u: (f.x / span + 1) / 2,
+    v: (f.y / span + 1) / 2,
+    angle: f.angle,
+    radius: f.radius
+  }));
+}
+
+export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = false, ring, fixtures }: MiniGridPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const frameRef = useRef(0);
@@ -84,16 +120,20 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
     if (!ctx2d) return;
 
     const isRing = typeof ring === 'number' && ring > 0;
-    const count = isRing ? (ring as number) : COUNT;
-    const cols = isRing ? count : COLS;
-    const rows = isRing ? 1 : ROWS;
-    const geo = isRing ? ringGeometry(count) : null;
+    const geo = fixtures?.length
+      ? fixtureGeometry(fixtures)
+      : isRing ? ringGeometry(ring as number) : null;
+    const count = geo ? geo.length : COUNT;
+    const cols = geo ? count : COLS;
+    const rows = geo ? 1 : ROWS;
 
     startRef.current = performance.now();
     frameRef.current = 0;
 
-    const cellW = canvas.width / COLS;
-    const cellH = canvas.height / ROWS;
+    const width = canvas.width;
+    const height = canvas.height;
+    const cellW = width / COLS;
+    const cellH = height / ROWS;
     const buf: { h: number; s: number; b: number }[] = new Array(count);
     for (let i = 0; i < count; i++) buf[i] = { h: 0, s: 0, b: 0 };
 
@@ -145,7 +185,7 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
         polar(i: number): [number, number] {
           if (geo) {
             const p = geo[i] || geo[0];
-            return [1, p.angle];
+            return [p.radius, p.angle];
           }
           const col = i % COLS;
           const row = Math.floor(i / COLS);
@@ -183,11 +223,12 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
       if (geo) {
         // Ring of glowing dots on black.
         ctx2d!.fillStyle = '#0a0a12';
-        ctx2d!.fillRect(0, 0, canvas.width, canvas.height);
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2;
-        const ringR = canvas.width * 0.34;
-        const dotR = Math.max(3, canvas.width * 0.11);
+        ctx2d!.fillRect(0, 0, width, height);
+        const cx = width / 2;
+        const cy = height / 2;
+        const ringR = width * 0.36;
+        // Dots have to shrink as fixtures multiply or a 25-cannon room is a blob.
+        const dotR = Math.max(1.5, width * (count > 12 ? 0.05 : 0.11));
         for (let i = 0; i < count; i++) {
           const p = geo[i];
           const px = cx + p.x * ringR;
@@ -217,7 +258,7 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
 
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [speed, size, ring]);
+  }, [speed, size, ring, fixtures]);
 
   return (
     <canvas

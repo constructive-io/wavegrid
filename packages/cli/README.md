@@ -130,7 +130,7 @@ via walk-up search (`wavegrid.json`, `.wavegridrc`, `package.json` keys,
 }
 ```
 
-Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `ring-25-filled`, `ring-25-hollow`, `disc-25`.
+Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `nova`, `grace-cathedral`, `ring-25-filled`, `ring-25-hollow`, `disc-25`.
 
 `layout` also takes shorthand for a custom shape, so a project can map its own rig without editing JSON:
 

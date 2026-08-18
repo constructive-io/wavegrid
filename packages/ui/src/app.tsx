@@ -7,10 +7,12 @@ import { ColorWheel } from '@/components/color-wheel';
 import { ControlGrid, ControlGroup } from '@/components/control-grid';
 import { DropsControls, useDrops } from '@/components/drops-tab';
 import { FlagsTab, useFlagAnimation } from '@/components/flags-tab';
+import { GraceTab } from '@/components/grace-tab';
 import { GradientBar, useGradient } from '@/components/gradient-tab';
 import type { GridMode } from '@/components/grid-display';
 import { GridDisplay } from '@/components/grid-display';
 import { LoginScreen } from '@/components/login-screen';
+import type { PreviewFixture } from '@/components/mini-grid-preview';
 import { useMotion } from '@/components/motion-tab';
 import { NovaTab } from '@/components/nova-tab';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
@@ -46,6 +48,7 @@ const tabs: { key: GridMode; label: string }[] = [
   { key: 'pride', label: 'Pride' },
   { key: 'usa', label: 'USA' },
   { key: 'nova', label: 'Nova' },
+  { key: 'grace', label: 'Grace' },
   { key: 'patterns', label: 'Patterns' },
   { key: 'sequences', label: 'Sequences' },
   { key: 'playlist', label: 'Playlist' },
@@ -70,7 +73,7 @@ function ToolContent({
   flags, brightness, audio,
   isPhone,
   onShift,
-  numCannons, gridColumns,
+  numCannons, gridColumns, fixtures,
   activePattern, onPatternSelect,
   playlistState
 }: {
@@ -95,6 +98,7 @@ function ToolContent({
   onShift: (vx: number, vy: number) => void;
   numCannons: number;
   gridColumns: number;
+  fixtures?: PreviewFixture[];
   activePattern: string | null;
   onPatternSelect: (id: string) => void;
   playlistState: PlaylistState | null;
@@ -235,6 +239,17 @@ function ToolContent({
           onAnimSpeed={onAnimSpeed}
           numCannons={numCannons}
           gridColumns={gridColumns}
+        />
+      )}
+
+      {tab === 'grace' && (
+        <GraceTab
+          send={send}
+          activePattern={activePattern}
+          onPatternSelect={onPatternSelect}
+          animSpeed={animSpeed}
+          onAnimSpeed={onAnimSpeed}
+          fixtures={fixtures}
         />
       )}
 
@@ -770,6 +785,7 @@ export default function Home() {
     onShift: handleShift,
     numCannons: NUM_CANNONS,
     gridColumns: GRID_COLUMNS,
+    fixtures: FIXTURES,
     activePattern,
     onPatternSelect: handlePatternSelect,
     playlistState

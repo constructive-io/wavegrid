@@ -12,6 +12,45 @@ describe('resolveLayout', () => {
     expect(resolveLayout({ preset: 'ring-25-filled' }).count).toBe(25);
   });
 
+  it('resolves grace-cathedral as two rings of twelve plus a centre', () => {
+    const grace = resolveLayout({ preset: 'grace-cathedral' });
+    expect(grace.count).toBe(25);
+    expect(grace.topology).toBe('rings');
+    expect(grace.hasGridCoords).toBe(false);
+
+    const radii = [...new Set(grace.fixtures.map(f => +f.radius.toFixed(3)))].sort((a, b) => b - a);
+    expect(radii).toEqual([1, 0.62, 0]);
+
+    const byRadius = (r: number) => grace.fixtures.filter(f => +f.radius.toFixed(3) === r);
+    expect(byRadius(1)).toHaveLength(12);
+    expect(byRadius(0.62)).toHaveLength(12);
+    expect(byRadius(0)).toHaveLength(1);
+
+    // Outer ring first, then inner, then the centre — the order looks in the UI rely on.
+    expect(grace.fixtures.slice(0, 12).every(f => f.radius === 1)).toBe(true);
+    expect(grace.fixtures[24].radius).toBe(0);
+
+    // Ring index counts from the centre out, so the centre is its own ring 0.
+    expect(grace.fixtures[24].ring).toBe(0);
+    expect(grace.fixtures[0].ring).toBe(2);
+  });
+
+  it('staggers grace-cathedral’s inner ring half a step off the outer one', () => {
+    const grace = resolveLayout({ preset: 'grace-cathedral' });
+    const posOf = (f: { angle: number }) =>
+      (((f.angle + Math.PI / 2) / (Math.PI * 2)) % 1 + 1) % 1;
+    const outer = grace.fixtures.filter(f => f.radius === 1).map(posOf);
+    const inner = grace.fixtures.filter(f => +f.radius.toFixed(3) === 0.62).map(posOf);
+
+    for (const p of inner) {
+      const nearest = Math.min(...outer.map(o => {
+        const d = Math.abs(o - p);
+        return d > 0.5 ? 1 - d : d;
+      }));
+      expect(nearest).toBeCloseTo(0.5 / 12, 5);
+    }
+  });
+
   it('resolves generator specs', () => {
     expect(resolveLayout({ kind: 'grid', cols: 10, rows: 10 }).count).toBe(100);
     expect(resolveLayout({ kind: 'ring', count: 12 }).count).toBe(12);
