@@ -10,6 +10,21 @@ export const presets: Record<string, () => Layout> = {
   'grid-7x2': () => gridLayout({ cols: 7, rows: 2, id: 'grid-7x2', name: '7×2 grid (14)' }),
   'ring-6': () => ringLayout({ count: 6, id: 'ring-6', name: '6-cannon ring' }),
   nova: () => ringLayout({ count: 6, id: 'nova', name: 'Nova (6-laser ring)' }),
+  /**
+   * Grace Cathedral: two concentric rings of twelve with a single cannon in the
+   * middle. The 25 cannons there were first configured as a filled disc, but
+   * the room is really two rings — the inner ring is staggered half a step so
+   * the two do not line up radially.
+   */
+  'grace-cathedral': () => ringsLayout({
+    rings: [
+      { count: 12, radius: 1 },
+      { count: 12, radius: 0.62, phase: 15 },
+      { count: 1, radius: 0 }
+    ],
+    id: 'grace-cathedral',
+    name: 'Grace Cathedral (12 + 12 + centre)'
+  }),
   'ring-25-filled': () => filledRingLayout({ count: 25, id: 'ring-25-filled', name: '25-cannon filled ring' }),
   'ring-25-hollow': () => annulusLayout({ count: 25, innerRadius: 0.5, id: 'ring-25-hollow', name: '25-cannon ring with a hollow centre' }),
   'disc-25': () => annulusLayout({ count: 25, innerRadius: 0, id: 'disc-25', name: '25-cannon disc (concentric rings)' })

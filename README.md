@@ -104,7 +104,7 @@ Operators don't run these — they use `wavegrid start` (see [Running a Show](#r
 
 ## Layouts
 
-The physical arrangement is a **layout** stored in the project — never code. Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `ring-25-filled`, `ring-25-hollow`, `disc-25`. Pick one at `wavegrid projects create`, or change it later:
+The physical arrangement is a **layout** stored in the project — never code. Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `nova`, `grace-cathedral` (12 + 12 + centre), `ring-25-filled`, `ring-25-hollow`, `disc-25`. Pick one at `wavegrid projects create`, or change it later:
 
 ```sh
 wavegrid projects config set layout grid-7x7        # a built-in preset
