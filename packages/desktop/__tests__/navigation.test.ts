@@ -19,8 +19,8 @@ describe('sidebar navigation', () => {
     expect(grouped.length).toBe(new Set(grouped).size);
   });
 
-  it('keeps running a show to two items, ahead of everything else', () => {
-    expect(NAV_GROUPS[0]).toEqual({ id: 'run', label: 'Run', routes: ['show', 'status'] });
+  it('keeps running a show to the show, its looks, and its health, ahead of everything else', () => {
+    expect(NAV_GROUPS[0]).toEqual({ id: 'run', label: 'Run', routes: ['show', 'nova', 'status'] });
   });
 
   it('hides the admin vocabulary under Advanced', () => {

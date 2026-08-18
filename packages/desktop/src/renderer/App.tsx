@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Cog, Cpu, FolderKanban, Lightbulb, MonitorPlay, Radio, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
+import { Activity, AlertTriangle, Cog, Cpu, Flame, FolderKanban, Lightbulb, MonitorPlay, Radio, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import * as React from 'react';
 
 import { type AppLinkRenderer } from '@/components/ui/app-bar';
@@ -28,6 +28,7 @@ import { AccessRoute } from '@/renderer/routes/access-route';
 import { ConfigRoute } from '@/renderer/routes/config-route';
 import { DevicesRoute } from '@/renderer/routes/devices-route';
 import { LightsRoute } from '@/renderer/routes/lights-route';
+import { NovaRoute } from '@/renderer/routes/nova-route';
 import { OutputRoute } from '@/renderer/routes/output-route';
 import { ProjectSwitcher } from '@/renderer/routes/project-switcher';
 import { ProjectsRoute } from '@/renderer/routes/projects-route';
@@ -40,6 +41,7 @@ type AppIcon = React.ComponentType<{ className?: string; 'aria-hidden'?: boolean
 
 const ROUTE_ICON: Record<Route, AppIcon> = {
   show: MonitorPlay,
+  nova: Flame,
   status: Activity,
   projects: FolderKanban,
   config: SlidersHorizontal,
@@ -333,6 +335,8 @@ export function App() {
       void refreshSecrets();
     }
     if (route === 'lights') void refreshLightMap();
+    // Nova previews the project's own ring, so it needs the resolved layout.
+    if (route === 'nova') void refreshConfig();
     if (route === 'output') void refreshOsc();
     if (route === 'settings') void refreshStore();
     if (route === 'status') void refreshDoctor();
@@ -385,6 +389,23 @@ export function App() {
           onStart={onStart}
           onStop={onStop}
           busy={busy}
+        />
+      )}
+      {route === 'nova' && (
+        <NovaRoute
+          project={editingProject}
+          layoutLabel={config?.layoutLabel ?? null}
+          count={config?.cannonCount ?? 6}
+          brainLive={status.running && status.project === editingProject}
+          onApply={(look) => {
+            if (editingProject) void window.wavegrid.nova.apply(editingProject, look);
+          }}
+          onSpeed={(value) => {
+            if (editingProject) void window.wavegrid.nova.speed(editingProject, value);
+          }}
+          onBlackout={() => {
+            if (editingProject) void window.wavegrid.nova.blackout(editingProject);
+          }}
         />
       )}
       {route === 'status' && (

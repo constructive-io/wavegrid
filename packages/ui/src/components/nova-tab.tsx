@@ -44,6 +44,13 @@ const SUNSET_COLORS: Palette = {
   css: 'conic-gradient(#ff3b1f, #ff9a3c, #ff4da6, #a24dff)'
 };
 
+// Amber is its own family: one hue for the whole ring, so every amber look
+// below says what it has to say with brightness alone.
+const AMBER_COLORS: Palette = {
+  colorsCode: `var COLORS = [[40,100,100]];`,
+  css: 'conic-gradient(#ffb000, #7a4f00, #ffb000)'
+};
+
 const RAINBOW_COLORS: Palette = {
   colorsCode: `var COLORS = [[0,100,100],[60,100,100],[120,100,100],[180,100,100],[240,100,100],[300,100,100]];`,
   css: 'conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)'
@@ -146,6 +153,60 @@ function ringStatic(name: string, colorsCode: string): string {
   }`, colorsCode);
 }
 
+// ── Amber: one hue, brightness only ───────────────────────────────────────
+// These mirror the shared amber looks in @wavegrid/animations so the artist UI
+// and the desktop Nova panel offer the same vocabulary. LEVELS is the same
+// brightness ladder: six steps for six lasers.
+function amber(name: string, body: string): string {
+  return wrap(name, body, `${AMBER_COLORS.colorsCode}\nvar LEVELS = [100,74,52,34,20,10];`);
+}
+
+/** Which of the ring's slots a fixture sits in, from its angle. */
+const AMBER_SLOT = `  var slot = Math.round(ringPos(ctx, i) * ctx.count) % ctx.count;`;
+
+/** Every laser at one brightness. */
+function amberFlat(name: string, level: number): string {
+  return amber(name, `  ctx.fill(40, 100, ${level});`);
+}
+
+const AMBER_PRESETS_CODE = {
+  alternate: amber('amber-alternate', `  for (var i = 0; i < ctx.count; i++) {
+${AMBER_SLOT}
+    ctx.set(i, 40, 100, slot % 2 === 0 ? 100 : 22);
+  }`),
+  ramp: amber('amber-ramp', `  for (var i = 0; i < ctx.count; i++) {
+${AMBER_SLOT}
+    ctx.set(i, 40, 100, LEVELS[slot % LEVELS.length]);
+  }`),
+  horizon: amber('amber-horizon', `  for (var i = 0; i < ctx.count; i++) {
+    ctx.set(i, 40, 100, ringPos(ctx, i) < 0.5 ? 100 : 25);
+  }`)
+};
+
+const AMBER_MOTION_CODE = {
+  chase: amber('amber-chase', `  var lit = Math.floor(ctx.t * 4) % ctx.count;
+  for (var i = 0; i < ctx.count; i++) {
+${AMBER_SLOT}
+    ctx.set(i, 40, 100, slot === lit ? 100 : 8);
+  }`),
+  levels: amber('amber-levels', `  var offset = Math.floor(ctx.t * 3);
+  for (var i = 0; i < ctx.count; i++) {
+${AMBER_SLOT}
+    ctx.set(i, 40, 100, LEVELS[(slot + offset) % LEVELS.length]);
+  }`),
+  heartbeat: amber('amber-heartbeat', `  var swing = 0.5 + 0.5 * Math.sin(ctx.t * 2);
+  for (var i = 0; i < ctx.count; i++) {
+${AMBER_SLOT}
+    var level = slot % 2 === 0 ? swing : 1 - swing;
+    ctx.set(i, 40, 100, 12 + 88 * level);
+  }`),
+  embers: amber('amber-embers', `  for (var i = 0; i < ctx.count; i++) {
+    var pos = ringPos(ctx, i);
+    var flicker = Math.sin(ctx.t * 1.3 + pos * 11) * 0.6 + Math.sin(ctx.t * 0.8 + pos * 27) * 0.4;
+    ctx.set(i, 40, 100, Math.max(5, 55 + 40 * flicker));
+  }`)
+};
+
 interface PatternDef {
   name: string;
   gradient: string;
@@ -176,6 +237,24 @@ const BRIGHTNESS_AROUND: PatternDef[] = [
   { name: 'Ocean Wave', gradient: OCEAN_COLORS.css, code: ringPulseWave('ocean-wave', OCEAN_COLORS.colorsCode) },
   { name: 'Sunset Wave', gradient: SUNSET_COLORS.css, code: ringPulseWave('sunset-wave', SUNSET_COLORS.colorsCode) },
   { name: 'Fire Breathe', gradient: 'radial-gradient(circle, #ffb300, #ff2200)', code: ringBreathe('fire-breathe', FIRE_COLORS.colorsCode) }
+];
+
+const AMBER_PRESETS: PatternDef[] = [
+  { name: 'Amber', gradient: AMBER_COLORS.css, code: amberFlat('amber', 100) },
+  { name: 'Glow', gradient: AMBER_COLORS.css, code: amberFlat('amber-glow', 45) },
+  { name: 'Alternate', gradient: AMBER_COLORS.css, code: AMBER_PRESETS_CODE.alternate },
+  { name: 'Ramp', gradient: AMBER_COLORS.css, code: AMBER_PRESETS_CODE.ramp },
+  { name: 'Horizon', gradient: AMBER_COLORS.css, code: AMBER_PRESETS_CODE.horizon }
+];
+
+const AMBER_MOTION: PatternDef[] = [
+  { name: 'Chase', gradient: AMBER_COLORS.css, code: AMBER_MOTION_CODE.chase },
+  { name: 'Comet', gradient: AMBER_COLORS.css, code: ringComet('amber-comet', AMBER_COLORS.colorsCode) },
+  { name: 'Wave', gradient: AMBER_COLORS.css, code: ringPulseWave('amber-wave', AMBER_COLORS.colorsCode) },
+  { name: 'Levels', gradient: AMBER_COLORS.css, code: AMBER_MOTION_CODE.levels },
+  { name: 'Heartbeat', gradient: AMBER_COLORS.css, code: AMBER_MOTION_CODE.heartbeat },
+  { name: 'Embers', gradient: AMBER_COLORS.css, code: AMBER_MOTION_CODE.embers },
+  { name: 'Breathe', gradient: 'radial-gradient(circle, #ffc44d, #7a4f00)', code: ringBreathe('amber-breathe', AMBER_COLORS.colorsCode) }
 ];
 
 const RING_COLORS: PatternDef[] = [
@@ -351,6 +430,8 @@ export function NovaTab({
 
       <ControlGrid minCellWidth={200}>
         {renderGroup('Nova — Signature', 'nova-sig', NOVA_SIGNATURE)}
+        {renderGroup('Amber — Presets', 'amber-preset', AMBER_PRESETS)}
+        {renderGroup('Amber — Motion', 'amber-motion', AMBER_MOTION)}
         {renderGroup('Colour Around the Ring', 'nova-color', COLOR_AROUND)}
         {renderGroup('Brightness Around the Ring', 'nova-bright', BRIGHTNESS_AROUND)}
         {renderGroup('Ring Colours', 'nova-ring', RING_COLORS)}

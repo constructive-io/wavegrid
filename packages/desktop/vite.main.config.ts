@@ -17,6 +17,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       external: [
+        '@wavegrid/animations',
         '@wavegrid/server',
         '@wavegrid/receiver',
         '@wavegrid/settings',

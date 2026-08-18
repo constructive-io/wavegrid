@@ -1,5 +1,6 @@
 import type { Fixture, Layout } from '@wavegrid/layout';
 
+import { amberScenes } from './amber';
 import { isArtGrid, setTarget } from './helpers';
 import { GridCell, SceneGenerator } from './types';
 
@@ -91,6 +92,10 @@ export const scenes: Record<string, SceneGenerator> = {
 
   off: () => ({ h: 0, s: 0, b: 0 })
 };
+
+// ── Amber (Nova) presets ────
+
+Object.assign(scenes, amberScenes);
 
 export function getSceneNames(): string[] {
   return Object.keys(scenes);

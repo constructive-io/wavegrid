@@ -459,6 +459,15 @@ export interface WavegridApi {
     /** Clear any active identify flash. */
     identifyClear(project: string): Promise<void>;
   };
+  nova: {
+    /** Run one amber look (a scene or an animation from the shared catalog) on
+     *  the rig. False when the id is unknown or this project isn't the live one. */
+    apply(project: string, look: string): Promise<boolean>;
+    /** How fast a moving look travels around the ring (0.1–3×). */
+    speed(project: string, value: number): Promise<boolean>;
+    /** Stop the running look and go dark. */
+    blackout(project: string): Promise<boolean>;
+  };
   osc: {
     /** The project's current laser output target. */
     get(project: string): Promise<OscTarget | null>;

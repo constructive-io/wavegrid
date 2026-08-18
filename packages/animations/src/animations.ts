@@ -1,5 +1,6 @@
 import type { Fixture, Layout } from '@wavegrid/layout';
 
+import { amberAnimations } from './amber';
 import { isArtGrid, prideColorAt, ROYGBIV, roygbivAt, setTarget, smooth } from './helpers';
 import { AnimationFn, GridCell } from './types';
 
@@ -177,6 +178,10 @@ animations['pride-ring'] = (grid, tick, attack, layout) => {
     setTarget(grid, i, color.h, color.s, 90, attack);
   });
 };
+
+// ── Amber (Nova) animations ────
+
+Object.assign(animations, amberAnimations);
 
 /** A discrete "column-ish" band: grid column when available, else fixture index. */
 function bandIndex(f: Fixture, layout: Layout): number {
