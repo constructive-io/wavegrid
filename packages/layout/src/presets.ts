@@ -13,13 +13,20 @@ export const presets: Record<string, () => Layout> = {
   /**
    * Grace Cathedral: two concentric rings of twelve with a single cannon in the
    * middle. The 25 cannons there were first configured as a filled disc, but
-   * the room is really two rings — the inner ring is staggered half a step so
-   * the two do not line up radially.
+   * the room is really two rings — staggered half a step so the two do not line
+   * up radially.
+   *
+   * Indices follow the venue's own numbering of the rose window, so logical
+   * index i is their cannon i + 1 and we can talk to their BEYOND show without a
+   * translation table: outer petals 1–12, inner petals 13–24, centre 25. That
+   * numbering starts a half step clockwise of 12 o'clock on the outer ring
+   * (their 1 and 12 straddle the top) while inner 13 sits at 12 o'clock, hence
+   * the phase on the outer ring rather than the inner one.
    */
   'grace-cathedral': () => ringsLayout({
     rings: [
-      { count: 12, radius: 1 },
-      { count: 12, radius: 0.62, phase: 15 },
+      { count: 12, radius: 1, phase: 15 },
+      { count: 12, radius: 0.62 },
       { count: 1, radius: 0 }
     ],
     id: 'grace-cathedral',

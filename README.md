@@ -62,6 +62,10 @@ pnpm build
 | `packages/osc` | `@wavegrid/osc` | OSC output adapters for BEYOND and FB4 laser hardware |
 | `packages/webgl` | `@wavegrid/webgl` | Three.js 3D Civic Center viewer — volumetric laser beams, bloom, camera presets |
 
+| Tool | Description |
+|------|-------------|
+| `tools/traffic` | Passive capture and byte-level analysis of Pangolin BEYOND ⇄ FB4 traffic, on Wireshark's CLI. Driven from Advanced → Traffic in the desktop app, or straight from a terminal — see [tools/traffic/README.md](tools/traffic/README.md). Observation only; it never transmits to laser hardware. |
+
 ## Architecture
 
 ```

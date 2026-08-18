@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+#
+# analyze — what is in a capture: who talks to whom, how often, how big, and
+# what the bytes look like.
+#
+# Usage: ./bin/analyze <capture.pcapng> [--host FB4_IP] [--hex N] [--bytes N]
+#
+#   --host   restrict every section to traffic involving this address
+#   --hex    hex-dump the first N packets' payloads (default 4, 0 to skip)
+#   --bytes  bytes per payload dump (default 64)
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+eval "$(parse_common_args "$@")"
+
+file="" host="" hex=4 nbytes=64
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host) host="${2:-}"; shift 2 ;;
+    --host=*) host="${1#--host=}"; shift ;;
+    --hex) hex="${2:-}"; shift 2 ;;
+    --hex=*) hex="${1#--hex=}"; shift ;;
+    --bytes) nbytes="${2:-}"; shift 2 ;;
+    --bytes=*) nbytes="${1#--bytes=}"; shift ;;
+    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) file="$1"; shift ;;
+  esac
+done
+
+[[ -n "$file" ]] || { echo 'usage: ./bin/analyze <capture.pcapng> [--host IP]' >&2; exit 2; }
+[[ -f "$file" ]] || { echo "error: no such capture: $file" >&2; exit 1; }
+
+TSHARK="$(need_tool tshark)"
+CAPINFOS="$(need_tool capinfos)"
+
+filter=""
+[[ -z "$host" ]] || filter="ip.addr==$host"
+
+# One pass, one line per packet — every section below is computed from this.
+read_fields() {
+  local args=(-r "$file" -n -T fields
+    -e frame.number -e frame.time_relative -e ip.src -e ip.dst
+    -e _ws.col.Protocol -e udp.srcport -e udp.dstport -e tcp.srcport -e tcp.dstport
+    -e frame.len -e udp.length
+    -E separator='|' -E occurrence=f)
+  [[ -z "$filter" ]] || args+=(-Y "$filter")
+  "$TSHARK" "${args[@]}" 2>/dev/null
+}
+
+rows="$(read_fields)"
+
+head1 "File"
+"$CAPINFOS" -c -d -u -a -e -S "$file" 2>/dev/null | sed 's/^/  /'
+[[ -z "$host" ]] || say "  filtered to    $filter"
+
+head1 "Conversations"
+"$TSHARK" -r "$file" -n -q -z conv,udp ${filter:+-Y "$filter"} 2>/dev/null | sed 's/^/  /'
+"$TSHARK" -r "$file" -n -q -z conv,tcp ${filter:+-Y "$filter"} 2>/dev/null | sed 's/^/  /'
+
+head1 "Endpoints"
+"$TSHARK" -r "$file" -n -q -z endpoints,ip ${filter:+-Y "$filter"} 2>/dev/null | sed 's/^/  /'
+
+head1 "Flows (src → dst, transport port)"
+printf '%s\n' "$rows" | awk -F'|' '
+  $3 == "" { next }
+  {
+    sport = ($6 != "" ? $6 : $8); dport = ($7 != "" ? $7 : $9)
+    key = sprintf("%-15s → %-15s %-6s %5s→%-5s", $3, $4, $5, sport, dport)
+    n[key]++; bytes[key] += $10
+    if (!(key in first)) first[key] = $2
+    last[key] = $2
+  }
+  END {
+    printf "  %-58s %8s %10s %8s\n", "FLOW", "PACKETS", "BYTES", "PKT/S"
+    for (k in n) {
+      span = last[k] - first[k]
+      rate = span > 0 ? n[k] / span : 0
+      printf "  %-58s %8d %10d %8.1f\n", k, n[k], bytes[k], rate
+    }
+  }' | (read -r hdr; printf '%s\n' "$hdr"; sort -k5 -nr)
+
+head1 "Packet sizes"
+printf '%s\n' "$rows" | awk -F'|' '
+  $10 != "" { n++; sum += $10; if (min == "" || $10 < min) min = $10; if ($10 > max) max = $10 }
+  END { if (n) printf "  packets %d   min %d   max %d   mean %.1f\n", n, min, max, sum / n; else print "  (no packets)" }'
+say "  most common lengths:"
+printf '%s\n' "$rows" | awk -F'|' '$10 != "" { print $10 }' | sort -n | uniq -c \
+  | sort -k1 -nr | head -8 | awk '{ printf "    %5d bytes  %6d packets\n", $2, $1 }'
+
+head1 "Timing"
+# Inter-packet gaps say whether this is a stream (fixed rate) or a request/reply
+# protocol, which is the first thing you want to know about an unknown protocol.
+# The median needs the gaps sorted, and sort(1) is the portable way to do that.
+printf '%s\n' "$rows" | awk -F'|' '$2 != "" { if (prev != "") printf "%.9f\n", $2 - prev; prev = $2 }' \
+  | sort -n | awk '
+      { gap[++n] = $1; sum += $1 }
+      END {
+        if (!n) { print "  (not enough packets)"; exit }
+        printf "  gaps: mean %.2f ms   median %.2f ms   min %.2f ms   max %.2f ms\n", \
+          sum / n * 1000, gap[int(n / 2) + 1] * 1000, gap[1] * 1000, gap[n] * 1000
+        if (sum > 0) printf "  ≈ %.1f packets/s overall\n", n / sum
+      }'
+
+if (( hex > 0 )); then
+  head1 "First $hex payloads"
+  "$TSHARK" -r "$file" -n -c "$hex" ${filter:+-Y "$filter"} -x 2>/dev/null \
+    | awk -v max="$nbytes" 'BEGIN { lines = int(max / 16) + 1 }
+        /^$/ { count = 0; print; next }
+        { if (count++ < lines + 1) print }' | sed 's/^/  /'
+fi
+
+say ""
+say "Next: ./bin/extract $file --host <IP>   ·   ./bin/compare <a.pcapng> <b.pcapng>"

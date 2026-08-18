@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Cog, Cpu, Flame, FolderKanban, Lightbulb, MonitorPlay, Radio, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
+import { Activity, AlertTriangle, Cog, Cpu, Flame, FolderKanban, Lightbulb, MonitorPlay, Radio, ShieldCheck, SlidersHorizontal, Waves, X } from 'lucide-react';
 import * as React from 'react';
 
 import { type AppLinkRenderer } from '@/components/ui/app-bar';
@@ -36,6 +36,7 @@ import { SettingsRoute } from '@/renderer/routes/settings-route';
 import { ShowRoute } from '@/renderer/routes/show-route';
 import { StatusRoute } from '@/renderer/routes/status-route';
 import { SwitchProjectDialog } from '@/renderer/routes/switch-project-dialog';
+import { TrafficRoute } from '@/renderer/routes/traffic-route';
 
 type AppIcon = React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
 
@@ -49,6 +50,7 @@ const ROUTE_ICON: Record<Route, AppIcon> = {
   lights: Lightbulb,
   output: Radio,
   devices: Cpu,
+  traffic: Waves,
   settings: Cog
 };
 
@@ -514,6 +516,9 @@ export function App() {
           busy={busy}
         />
       )}
+      {/* Traffic loads itself: it is the only screen that touches Wireshark, and
+          nothing may be looked for until you open it. */}
+      {route === 'traffic' && <TrafficRoute />}
       {route === 'settings' && (
         <SettingsRoute
           info={storeInfo}

@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+#
+# interfaces — which interface should you capture on?
+#
+# Lists what dumpcap can see, with each interface's own addresses, and (given a
+# host) marks the interface whose subnet contains it — that is the one carrying
+# BEYOND ↔ FB4 traffic.
+#
+# Usage: ./bin/interfaces [--host FB4_IP] [--all] [--json]
+#
+#   --all   also list Wireshark's extcap pseudo-devices (sshdump, randpkt, …),
+#           which are hidden because none of them is your laser network
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+eval "$(parse_common_args "$@")"
+
+host="" all=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host) host="${2:-}"; shift 2 ;;
+    --host=*) host="${1#--host=}"; shift ;;
+    --all|-a) all=1; shift ;;
+    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+TSHARK="$(need_tool tshark)"
+
+# ── Addresses per interface, from the OS rather than tshark ────────────────
+# tshark -D names the capture devices; the addresses tell you which one is on
+# the laser's network.
+addrs_for() {
+  local ifname="$1"
+  case "$(uname -s)" in
+    Darwin)
+      { ifconfig "$ifname" 2>/dev/null || true; } | awk '/inet /{printf "%s/%s ", $2, $4}' ;;
+    Linux)
+      { ip -o -4 addr show dev "$ifname" 2>/dev/null || true; } | awk '{printf "%s ", $4}' ;;
+  esac
+}
+
+# Same /24 is the useful approximation: laser rigs are flat networks, and the
+# alternative is parsing netmasks per platform for no practical gain.
+same_net24() {
+  [[ -n "$1" && -n "$2" ]] || return 1
+  [[ "${1%.*}" == "${2%.*}" ]]
+}
+
+# Real NICs, per the OS. Anything tshark offers that is not here is an extcap
+# helper rather than a network interface.
+os_interfaces() {
+  case "$(uname -s)" in
+    Darwin) { ifconfig -l 2>/dev/null || true; } | tr ' ' '\n' ;;
+    Linux) { ip -o link show 2>/dev/null || true; } | awk -F': ' '{ split($2, a, "@"); print a[1] }' ;;
+  esac
+}
+
+real_ifaces=" $(os_interfaces | tr '\n' ' ')"
+
+mapfile -t devices < <("$TSHARK" -D 2>/dev/null | sed 's/^[0-9]*\. //')
+
+if is_json; then
+  printf '{ "host": %s, "interfaces": [\n' "$(json_str "$host")"
+  first=1
+fi
+
+for dev in ${devices+"${devices[@]}"}; do
+  name="${dev%% *}"
+  if (( ! all )) && [[ "$name" != any && "$real_ifaces" != *" $name "* ]]; then continue; fi
+  desc="$(printf '%s' "$dev" | sed -n 's/^[^ ]* (\(.*\))$/\1/p')"
+  list="$(addrs_for "$name")"
+  match=false
+  if [[ -n "$host" ]]; then
+    for a in $list; do
+      if same_net24 "${a%%/*}" "$host"; then match=true; fi
+    done
+  fi
+
+  if is_json; then
+    [[ $first == 1 ]] || printf ',\n'
+    first=0
+    printf '  { "name": %s, "description": %s, "addresses": %s, "matchesHost": %s }' \
+      "$(json_str "$name")" "$(json_str "$desc")" "$(json_str "$(printf '%s' "$list" | sed 's/ *$//')")" "$match"
+  else
+    marker=""
+    [[ "$match" == true ]] && marker="  ← on the same /24 as $host"
+    printf '  %-16s %-28s %s%s\n' "$name" "${desc:--}" "${list:--}" "$marker"
+  fi
+done
+
+if is_json; then
+  printf '\n] }\n'
+else
+  say ""
+  say "Pick the interface whose address shares a subnet with the FB4 (./bin/discover finds candidates),"
+  say "then: ./bin/capture --iface <name> --host <FB4_IP> --label idle"
+fi

@@ -27,7 +27,7 @@ describe('resolveLayout', () => {
     expect(byRadius(0)).toHaveLength(1);
 
     // Outer ring first, then inner, then the centre — the order looks in the UI rely on.
-    expect(grace.fixtures.slice(0, 12).every(f => f.radius === 1)).toBe(true);
+    expect(grace.fixtures.slice(0, 12).every(f => +f.radius.toFixed(3) === 1)).toBe(true);
     expect(grace.fixtures[24].radius).toBe(0);
 
     // Ring index counts from the centre out, so the centre is its own ring 0.
@@ -39,7 +39,7 @@ describe('resolveLayout', () => {
     const grace = resolveLayout({ preset: 'grace-cathedral' });
     const posOf = (f: { angle: number }) =>
       (((f.angle + Math.PI / 2) / (Math.PI * 2)) % 1 + 1) % 1;
-    const outer = grace.fixtures.filter(f => f.radius === 1).map(posOf);
+    const outer = grace.fixtures.filter(f => +f.radius.toFixed(3) === 1).map(posOf);
     const inner = grace.fixtures.filter(f => +f.radius.toFixed(3) === 0.62).map(posOf);
 
     for (const p of inner) {
@@ -48,6 +48,28 @@ describe('resolveLayout', () => {
         return d > 0.5 ? 1 - d : d;
       }));
       expect(nearest).toBeCloseTo(0.5 / 12, 5);
+    }
+  });
+
+  it('numbers grace-cathedral the way the venue numbers the rose window', () => {
+    const grace = resolveLayout({ preset: 'grace-cathedral' });
+    // Clock position in twelfths, 0 = 12 o'clock, growing clockwise.
+    const slotOf = (f: { angle: number }) =>
+      ((((f.angle + Math.PI / 2) / (Math.PI * 2)) % 1 + 1) % 1) * 12;
+
+    // Their 1 and 12 straddle the top, so the outer ring is half a slot round.
+    expect(slotOf(grace.fixtures[0])).toBeCloseTo(0.5, 5);
+    expect(slotOf(grace.fixtures[11])).toBeCloseTo(11.5, 5);
+    // Their 13 is the inner petal at 12 o'clock, and 25 is the centre.
+    expect(slotOf(grace.fixtures[12])).toBeCloseTo(0, 5);
+    expect(+grace.fixtures[12].radius.toFixed(3)).toBe(0.62);
+    expect(grace.fixtures[24].radius).toBe(0);
+
+    // Both rings run clockwise one slot at a time from their first cannon.
+    for (const base of [0, 12]) {
+      for (let i = 1; i < 12; i++) {
+        expect(slotOf(grace.fixtures[base + i])).toBeCloseTo(slotOf(grace.fixtures[base]) + i, 5);
+      }
     }
   });
 

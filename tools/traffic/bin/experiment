@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+#
+# experiment — walk through the controlled states, one capture per state.
+#
+# You drive BEYOND; this only records. It prompts for each step, captures while
+# you do it, and stops before the next one, so every file holds exactly one
+# state and ./bin/compare has clean inputs.
+#
+# Usage:
+#   ./bin/experiment --host <FB4_IP> [--iface IF] [--seconds 10] [--steps a,b,c]
+#   ./bin/experiment --list
+#
+# Default steps: idle, output-on, static-frame, change-x, change-y, brightness, output-off
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+eval "$(parse_common_args "$@")"
+
+DEFAULT_STEPS=(idle output-on static-frame change-x change-y brightness output-off)
+
+declare -A PROMPT=(
+  [idle]="BEYOND open, laser NOT outputting. Leave everything alone."
+  [output-on]="Start laser output in BEYOND, then leave it running."
+  [static-frame]="Output a single static frame (one shape, nothing moving)."
+  [change-x]="Same static frame, moved along X only."
+  [change-y]="Same static frame, moved along Y only."
+  [brightness]="Same static frame, change brightness/colour only."
+  [output-off]="Stop laser output. Nothing else."
+)
+
+host="" iface="" seconds=10 steps=() list=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host) host="${2:-}"; shift 2 ;;
+    --host=*) host="${1#--host=}"; shift ;;
+    --iface|-i) iface="${2:-}"; shift 2 ;;
+    --iface=*) iface="${1#--iface=}"; shift ;;
+    --seconds|-s) seconds="${2:-}"; shift 2 ;;
+    --seconds=*) seconds="${1#--seconds=}"; shift ;;
+    --steps) IFS=, read -r -a steps <<< "${2:-}"; shift 2 ;;
+    --steps=*) IFS=, read -r -a steps <<< "${1#--steps=}" ;;
+    --list) list=1; shift ;;
+    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+if (( list )); then
+  for s in "${DEFAULT_STEPS[@]}"; do printf '  %-14s %s\n' "$s" "${PROMPT[$s]}"; done
+  exit 0
+fi
+
+(( ${#steps[@]} )) || steps=("${DEFAULT_STEPS[@]}")
+
+dir="$(ensure_capture_dir)"
+session="$dir/exp-$(stamp)"
+mkdir -p "$session"
+CAPTURE="$(dirname "${BASH_SOURCE[0]}")/capture"
+
+say "Session: $session"
+say "Each step captures ${seconds}s. Passive only — nothing is sent to the laser."
+say ""
+
+for step in "${steps[@]}"; do
+  printf '\n\033[1m%s\033[0m\n  %s\n' "$step" "${PROMPT[$step]:-(your own step)}"
+  read -r -p "  press Enter when BEYOND is in this state (s to skip, q to quit) " answer
+  case "$answer" in
+    q|Q) say 'stopping'; break ;;
+    s|S) say '  skipped'; continue ;;
+  esac
+  TRAFFIC_DIR="$session" "$CAPTURE" --label "$step" --seconds "$seconds" \
+    ${iface:+--iface "$iface"} ${host:+--host "$host"} >/dev/null
+  file="$(ls -t "$session"/*-"$(slug "$step")".pcapng 2>/dev/null | head -1)"
+  printf '  captured → %s\n' "${file:-(nothing)}"
+done
+
+say ""
+say "Compare the interesting pairs, e.g.:"
+say "  ./bin/compare $session/*-idle.pcapng $session/*-output-on.pcapng --host ${host:-<FB4_IP>}"
+say "  ./bin/compare $session/*-static-frame.pcapng $session/*-change-x.pcapng --host ${host:-<FB4_IP>}"

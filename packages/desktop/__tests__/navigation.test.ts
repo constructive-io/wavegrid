@@ -28,6 +28,8 @@ describe('sidebar navigation', () => {
     expect(advanced).toContain('access');
     expect(advanced).toContain('settings');
     expect(advanced).toContain('devices');
+    // Packet capture is protocol archaeology, not something an operator needs.
+    expect(advanced).toContain('traffic');
   });
 
   it('labels every route', () => {

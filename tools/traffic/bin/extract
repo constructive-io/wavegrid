@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#
+# extract — cut a big capture down to the packets that matter.
+#
+# Usage:
+#   ./bin/extract <capture.pcapng> [--host IP] [--port N] [--filter "display filter"] [--out FILE]
+#
+# The default output sits next to the input as <name>-<what>.pcapng, so an
+# extract is never mistaken for an original capture.
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+eval "$(parse_common_args "$@")"
+
+file="" host="" port="" extra="" out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host) host="${2:-}"; shift 2 ;;
+    --host=*) host="${1#--host=}"; shift ;;
+    --port) port="${2:-}"; shift 2 ;;
+    --port=*) port="${1#--port=}"; shift ;;
+    --filter) extra="${2:-}"; shift 2 ;;
+    --filter=*) extra="${1#--filter=}"; shift ;;
+    --out|-o) out="${2:-}"; shift 2 ;;
+    --out=*) out="${1#--out=}"; shift ;;
+    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) file="$1"; shift ;;
+  esac
+done
+
+[[ -n "$file" && -f "$file" ]] || { echo 'usage: ./bin/extract <capture.pcapng> [--host IP] [--port N]' >&2; exit 2; }
+
+TSHARK="$(need_tool tshark)"
+
+parts=() name=()
+[[ -z "$host" ]] || { parts+=("ip.addr==$host"); name+=("$(slug "$host")"); }
+[[ -z "$port" ]] || { parts+=("udp.port==$port || tcp.port==$port"); name+=("port$port"); }
+[[ -z "$extra" ]] || { parts+=("$extra"); name+=(filtered); }
+(( ${#parts[@]} > 0 )) || { echo 'error: give at least one of --host, --port, --filter' >&2; exit 2; }
+
+filter="$(printf '(%s) && ' "${parts[@]}")"
+filter="${filter% && }"
+
+if [[ -z "$out" ]]; then
+  base="${file%.pcapng}"
+  out="$base-$(IFS=-; printf '%s' "${name[*]}").pcapng"
+fi
+
+"$TSHARK" -r "$file" -n -Y "$filter" -w "$out" 2>/dev/null
+
+kept="$("$(need_tool capinfos)" -c "$out" 2>/dev/null | awk -F': *' '/Number of packets/ { print $2 }')"
+if is_json; then
+  printf '{ "out": %s, "filter": %s, "packets": %s }\n' "$(json_str "$out")" "$(json_str "$filter")" "$(json_str "$kept")"
+else
+  printf '%s\n  filter  %s\n  packets %s\n' "$out" "$filter" "${kept:-?}"
+fi

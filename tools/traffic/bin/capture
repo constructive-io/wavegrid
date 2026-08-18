@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+#
+# capture — write a timestamped .pcapng, optionally only the FB4's traffic.
+#
+# Usage:
+#   ./bin/capture [--iface IF] [--host FB4_IP] [--label idle] [--seconds N] [--background]
+#   ./bin/capture --stop
+#   ./bin/capture --status
+#
+# Files land in the capture directory (see ./bin/doctor) as
+# <timestamp>-<label>.pcapng, with a .json sidecar recording how it was taken —
+# without that, two captures a week apart are not comparable.
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+eval "$(parse_common_args "$@")"
+
+iface="" host="" label="capture" seconds="" background=0 action=start
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --iface|-i) iface="${2:-}"; shift 2 ;;
+    --iface=*) iface="${1#--iface=}"; shift ;;
+    --host) host="${2:-}"; shift 2 ;;
+    --host=*) host="${1#--host=}"; shift ;;
+    --label|-l) label="${2:-}"; shift 2 ;;
+    --label=*) label="${1#--label=}"; shift ;;
+    --seconds|-s) seconds="${2:-}"; shift 2 ;;
+    --seconds=*) seconds="${1#--seconds=}"; shift ;;
+    --background|-b) background=1; shift ;;
+    --stop) action=stop; shift ;;
+    --status) action=status; shift ;;
+    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+dir="$(ensure_capture_dir)"
+PIDFILE="$dir/.capture.pid"
+
+running_pid() {
+  [[ -f "$PIDFILE" ]] || return 1
+  local pid
+  pid="$(head -1 "$PIDFILE")"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && printf '%s\n' "$pid"
+}
+
+case "$action" in
+  status)
+    if pid="$(running_pid)"; then
+      file="$(sed -n 2p "$PIDFILE")"
+      if is_json; then
+        printf '{ "running": true, "pid": %s, "file": %s }\n' "$pid" "$(json_str "$file")"
+      else
+        printf 'capturing (pid %s) → %s\n' "$pid" "$file"
+      fi
+    else
+      is_json && printf '{ "running": false }\n' || echo 'not capturing'
+    fi
+    exit 0 ;;
+  stop)
+    if pid="$(running_pid)"; then
+      file="$(sed -n 2p "$PIDFILE")"
+      # dumpcap flushes and closes the file cleanly on SIGTERM.
+      kill -TERM "$pid" 2>/dev/null || true
+      for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+      rm -f "$PIDFILE"
+      if is_json; then
+        printf '{ "stopped": true, "file": %s }\n' "$(json_str "$file")"
+      else
+        printf 'stopped → %s\n' "$file"
+        [[ -f "$file" ]] && "$(need_tool capinfos)" -c -d "$file" 2>/dev/null | sed 's/^/  /' || true
+      fi
+    else
+      is_json && printf '{ "stopped": false }\n' || echo 'not capturing'
+    fi
+    exit 0 ;;
+esac
+
+if pid="$(running_pid)"; then
+  echo "error: a capture is already running (pid $pid). ./bin/capture --stop first." >&2
+  exit 1
+fi
+
+DUMPCAP="$(need_tool dumpcap)"
+
+# No --iface: take the first device dumpcap offers, which is what tshark would do.
+if [[ -z "$iface" ]]; then
+  iface="$("$(need_tool tshark)" -D 2>/dev/null | head -1 | sed 's/^[0-9]*\. //; s/ .*//')"
+  [[ -n "$iface" ]] || { echo 'error: no capture interface available (see ./bin/doctor)' >&2; exit 1; }
+fi
+
+file="$dir/$(stamp)-$(slug "$label").pcapng"
+args=(-i "$iface" -w "$file" -n)
+# A capture filter (not a display filter) keeps everything else off the disk,
+# which matters when a laser is streaming frames.
+[[ -z "$host" ]] || args+=(-f "host $host")
+[[ -z "$seconds" ]] || args+=(-a "duration:$seconds")
+
+write_meta() {
+  cat > "${file%.pcapng}.json" <<JSON
+{
+  "file": $(json_str "$(basename "$file")"),
+  "label": $(json_str "$label"),
+  "interface": $(json_str "$iface"),
+  "host": $(json_str "$host"),
+  "seconds": $(json_str "$seconds"),
+  "startedAt": $(json_str "$(date -u +%Y-%m-%dT%H:%M:%SZ)"),
+  "captureFilter": $(json_str "${host:+host $host}"),
+  "tool": $(json_str "$(tool_version "$DUMPCAP")")
+}
+JSON
+}
+
+if (( background )); then
+  "$DUMPCAP" "${args[@]}" >/dev/null 2>"${file%.pcapng}.log" &
+  pid=$!
+  printf '%s\n%s\n' "$pid" "$file" > "$PIDFILE"
+  write_meta
+  if is_json; then
+    printf '{ "started": true, "pid": %s, "file": %s, "interface": %s, "host": %s }\n' \
+      "$pid" "$(json_str "$file")" "$(json_str "$iface")" "$(json_str "$host")"
+  else
+    printf 'capturing on %s%s → %s\n' "$iface" "${host:+ (host $host)}" "$file"
+    echo '  ./bin/capture --stop   when the experiment is done'
+  fi
+  exit 0
+fi
+
+write_meta
+say "capturing on $iface${host:+ (host $host)} → $file"
+say "  Ctrl-C to stop${seconds:+, or it stops after ${seconds}s}"
+"$DUMPCAP" "${args[@]}"
+say ""
+say "→ ./bin/analyze $file"

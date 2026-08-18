@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#
+# compare — which bytes changed between two captures.
+#
+# Usage: ./bin/compare <a.pcapng> <b.pcapng> [--host IP] [--filter "…"] [--json]
+#
+# Capture one state per file (./bin/experiment does this for you), then compare
+# them: offsets that are constant inside each capture but different between them
+# are the field encoding whatever you changed.
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+
+TSHARK="$(need_tool tshark)"
+command -v python3 >/dev/null || { echo 'error: python3 is required for compare' >&2; exit 127; }
+
+exec python3 "$TRAFFIC_ROOT/lib/compare.py" --tshark "$TSHARK" "$@"

@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+#
+# doctor — what this machine can and cannot do, before you try to capture.
+#
+# Usage: ./bin/doctor [--json] [--dir DIR]
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+eval "$(parse_common_args "$@")"
+
+TOOLS=(tshark dumpcap capinfos editcap mergecap)
+
+os="$(uname -s)"
+arch="$(uname -m)"
+os_version=""
+case "$os" in
+  Darwin) os_version="$(sw_vers -productVersion 2>/dev/null || true)" ;;
+  Linux) os_version="$(. /etc/os-release 2>/dev/null && printf '%s' "${PRETTY_NAME:-}" || true)" ;;
+esac
+
+# ── Capture permission ─────────────────────────────────────────────────────
+#
+# macOS gates capture on the BPF devices (/dev/bpf*), which Wireshark's
+# "ChmodBPF" helper opens up to the access_bpf group. Linux gates it on
+# capabilities on dumpcap (or the wireshark group). Report the *fix*, never run
+# it: both need privileges the operator has to grant deliberately.
+perm_ok=0
+perm_detail=""
+perm_fix=""
+case "$os" in
+  Darwin)
+    bpf="$(ls /dev/bpf0 2>/dev/null || true)"
+    if [[ -z "$bpf" ]]; then
+      perm_detail="no /dev/bpf devices found"
+    elif [[ -r /dev/bpf0 ]]; then
+      perm_ok=1
+      perm_detail="/dev/bpf0 is readable by $(id -un)"
+    else
+      perm_detail="/dev/bpf0 exists but is not readable by $(id -un)"
+      perm_fix="Install Wireshark's ChmodBPF helper (Wireshark → Install ChmodBPF), or: sudo dseditgroup -o edit -a $(id -un) -t user access_bpf && sudo chmod g+r /dev/bpf*"
+    fi
+    ;;
+  Linux)
+    if caps="$(getcap "$(find_tool dumpcap || true)" 2>/dev/null)" && [[ "$caps" == *cap_net_raw* ]]; then
+      perm_ok=1
+      perm_detail="dumpcap has cap_net_raw"
+    elif id -nG | tr ' ' '\n' | grep -qx wireshark; then
+      perm_ok=1
+      perm_detail="$(id -un) is in the wireshark group"
+    else
+      perm_detail="dumpcap lacks cap_net_raw and $(id -un) is not in the wireshark group"
+      perm_fix="sudo dpkg-reconfigure wireshark-common && sudo usermod -aG wireshark $(id -un)   # then log out and back in"
+    fi
+    ;;
+esac
+
+dir="$(capture_dir)"
+
+if is_json; then
+  printf '{\n'
+  printf '  "os": %s,\n' "$(json_str "$os")"
+  printf '  "osVersion": %s,\n' "$(json_str "$os_version")"
+  printf '  "arch": %s,\n' "$(json_str "$arch")"
+  printf '  "captureDir": %s,\n' "$(json_str "$dir")"
+  printf '  "captureDirExists": %s,\n' "$([[ -d "$dir" ]] && echo true || echo false)"
+  printf '  "capturePermission": { "ok": %s, "detail": %s, "fix": %s },\n' \
+    "$([[ $perm_ok == 1 ]] && echo true || echo false)" \
+    "$(json_str "$perm_detail")" "$(json_str "$perm_fix")"
+  printf '  "tools": [\n'
+  first=1
+  for t in "${TOOLS[@]}"; do
+    p="$(find_tool "$t" || true)"
+    [[ $first == 1 ]] || printf ',\n'
+    first=0
+    if [[ -n "$p" ]]; then
+      printf '    { "name": %s, "found": true, "path": %s, "version": %s }' \
+        "$(json_str "$t")" "$(json_str "$p")" "$(json_str "$(tool_version "$p")")"
+    else
+      printf '    { "name": %s, "found": false }' "$(json_str "$t")"
+    fi
+  done
+  printf '\n  ]\n}\n'
+  exit 0
+fi
+
+head1 "Machine"
+printf '  os          %s %s (%s)\n' "$os" "$os_version" "$arch"
+
+head1 "Wireshark CLI tools"
+missing=0
+for t in "${TOOLS[@]}"; do
+  if p="$(find_tool "$t")"; then
+    printf '  %-9s %s\n            %s\n' "$t" "$p" "$(tool_version "$p")"
+  else
+    printf '  %-9s MISSING\n' "$t"
+    missing=$((missing + 1))
+  fi
+done
+if (( missing > 0 )); then
+  case "$os" in
+    Darwin) say "  → brew install --cask wireshark   (or install Wireshark.app; this toolkit finds the bundled tools)" ;;
+    Linux) say "  → sudo apt-get install tshark" ;;
+  esac
+fi
+
+head1 "Capture permission"
+if [[ $perm_ok == 1 ]]; then
+  printf '  ok — %s\n' "$perm_detail"
+else
+  printf '  NOT ok — %s\n' "$perm_detail"
+  [[ -z "$perm_fix" ]] || printf '  → run this yourself (needs privileges):\n    %s\n' "$perm_fix"
+fi
+
+head1 "Captures"
+printf '  directory   %s%s\n' "$dir" "$([[ -d "$dir" ]] && echo '' || echo '  (will be created on first capture)')"
+if [[ -d "$dir" ]]; then
+  count="$(find "$dir" -maxdepth 1 -name '*.pcapng' | wc -l | tr -d ' ')"
+  printf '  captures    %s\n' "$count"
+fi
+say ""
