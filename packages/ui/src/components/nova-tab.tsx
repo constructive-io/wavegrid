@@ -1,4 +1,14 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+
+import {
+  tintCss,
+  tintGradient,
+  tintPalette,
+  TINTS,
+  warmFlat,
+  warmMotionCode,
+  warmStillCode
+} from '@/lib/warm-ring';
 
 import { ControlGrid, ControlGroup } from './control-grid';
 import { MiniGridPreview } from './mini-grid-preview';
@@ -42,13 +52,6 @@ const OCEAN_COLORS: Palette = {
 const SUNSET_COLORS: Palette = {
   colorsCode: `var COLORS = [[8,100,100],[28,100,100],[330,75,100],[275,70,90]];`,
   css: 'conic-gradient(#ff3b1f, #ff9a3c, #ff4da6, #a24dff)'
-};
-
-// Amber is its own family: one hue for the whole ring, so every amber look
-// below says what it has to say with brightness alone.
-const AMBER_COLORS: Palette = {
-  colorsCode: `var COLORS = [[40,100,100]];`,
-  css: 'conic-gradient(#ffb000, #7a4f00, #ffb000)'
 };
 
 const RAINBOW_COLORS: Palette = {
@@ -153,59 +156,8 @@ function ringStatic(name: string, colorsCode: string): string {
   }`, colorsCode);
 }
 
-// ── Amber: one hue, brightness only ───────────────────────────────────────
-// These mirror the shared amber looks in @wavegrid/animations so the artist UI
-// and the desktop Nova panel offer the same vocabulary. LEVELS is the same
-// brightness ladder: six steps for six lasers.
-function amber(name: string, body: string): string {
-  return wrap(name, body, `${AMBER_COLORS.colorsCode}\nvar LEVELS = [100,74,52,34,20,10];`);
-}
-
-/** Which of the ring's slots a fixture sits in, from its angle. */
-const AMBER_SLOT = `  var slot = Math.round(ringPos(ctx, i) * ctx.count) % ctx.count;`;
-
-/** Every laser at one brightness. */
-function amberFlat(name: string, level: number): string {
-  return amber(name, `  ctx.fill(40, 100, ${level});`);
-}
-
-const AMBER_PRESETS_CODE = {
-  alternate: amber('amber-alternate', `  for (var i = 0; i < ctx.count; i++) {
-${AMBER_SLOT}
-    ctx.set(i, 40, 100, slot % 2 === 0 ? 100 : 22);
-  }`),
-  ramp: amber('amber-ramp', `  for (var i = 0; i < ctx.count; i++) {
-${AMBER_SLOT}
-    ctx.set(i, 40, 100, LEVELS[slot % LEVELS.length]);
-  }`),
-  horizon: amber('amber-horizon', `  for (var i = 0; i < ctx.count; i++) {
-    ctx.set(i, 40, 100, ringPos(ctx, i) < 0.5 ? 100 : 25);
-  }`)
-};
-
-const AMBER_MOTION_CODE = {
-  chase: amber('amber-chase', `  var lit = Math.floor(ctx.t * 4) % ctx.count;
-  for (var i = 0; i < ctx.count; i++) {
-${AMBER_SLOT}
-    ctx.set(i, 40, 100, slot === lit ? 100 : 8);
-  }`),
-  levels: amber('amber-levels', `  var offset = Math.floor(ctx.t * 3);
-  for (var i = 0; i < ctx.count; i++) {
-${AMBER_SLOT}
-    ctx.set(i, 40, 100, LEVELS[(slot + offset) % LEVELS.length]);
-  }`),
-  heartbeat: amber('amber-heartbeat', `  var swing = 0.5 + 0.5 * Math.sin(ctx.t * 2);
-  for (var i = 0; i < ctx.count; i++) {
-${AMBER_SLOT}
-    var level = slot % 2 === 0 ? swing : 1 - swing;
-    ctx.set(i, 40, 100, 12 + 88 * level);
-  }`),
-  embers: amber('amber-embers', `  for (var i = 0; i < ctx.count; i++) {
-    var pos = ringPos(ctx, i);
-    var flicker = Math.sin(ctx.t * 1.3 + pos * 11) * 0.6 + Math.sin(ctx.t * 0.8 + pos * 27) * 0.4;
-    ctx.set(i, 40, 100, Math.max(5, 55 + 40 * flicker));
-  }`)
-};
+const AMBER_PRESET_PREFIX = 'amber-preset';
+const AMBER_MOTION_PREFIX = 'amber-motion';
 
 interface PatternDef {
   name: string;
@@ -239,23 +191,38 @@ const BRIGHTNESS_AROUND: PatternDef[] = [
   { name: 'Fire Breathe', gradient: 'radial-gradient(circle, #ffb300, #ff2200)', code: ringBreathe('fire-breathe', FIRE_COLORS.colorsCode) }
 ];
 
-const AMBER_PRESETS: PatternDef[] = [
-  { name: 'Amber', gradient: AMBER_COLORS.css, code: amberFlat('amber', 100) },
-  { name: 'Glow', gradient: AMBER_COLORS.css, code: amberFlat('amber-glow', 45) },
-  { name: 'Alternate', gradient: AMBER_COLORS.css, code: AMBER_PRESETS_CODE.alternate },
-  { name: 'Ramp', gradient: AMBER_COLORS.css, code: AMBER_PRESETS_CODE.ramp },
-  { name: 'Horizon', gradient: AMBER_COLORS.css, code: AMBER_PRESETS_CODE.horizon }
-];
+/** The stills, at one tint. */
+function warmPresets(sat: number): PatternDef[] {
+  const code = warmStillCode(wrap, sat);
+  const gradient = tintGradient(sat);
+  return [
+    { name: 'Solid', gradient, code: warmFlat(wrap, 'amber', sat, 100) },
+    { name: 'Glow', gradient, code: warmFlat(wrap, 'amber-glow', sat, 45) },
+    { name: 'Alternate', gradient, code: code.alternate },
+    { name: 'Ramp', gradient, code: code.ramp },
+    { name: 'Horizon', gradient, code: code.horizon }
+  ];
+}
 
-const AMBER_MOTION: PatternDef[] = [
-  { name: 'Chase', gradient: AMBER_COLORS.css, code: AMBER_MOTION_CODE.chase },
-  { name: 'Comet', gradient: AMBER_COLORS.css, code: ringComet('amber-comet', AMBER_COLORS.colorsCode) },
-  { name: 'Wave', gradient: AMBER_COLORS.css, code: ringPulseWave('amber-wave', AMBER_COLORS.colorsCode) },
-  { name: 'Levels', gradient: AMBER_COLORS.css, code: AMBER_MOTION_CODE.levels },
-  { name: 'Heartbeat', gradient: AMBER_COLORS.css, code: AMBER_MOTION_CODE.heartbeat },
-  { name: 'Embers', gradient: AMBER_COLORS.css, code: AMBER_MOTION_CODE.embers },
-  { name: 'Breathe', gradient: 'radial-gradient(circle, #ffc44d, #7a4f00)', code: ringBreathe('amber-breathe', AMBER_COLORS.colorsCode) }
-];
+/** The same looks in motion, at one tint. */
+function warmMotion(sat: number): PatternDef[] {
+  const code = warmMotionCode(wrap, sat);
+  const gradient = tintGradient(sat);
+  const palette = tintPalette(sat);
+  return [
+    { name: 'Chase', gradient, code: code.chase },
+    { name: 'Comet', gradient, code: ringComet('amber-comet', palette) },
+    { name: 'Wave', gradient, code: ringPulseWave('amber-wave', palette) },
+    { name: 'Levels', gradient, code: code.levels },
+    { name: 'Heartbeat', gradient, code: code.heartbeat },
+    { name: 'Embers', gradient, code: code.embers },
+    {
+      name: 'Breathe',
+      gradient: `radial-gradient(circle, ${tintCss(sat)}, ${tintCss(sat, 25)})`,
+      code: ringBreathe('amber-breathe', palette)
+    }
+  ];
+}
 
 const RING_COLORS: PatternDef[] = [
   { name: 'Israel', gradient: ISRAEL_COLORS.css, code: ringStatic('israel-static', ISRAEL_COLORS.colorsCode) },
@@ -347,6 +314,36 @@ function PreviewToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () =
   );
 }
 
+/** White → amber in five steps. Changing it re-tints whatever is already on. */
+function TintPicker({ sat, onPick }: { sat: number; onPick: (sat: number) => void }) {
+  return (
+    <div className="flex gap-2.5 flex-wrap">
+      {TINTS.map((t) => (
+        <button
+          key={t.name}
+          onClick={() => onPick(t.sat)}
+          title={`${t.name} — ${t.sat}% amber`}
+          className="relative overflow-hidden transition-all active:scale-93"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 14,
+            background: tintCss(t.sat),
+            border: sat === t.sat ? '2.5px solid #fff' : '2.5px solid transparent'
+          }}
+        >
+          <span
+            className="absolute bottom-0.5 left-0 right-0 text-center font-semibold"
+            style={{ fontSize: 9, color: '#3a2400', letterSpacing: '0.02em' }}
+          >
+            {t.name}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function NovaTab({
   send,
   activePattern,
@@ -365,7 +362,24 @@ export function NovaTab({
   gridColumns: number;
 }) {
   const [showPreview, setShowPreview] = useState(true);
+  // How warm the ring is, independent of which look is running.
+  const [tint, setTint] = useState(100);
   const ring = numCannons > 0 ? numCannons : 6;
+
+  const amberPresets = useMemo(() => warmPresets(tint), [tint]);
+  const amberMotion = useMemo(() => warmMotion(tint), [tint]);
+
+  // Tint and look are separate choices, so changing the tint re-sends the look
+  // that is already running rather than making the operator pick it again.
+  const pickTint = useCallback((next: number) => {
+    setTint(next);
+    if (!activePattern) return;
+    const running = [
+      ...warmPresets(next).map((p) => [AMBER_PRESET_PREFIX, p] as const),
+      ...warmMotion(next).map((p) => [AMBER_MOTION_PREFIX, p] as const)
+    ].find(([prefix, p]) => activePattern === `${prefix}-${p.name}`);
+    if (running) send({ type: 'evalPattern', code: running[1].code, params: {} });
+  }, [activePattern, send]);
 
   const handleSelect = useCallback((groupPrefix: string, pattern: PatternDef) => {
     const id = `${groupPrefix}-${pattern.name}`;
@@ -429,9 +443,12 @@ export function NovaTab({
       </div>
 
       <ControlGrid minCellWidth={200}>
+        <ControlGroup label={`White ↔ Amber — ${TINTS.find((t) => t.sat === tint)?.name ?? `${tint}%`}`}>
+          <TintPicker sat={tint} onPick={pickTint} />
+        </ControlGroup>
+        {renderGroup('Amber — Presets', AMBER_PRESET_PREFIX, amberPresets)}
+        {renderGroup('Amber — Motion', AMBER_MOTION_PREFIX, amberMotion)}
         {renderGroup('Nova — Signature', 'nova-sig', NOVA_SIGNATURE)}
-        {renderGroup('Amber — Presets', 'amber-preset', AMBER_PRESETS)}
-        {renderGroup('Amber — Motion', 'amber-motion', AMBER_MOTION)}
         {renderGroup('Colour Around the Ring', 'nova-color', COLOR_AROUND)}
         {renderGroup('Brightness Around the Ring', 'nova-bright', BRIGHTNESS_AROUND)}
         {renderGroup('Ring Colours', 'nova-ring', RING_COLORS)}
