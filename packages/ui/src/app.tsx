@@ -465,7 +465,7 @@ export default function Home() {
   const [layout, setLayout] = useState<PanelLayout>('bottom');
   const [hue, setHue] = useState(220);
   const [sat, setSat] = useState(90);
-  const [bright, setBright] = useState(80);
+  const [bright, setBright] = useState(100);
   const [brushSize, setBrushSize] = useState(1);
   const [softEdge, setSoftEdge] = useState(false);
   const [trailFade, setTrailFade] = useState(false);
