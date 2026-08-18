@@ -1,12 +1,24 @@
 packages:
   - 'packages/*'
 
+# Allow these packages' install scripts to run (pnpm blocks them by default).
+# Electron/esbuild download their platform binaries in a postinstall; the desktop
+# app can't launch without them. `onlyBuiltDependencies` is pnpm 10's name for
+# this list and `allowBuilds` is pnpm 11's; both are listed so either version
+# builds them.
+allowBuilds:
+  '0': electron
+  '1': esbuild
+
+# electron-forge refuses to start under pnpm unless a hoist pattern or a hoisted
+# node-linker is configured. pnpm 11 reads only auth/registry settings from
+# .npmrc, so it has to be declared here to be seen at all; the .npmrc copies keep
+# pnpm 10 working. '*' is pnpm's own default pattern — the layout is unchanged.
+hoistPattern:
+  - '*'
+
 minimumReleaseAgeExclude:
   - 'toml-ast'
-
-# Allow these packages' install scripts to run (pnpm 10 blocks them by default).
-# Electron/esbuild download their platform binaries in a postinstall; the desktop
-# app can't launch without them.
 onlyBuiltDependencies:
   - electron
   - esbuild
