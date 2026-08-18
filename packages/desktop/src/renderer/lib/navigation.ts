@@ -16,6 +16,7 @@ export type Route =
   | 'lights'
   | 'output'
   | 'devices'
+  | 'traffic'
   | 'settings';
 
 export const ROUTE_LABEL: Record<Route, string> = {
@@ -28,6 +29,7 @@ export const ROUTE_LABEL: Record<Route, string> = {
   lights: 'Lights',
   output: 'Output',
   devices: 'Devices',
+  traffic: 'Traffic',
   settings: 'Settings'
 };
 
@@ -42,7 +44,7 @@ export interface NavGroup {
 export const NAV_GROUPS: NavGroup[] = [
   { id: 'run', label: 'Run', routes: ['show', 'nova', 'status'] },
   { id: 'setup', label: 'Set up', routes: ['config', 'lights', 'output'] },
-  { id: 'advanced', label: 'Advanced', routes: ['devices', 'access', 'settings'] }
+  { id: 'advanced', label: 'Advanced', routes: ['devices', 'access', 'traffic', 'settings'] }
 ];
 
 /** Routes reachable other than from a sidebar group. */

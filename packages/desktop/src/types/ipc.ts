@@ -490,6 +490,124 @@ export interface WavegridApi {
      */
     clear(keepDevice: boolean): Promise<StoreClearResult>;
   };
+  /**
+   * Traffic: passive capture and analysis of BEYOND ⇄ laser hardware traffic.
+   * Nothing here is called until the panel is opened, and nothing transmits.
+   */
+  traffic: {
+    /** Tools, versions, capture permission and the capture directory. Null when
+     *  the toolkit itself is missing or printed nothing usable. */
+    doctor(): Promise<TrafficDoctorReport | null>;
+    /** Capture devices; pass a host to mark the one on its subnet. */
+    interfaces(host?: string): Promise<TrafficInterfaceInfo[]>;
+    /** Listen for `seconds` and rank the peers we exchange packets with. */
+    discover(iface?: string, seconds?: number): Promise<TrafficDiscovery | null>;
+    start(req: TrafficCaptureRequest): Promise<TrafficCaptureState | null>;
+    stop(): Promise<TrafficCaptureState | null>;
+    status(): Promise<TrafficCaptureState | null>;
+    captures(): Promise<TrafficCaptureFile[]>;
+    analyze(path: string, host?: string): Promise<TrafficResult>;
+    /** Byte-level diff: which offsets encode what changed between two states. */
+    compare(a: string, b: string, host?: string): Promise<TrafficResult>;
+    settings(): Promise<TrafficSettings>;
+    /** Persist the capture directory (shared with the CLI). */
+    setCaptureDir(dir: string): Promise<TrafficSettings>;
+    /** Ask for a directory with the native picker. Null when cancelled. */
+    chooseCaptureDir(): Promise<TrafficSettings | null>;
+  };
+}
+
+// ── Traffic (Advanced → Traffic) ───────────────────────────────────────────
+//
+// Passive observation of the traffic between Pangolin BEYOND and laser hardware,
+// driven by the `tools/traffic` CLI. Wireshark is not a Wavegrid dependency, so
+// every one of these calls can legitimately report "not installed".
+
+export interface TrafficTool {
+  name: string;
+  found: boolean;
+  path?: string;
+  version?: string;
+}
+
+export interface TrafficDoctorReport {
+  os: string;
+  osVersion: string;
+  arch: string;
+  captureDir: string;
+  captureDirExists: boolean;
+  /** Whether this machine may capture, and the privileged fix when it may not.
+   *  The app never runs the fix — the operator has to approve it themselves. */
+  capturePermission: { ok: boolean; detail: string; fix: string };
+  tools: TrafficTool[];
+}
+
+export interface TrafficInterfaceInfo {
+  name: string;
+  description: string;
+  /** Space-separated CIDR addresses, as the OS reports them. */
+  addresses: string;
+  /** True when this interface is on the same /24 as the queried host. */
+  matchesHost: boolean;
+}
+
+/** A peer seen exchanging packets with this machine while listening. */
+export interface TrafficPeer {
+  ip: string;
+  packets: number;
+  bytes: number;
+  protocols: string;
+  ports: string;
+  inbound: number;
+  outbound: number;
+  /** Higher = more like laser hardware (two-way, high-rate UDP). */
+  score: number;
+}
+
+export interface TrafficDiscovery {
+  seconds: number;
+  iface: string;
+  candidates: TrafficPeer[];
+  neighbours: { ip: string; mac: string }[];
+}
+
+export interface TrafficCaptureRequest {
+  iface?: string;
+  /** Capture filter: only traffic involving this address reaches the disk. */
+  host?: string;
+  label?: string;
+  seconds?: number;
+}
+
+export interface TrafficCaptureState {
+  running?: boolean;
+  started?: boolean;
+  stopped?: boolean;
+  pid?: number;
+  file?: string;
+}
+
+export interface TrafficCaptureFile {
+  name: string;
+  path: string;
+  label: string;
+  bytes: number;
+  modified: number;
+}
+
+export interface TrafficSettings {
+  captureDir: string;
+  /** Config file the CLI reads too, so the tab and a terminal agree. */
+  configPath: string;
+  toolkitDir: string;
+  toolkitFound: boolean;
+}
+
+/** Raw output of a toolkit command, for the panel's text pane. */
+export interface TrafficResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
 }
 
 export interface WavegridLaser {

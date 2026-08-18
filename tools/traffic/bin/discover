@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+#
+# discover — find the laser hardware without touching it.
+#
+# Two passive sources, in order of confidence:
+#   1. a short listen with tshark, ranking the peers this machine is actually
+#      exchanging packets with (an FB4 receiving frames is a steady, high-rate
+#      UDP conversation — that is the signature, not a port number);
+#   2. the ARP / neighbour table, which shows who has been talked to recently.
+#
+# Nothing is sent: no ping, no ARP probe, no discovery broadcast.
+#
+# Usage: ./bin/discover [--iface IF] [--seconds N] [--json]
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+eval "$(parse_common_args "$@")"
+
+iface=""
+seconds=10
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --iface|-i) iface="${2:-}"; shift 2 ;;
+    --iface=*) iface="${1#--iface=}"; shift ;;
+    --seconds|-s) seconds="${2:-}"; shift 2 ;;
+    --seconds=*) seconds="${1#--seconds=}"; shift ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+TSHARK="$(need_tool tshark)"
+
+# ── Neighbour table (no traffic generated) ────────────────────────────────
+neighbours() {
+  case "$(uname -s)" in
+    Darwin) arp -an 2>/dev/null | sed -n 's/^? (\([0-9.]*\)) at \([0-9a-f:]*\).*/\1 \2/p' ;;
+    Linux) ip neigh show 2>/dev/null | awk '$1 ~ /^[0-9.]+$/ && $5 ~ /:/ { print $1, $5 }' ;;
+  esac
+}
+
+# ── Passive listen ────────────────────────────────────────────────────────
+# One tshark pass, one line per packet: src, dst, transport, dst port, length.
+listen() {
+  local args=(-a "duration:$seconds" -n -T fields
+    -e ip.src -e ip.dst -e _ws.col.Protocol -e udp.dstport -e tcp.dstport -e frame.len
+    -E separator=,)
+  [[ -z "$iface" ]] || args=(-i "$iface" "${args[@]}")
+  "$TSHARK" "${args[@]}" 2>/dev/null || true
+}
+
+local_ips() {
+  case "$(uname -s)" in
+    Darwin) ifconfig 2>/dev/null | awk '/inet /{print $2}' ;;
+    Linux) ip -o -4 addr show 2>/dev/null | awk '{split($4,a,"/"); print a[1]}' ;;
+  esac
+}
+
+mine="$(local_ips | tr '\n' ' ')"
+
+say "Listening passively for ${seconds}s${iface:+ on $iface}…"
+raw="$(listen)"
+
+# Aggregate per peer: packets, bytes, ports seen, protocols.
+summary="$(printf '%s\n' "$raw" | awk -F, -v mine="$mine" '
+  BEGIN { split(mine, m, " "); for (i in m) if (m[i] != "") local[m[i]] = 1 }
+  $1 == "" && $2 == "" { next }
+  {
+    src = $1; dst = $2; proto = $3; port = ($4 != "" ? $4 : $5); len = $6 + 0
+    # The peer is whichever end is not us; skip traffic between two strangers.
+    peer = ""
+    if (local[src] && !local[dst]) peer = dst
+    else if (local[dst] && !local[src]) peer = src
+    else next
+    # Broadcast and multicast are not a device we can capture a conversation with.
+    if (peer ~ /\.255$/ || peer ~ /^(22[4-9]|23[0-9])\./) next
+    pkts[peer]++; bytes[peer] += len
+    if (proto != "") protos[peer] = protos[peer] (index(protos[peer], proto) ? "" : (protos[peer] ? "/" : "") proto)
+    if (port != "") ports[peer] = ports[peer] (index(ports[peer], port) ? "" : (ports[peer] ? "," : "") port)
+    if (local[dst]) inbound[peer]++
+    if (local[src]) outbound[peer]++
+  }
+  END {
+    for (p in pkts)
+      printf "%s|%d|%d|%s|%s|%d|%d\n", p, pkts[p], bytes[p], protos[p], ports[p], inbound[p], outbound[p]
+  }
+' | sort -t'|' -k2 -nr)"
+
+# Bidirectional, high-rate UDP is what a laser controller looks like on the wire.
+score_of() {
+  local pkts="$1" proto="$2" in="$3" out="$4" score=0
+  score=$((pkts))
+  [[ "$proto" == *UDP* ]] && score=$((score * 2))
+  if (( in > 0 && out > 0 )); then score=$((score * 2)); fi
+  printf '%s\n' "$score"
+}
+
+if is_json; then
+  printf '{ "seconds": %s, "iface": %s, "candidates": [\n' "$seconds" "$(json_str "$iface")"
+  first=1
+  while IFS='|' read -r ip pkts bytes protos ports inb outb; do
+    [[ -n "$ip" ]] || continue
+    [[ $first == 1 ]] || printf ',\n'
+    first=0
+    printf '  { "ip": %s, "packets": %s, "bytes": %s, "protocols": %s, "ports": %s, "inbound": %s, "outbound": %s, "score": %s }' \
+      "$(json_str "$ip")" "$pkts" "$bytes" "$(json_str "$protos")" "$(json_str "$ports")" \
+      "${inb:-0}" "${outb:-0}" "$(score_of "$pkts" "$protos" "${inb:-0}" "${outb:-0}")"
+  done <<< "$summary"
+  printf '\n], "neighbours": [\n'
+  first=1
+  while read -r ip mac; do
+    [[ -n "$ip" ]] || continue
+    [[ $first == 1 ]] || printf ',\n'
+    first=0
+    printf '  { "ip": %s, "mac": %s }' "$(json_str "$ip")" "$(json_str "$mac")"
+  done < <(neighbours)
+  printf '\n] }\n'
+  exit 0
+fi
+
+head1 "Peers seen talking to this machine"
+if [[ -z "$summary" ]]; then
+  say "  none — is BEYOND running and outputting? Try a longer --seconds, or another --iface."
+else
+  printf '  %-16s %8s %10s  %-12s %s\n' IP PACKETS BYTES PROTO PORTS
+  while IFS='|' read -r ip pkts bytes protos ports inb outb; do
+    [[ -n "$ip" ]] || continue
+    printf '  %-16s %8s %10s  %-12s %s%s\n' "$ip" "$pkts" "$bytes" "${protos:--}" "${ports:--}" \
+      "$( (( inb > 0 && outb > 0 )) && printf '  (two-way)' )"
+  done <<< "$summary"
+  best="$(printf '%s\n' "$summary" | head -1 | cut -d'|' -f1)"
+  say ""
+  say "Most active peer: $best"
+  say "  → ./bin/capture --host $best --label idle"
+fi
+
+head1 "Neighbour table (ARP)"
+neighbours | while read -r ip mac; do printf '  %-16s %s\n' "$ip" "$mac"; done
+say ""
+say "Heuristic only: confirm by starting laser output in BEYOND and re-running — the FB4"
+say "is the peer whose packet rate jumps."

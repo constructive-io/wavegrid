@@ -13,7 +13,10 @@ const config: ForgeConfig = {
     name: 'Wavegrid Desktop',
     // Constructive company mark (assets/icon.{icns,ico}) until Wavegrid has its own.
     icon: './assets/icon',
-    asar: true
+    asar: true,
+    // The traffic toolkit is shell + python the main process spawns, so it has to
+    // sit outside the asar archive; it lands at <resources>/traffic.
+    extraResource: ['../../tools/traffic']
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],

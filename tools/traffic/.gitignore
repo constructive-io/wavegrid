@@ -1,0 +1,5 @@
+captures/
+*.pcapng
+*.pcap
+*.log
+.capture.pid

@@ -1,7 +1,7 @@
 import { browse } from '@wavegrid/discovery';
 import { autoMap, resolveLayout } from '@wavegrid/layout';
 import { openStore } from '@wavegrid/settings';
-import { ipcMain } from 'electron';
+import { dialog, ipcMain } from 'electron';
 
 import {
   sendToBrain,
@@ -23,6 +23,19 @@ import {
   knownPresets,
   toEditable
 } from '@/main/project-config';
+import {
+  analyzeCapture,
+  captureState,
+  compareCaptures,
+  listCaptures,
+  readSettings,
+  startCapture,
+  stopCapture,
+  trafficDiscover,
+  trafficDoctor,
+  trafficInterfaces,
+  writeSettings
+} from '@/main/traffic';
 import { exportProjectToFile, importProjectFromFile } from '@/main/transfer';
 import type {
   DeviceInfo,
@@ -37,6 +50,7 @@ import type {
   ShardRange,
   StoreClearResult,
   StoreInfo,
+  TrafficCaptureRequest,
   UserRole
 } from '@/types/ipc';
 
@@ -344,6 +358,33 @@ export function registerAllIpc(): void {
     syncLaser({ url: null, bounds: { x: 0, y: 0, width: 0, height: 0 }, visible: false });
     const summary = openStore().reset({ keepDevice });
     return { ...summary, info: storeInfo() };
+  });
+
+  // Traffic panel (Advanced → Traffic): passive observation only. Wireshark is
+  // looked for when the panel asks, never at startup, so a machine without it
+  // runs the rest of the app untouched.
+  ipcMain.handle('traffic:doctor', () => trafficDoctor());
+  ipcMain.handle('traffic:interfaces', (_e, host?: string) => trafficInterfaces(host));
+  ipcMain.handle('traffic:discover', (_e, iface?: string, seconds?: number) =>
+    trafficDiscover(iface, seconds)
+  );
+  ipcMain.handle('traffic:start', (_e, req: TrafficCaptureRequest) => startCapture(req));
+  ipcMain.handle('traffic:stop', () => stopCapture());
+  ipcMain.handle('traffic:status', () => captureState());
+  ipcMain.handle('traffic:captures', () => listCaptures());
+  ipcMain.handle('traffic:analyze', (_e, path: string, host?: string) => analyzeCapture(path, host));
+  ipcMain.handle('traffic:compare', (_e, a: string, b: string, host?: string) =>
+    compareCaptures(a, b, host)
+  );
+  ipcMain.handle('traffic:settings', () => readSettings());
+  ipcMain.handle('traffic:setCaptureDir', (_e, dir: string) => writeSettings(dir));
+  ipcMain.handle('traffic:chooseCaptureDir', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Where should captures be saved?',
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (canceled || !filePaths[0]) return null;
+    return writeSettings(filePaths[0]);
   });
 
   ipcMain.on('laser:sync', (_e, state: LaserSyncState) => syncLaser(state));

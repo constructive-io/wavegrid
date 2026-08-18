@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { AccessKeyInfo, BrainStatus, DeviceInfo, DiscoveredBrainInfo, DoctorReport, EditableConfig, ExportResult, ImportRequest, ImportSummary, LaserSyncState, LightMapView, NetworkReport, NewProjectInput, OscTarget, ProjectSummary, RequiredSecretInfo, SessionInfo, ShardRange, StoreClearResult, StoreInfo, UserAccount, UserRole, WavegridApi, WavegridLaser } from '@/types/ipc';
+import type { AccessKeyInfo, BrainStatus, DeviceInfo, DiscoveredBrainInfo, DoctorReport, EditableConfig, ExportResult, ImportRequest, ImportSummary, LaserSyncState, LightMapView, NetworkReport, NewProjectInput, OscTarget, ProjectSummary, RequiredSecretInfo, SessionInfo, ShardRange, StoreClearResult, StoreInfo, TrafficCaptureFile, TrafficCaptureRequest, TrafficCaptureState, TrafficDiscovery, TrafficDoctorReport, TrafficInterfaceInfo, TrafficResult, TrafficSettings, UserAccount, UserRole, WavegridApi, WavegridLaser } from '@/types/ipc';
 
 // The single, narrow bridge exposed to the renderer. The renderer never imports
 // @wavegrid/settings or `fs`; everything goes through these typed calls.
@@ -104,6 +104,29 @@ const api: WavegridApi = {
   discovery: {
     browse: (timeoutMs) =>
       ipcRenderer.invoke('discovery:browse', timeoutMs) as Promise<DiscoveredBrainInfo[]>
+  },
+  // Traffic panel. Nothing is invoked until that screen mounts, so a machine
+  // without Wireshark never notices these exist.
+  traffic: {
+    doctor: () => ipcRenderer.invoke('traffic:doctor') as Promise<TrafficDoctorReport | null>,
+    interfaces: (host) =>
+      ipcRenderer.invoke('traffic:interfaces', host) as Promise<TrafficInterfaceInfo[]>,
+    discover: (iface, seconds) =>
+      ipcRenderer.invoke('traffic:discover', iface, seconds) as Promise<TrafficDiscovery | null>,
+    start: (req: TrafficCaptureRequest) =>
+      ipcRenderer.invoke('traffic:start', req) as Promise<TrafficCaptureState | null>,
+    stop: () => ipcRenderer.invoke('traffic:stop') as Promise<TrafficCaptureState | null>,
+    status: () => ipcRenderer.invoke('traffic:status') as Promise<TrafficCaptureState | null>,
+    captures: () => ipcRenderer.invoke('traffic:captures') as Promise<TrafficCaptureFile[]>,
+    analyze: (path, host) =>
+      ipcRenderer.invoke('traffic:analyze', path, host) as Promise<TrafficResult>,
+    compare: (a, b, host) =>
+      ipcRenderer.invoke('traffic:compare', a, b, host) as Promise<TrafficResult>,
+    settings: () => ipcRenderer.invoke('traffic:settings') as Promise<TrafficSettings>,
+    setCaptureDir: (dir) =>
+      ipcRenderer.invoke('traffic:setCaptureDir', dir) as Promise<TrafficSettings>,
+    chooseCaptureDir: () =>
+      ipcRenderer.invoke('traffic:chooseCaptureDir') as Promise<TrafficSettings | null>
   },
   store: {
     info: () => ipcRenderer.invoke('store:info') as Promise<StoreInfo>,

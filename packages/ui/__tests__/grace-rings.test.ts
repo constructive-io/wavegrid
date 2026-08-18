@@ -47,7 +47,7 @@ function run(code: string, t = 0): Cell[] {
   return cells;
 }
 
-const OUTER = GRACE.fixtures.filter(f => f.radius === 1).map(f => f.index);
+const OUTER = GRACE.fixtures.filter(f => +f.radius.toFixed(3) === 1).map(f => f.index);
 const INNER = GRACE.fixtures.filter(f => +f.radius.toFixed(3) === 0.62).map(f => f.index);
 const CENTRE = GRACE.fixtures.filter(f => f.radius === 0).map(f => f.index);
 
@@ -135,9 +135,10 @@ describe('shapes', () => {
   it('Cross lights four arms plus the centre', () => {
     const cells = run(get('Cross'));
     expect(cells[CENTRE[0]].b).toBe(100);
-    expect(OUTER.filter(i => cells[i].b > 50)).toHaveLength(4);
-    // The inner ring is staggered, so each arm lands between two fixtures.
-    expect(INNER.filter(i => cells[i].b > 50)).toHaveLength(8);
+    // The outer ring is the staggered one, so each arm lands between two of its
+    // fixtures and lights both; the inner ring sits on the arms themselves.
+    expect(OUTER.filter(i => cells[i].b > 50)).toHaveLength(8);
+    expect(INNER.filter(i => cells[i].b > 50)).toHaveLength(4);
   });
 });
 
@@ -209,7 +210,8 @@ describe('chases', () => {
   });
 
   it('Comet keeps one bright head with a tail behind it', () => {
-    const cells = run(get('Comet'), 1 / 3); // head on an outer fixture
+    // Head exactly on an outer fixture — they sit half a slot round from 12 o'clock.
+    const cells = run(get('Comet'), 1 / 6);
     const lit = OUTER.filter(i => cells[i].b > 90);
     expect(lit).toHaveLength(1);
     const tail = OUTER.filter(i => cells[i].b > 20);
