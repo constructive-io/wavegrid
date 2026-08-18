@@ -1,12 +1,14 @@
 /**
  * The sidebar's shape, grouped by *when* you reach for something rather than by
- * what it is: running a show is two items, everything a project needs is under
+ * what it is: running a show is the show itself, the Nova look panel, and its
+ * health; everything a project needs is under
  * "Set up", and the vocabulary that scares a non-technical operator lives under
  * "Advanced". Projects is not a destination — the switcher in the sidebar
  * header owns choosing one and links to the manage screen.
  */
 export type Route =
   | 'show'
+  | 'nova'
   | 'status'
   | 'projects'
   | 'config'
@@ -18,6 +20,7 @@ export type Route =
 
 export const ROUTE_LABEL: Record<Route, string> = {
   show: 'Show',
+  nova: 'Nova',
   status: 'Status',
   projects: 'Projects',
   config: 'Layout',
@@ -37,7 +40,7 @@ export interface NavGroup {
 }
 
 export const NAV_GROUPS: NavGroup[] = [
-  { id: 'run', label: 'Run', routes: ['show', 'status'] },
+  { id: 'run', label: 'Run', routes: ['show', 'nova', 'status'] },
   { id: 'setup', label: 'Set up', routes: ['config', 'lights', 'output'] },
   { id: 'advanced', label: 'Advanced', routes: ['devices', 'access', 'settings'] }
 ];

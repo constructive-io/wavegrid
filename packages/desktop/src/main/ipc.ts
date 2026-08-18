@@ -15,6 +15,7 @@ import { buildDoctorReport } from '@/main/doctor';
 import { invalidateLaserView, type LaserSyncState, syncLaser } from '@/main/laser-view';
 import { buildLightMapView } from '@/main/light-map';
 import { buildNetworkReport } from '@/main/network';
+import { applyNovaLook, novaBlackout, setNovaSpeed } from '@/main/nova';
 import { applyOscTarget, toOscTarget } from '@/main/osc-target';
 import {
   applyEditable,
@@ -295,6 +296,12 @@ export function registerAllIpc(): void {
     sendToBrain(project, { type: 'physical_preview_clear' });
     sendToBrain(project, { type: 'calibration_mode', enabled: false });
   });
+
+  // Nova panel: run an amber look on the live rig. The look id is validated
+  // against the shared catalog in `nova.ts`; nothing else can be injected.
+  ipcMain.handle('nova:apply', (_e, project: string, look: string) => applyNovaLook(project, look));
+  ipcMain.handle('nova:speed', (_e, project: string, value: number) => setNovaSpeed(project, value));
+  ipcMain.handle('nova:blackout', (_e, project: string) => novaBlackout(project));
 
   ipcMain.handle('projects:exportToFile', (_e, project: string, includeSecrets: boolean) =>
     exportProjectToFile(project, includeSecrets)

@@ -91,6 +91,11 @@ const api: WavegridApi = {
     identifyClear: (project) =>
       ipcRenderer.invoke('lights:identifyClear', project) as Promise<void>
   },
+  nova: {
+    apply: (project, look) => ipcRenderer.invoke('nova:apply', project, look) as Promise<boolean>,
+    speed: (project, value) => ipcRenderer.invoke('nova:speed', project, value) as Promise<boolean>,
+    blackout: (project) => ipcRenderer.invoke('nova:blackout', project) as Promise<boolean>
+  },
   osc: {
     get: (project) => ipcRenderer.invoke('osc:get', project) as Promise<OscTarget | null>,
     set: (project, target: OscTarget) =>
