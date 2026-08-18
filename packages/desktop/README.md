@@ -89,6 +89,11 @@ read only the .npmrc next to the cwd rather than the workspace root's. Check the
 file is present (`git pull`), and that no user- or global-level pnpm config
 overrides it (`pnpm config get hoist-pattern --json` here should print `["*"]`).
 
+`forge.config.ts` imports its makers lazily, so `pnpm start` never loads the
+packaging toolchain (`@electron-forge/maker-squirrel` pulls in
+`electron-winstaller`, which fails to resolve in some pnpm layouts). Only
+`make`/`package`/`publish` construct makers — if you add one, add it there.
+
 ## Packaging (later phase)
 
 `pnpm run package` / `pnpm run make` build a distributable. Electron Forge
