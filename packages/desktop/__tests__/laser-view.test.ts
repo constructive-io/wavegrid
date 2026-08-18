@@ -20,7 +20,8 @@ jest.mock('electron', () => ({
   shell: { openExternal: jest.fn() },
   WebContentsView: jest.fn(() => viewInstance)
 }));
-jest.mock('@/main/brain', () => ({ status: () => ({ project: 'grace' }) }));
+let brainProject: string | null = 'grace';
+jest.mock('@/main/brain', () => ({ status: () => ({ project: brainProject }) }));
 jest.mock('@/main/operator-session', () => ({ embeddedUrl: (url: string) => `${url}#wg_token=t` }));
 jest.mock('@/main/runtime', () => ({
   runtime: { mainWindow: { isDestroyed: () => false, contentView: { addChildView: jest.fn() } } }
@@ -39,6 +40,7 @@ beforeEach(() => {
   // the retry timers this exercises.
   jest.useFakeTimers({ doNotFake: ['setImmediate'] });
   resetLaserView();
+  brainProject = 'grace';
   webContents.loadURL.mockReset().mockResolvedValue(undefined);
   viewInstance.setVisible.mockClear();
 });
@@ -105,6 +107,47 @@ it('reloads on a project switch, hiding the stale page until the new one paints'
   webContents.loadURL.mockReturnValueOnce(new Promise<void>((r) => (resolveLoad = r)));
   invalidateLaserView();
   expect(webContents.loadURL).toHaveBeenCalledTimes(2);
+
+  resolveLoad();
+  await flush();
+  expect(visibility().at(-1)).toBe(true);
+});
+
+it('reloads when the brain switched projects behind the same url', async () => {
+  show();
+  await flush();
+  viewInstance.setVisible.mockClear();
+
+  // Every project is served on the same loopback origin, so only the project
+  // itself distinguishes the loaded page from the one that should be up.
+  brainProject = 'nova';
+  let resolveLoad: () => void = () => undefined;
+  webContents.loadURL.mockReturnValueOnce(new Promise<void>((r) => (resolveLoad = r)));
+  show();
+
+  expect(webContents.loadURL).toHaveBeenCalledTimes(2);
+  expect(visibility().at(-1)).toBe(false);
+
+  resolveLoad();
+  await flush();
+  expect(visibility().at(-1)).toBe(true);
+});
+
+it('does not put the stopped show back on screen when the next one starts', async () => {
+  show();
+  await flush();
+
+  // Stopping the brain hides the view and invalidates the page it holds.
+  show(null);
+  invalidateLaserView();
+  brainProject = 'nova';
+  viewInstance.setVisible.mockClear();
+
+  let resolveLoad: () => void = () => undefined;
+  webContents.loadURL.mockReturnValueOnce(new Promise<void>((r) => (resolveLoad = r)));
+  show();
+  expect(webContents.loadURL).toHaveBeenCalledTimes(2);
+  expect(visibility()).not.toContain(true);
 
   resolveLoad();
   await flush();

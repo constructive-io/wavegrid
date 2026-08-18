@@ -20,6 +20,11 @@ let view: WebContentsView | null = null;
 let desiredUrl: string | null = null;
 /** The URL currently loaded (or loading). Null means "nothing usable is up". */
 let loadedUrl: string | null = null;
+/** Which project's brain served what is loaded. Every project is served on the
+ *  same loopback origin, so the URL alone cannot tell two projects apart: the
+ *  page has to be re-checked against the running project or a switch leaves the
+ *  previous project's interface on screen. */
+let loadedProject: string | null = null;
 /** True once the current load painted; a loading view is a black rectangle. */
 let painted = false;
 let retryTimer: NodeJS.Timeout | null = null;
@@ -38,7 +43,13 @@ export function resetLaserView(): void {
   view = null;
   desiredUrl = null;
   loadedUrl = null;
+  loadedProject = null;
   painted = false;
+}
+
+/** Does what is loaded still match what the brain is serving? */
+function stale(url: string): boolean {
+  return loadedUrl !== url || loadedProject !== status().project;
 }
 
 /**
@@ -63,12 +74,13 @@ function load(url: string): void {
   const v = ensureView();
   if (!v) return;
   loadedUrl = url;
+  loadedProject = status().project;
   painted = false;
   const seq = ++loadSeq;
   // Carries a session for the active project, so a project switch doesn't
   // strand the operator on a login screen inside their own app.
   v.webContents
-    .loadURL(embeddedUrl(url, status().project))
+    .loadURL(embeddedUrl(url, loadedProject))
     .then(() => {
       if (seq !== loadSeq) return;
       attempts = 0;
@@ -95,7 +107,10 @@ function applyVisibility(): void {
 export function invalidateLaserView(): void {
   attempts = 0;
   if (!view || view.webContents.isDestroyed() || !desiredUrl) {
+    // Nothing to reload now; make sure the next sync doesn't mistake the stale
+    // page for a usable one.
     loadedUrl = null;
+    loadedProject = null;
     return;
   }
   // Not `reload()`: the UI strips the session token out of the address once it
@@ -137,7 +152,7 @@ export function syncLaser(state: LaserSyncState): void {
   desiredUrl = url;
   const v = ensureView();
   if (!v) return;
-  if (loadedUrl !== url) load(url);
+  if (stale(url)) load(url);
   v.setBounds({
     x: Math.round(bounds.x),
     y: Math.round(bounds.y),

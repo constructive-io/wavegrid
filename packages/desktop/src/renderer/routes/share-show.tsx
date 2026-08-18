@@ -17,12 +17,9 @@ import { rankLanUrls } from '@/renderer/lib/share-urls';
 
 interface ShareShowProps {
   lanUrls: string[];
-  /** Called while the QR is open so the native laser view can get out of the
-   *  way — it renders above the page and would otherwise cover the popover. */
-  onOpenChange?: (open: boolean) => void;
 }
 
-export function ShareShow({ lanUrls, onOpenChange }: ShareShowProps) {
+export function ShareShow({ lanUrls }: ShareShowProps) {
   const urls = React.useMemo(() => rankLanUrls(lanUrls), [lanUrls]);
   const [selected, setSelected] = React.useState(0);
   const [dataUrl, setDataUrl] = React.useState<string | null>(null);
@@ -53,7 +50,7 @@ export function ShareShow({ lanUrls, onOpenChange }: ShareShowProps) {
   if (urls.length === 0) return null;
 
   return (
-    <Popover onOpenChange={(open) => onOpenChange?.(open)}>
+    <Popover>
       <PopoverTrigger asChild>
         <Button variant='outline' size='sm'>
           <QrCode />

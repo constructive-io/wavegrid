@@ -187,16 +187,20 @@ export function App() {
     async (name: string) => {
       setBusy(true);
       try {
+        // Asked, not remembered: the rendered status is a broadcast that can lag
+        // the brain, and acting on a stale one leaves the old project's show
+        // running under the new project's screen.
+        const before = await window.wavegrid.brain.status();
+        const restart = before.running && before.project !== name;
+        if (restart) await window.wavegrid.brain.stop();
         await use(name);
         invalidateProjectData();
-        if (status.running && status.project !== name) {
-          await window.wavegrid.brain.start(name).catch(() => undefined);
-        }
+        if (restart) await window.wavegrid.brain.start(name).catch(() => undefined);
       } finally {
         setBusy(false);
       }
     },
-    [use, invalidateProjectData, status.running, status.project]
+    [use, invalidateProjectData]
   );
 
   /**

@@ -123,7 +123,13 @@ export function registerAllIpc(): void {
     invalidateLaserView();
     return s;
   });
-  ipcMain.handle('brain:stop', () => stopBrain());
+  ipcMain.handle('brain:stop', async () => {
+    const s = await stopBrain();
+    // The page the view is holding belongs to a brain that no longer exists;
+    // starting the show again must not put it back on screen.
+    invalidateLaserView();
+    return s;
+  });
   // Receiver-only controls: the output stage reads its OSC target, shard, and
   // light map at startup, so restarting just the receiver applies a config
   // change without dropping the server, the laser UI, or connected clients.
