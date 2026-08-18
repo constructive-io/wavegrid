@@ -1,14 +1,38 @@
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
-import { MakerDeb } from '@electron-forge/maker-deb';
-import { MakerRpm } from '@electron-forge/maker-rpm';
-import { MakerSquirrel } from '@electron-forge/maker-squirrel';
-import { MakerZIP } from '@electron-forge/maker-zip';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 
-const config: ForgeConfig = {
+/**
+ * Commands that actually build artifacts, and so need the makers.
+ *
+ * Forge loads this file for *every* command, and importing a maker runs it:
+ * `@electron-forge/maker-squirrel` requires `electron-winstaller` at module
+ * scope, which fails outright in some pnpm layouts. `start` has no use for
+ * makers, so they're imported only when something is being made — otherwise
+ * dev is hostage to the packaging toolchain resolving.
+ */
+const MAKE_COMMANDS = ['make', 'package', 'publish'];
+
+export function needsMakers(argv: string[] = process.argv): boolean {
+  return argv.slice(2).some((arg) => MAKE_COMMANDS.includes(arg));
+}
+
+async function makers(): Promise<NonNullable<ForgeConfig['makers']>> {
+  if (!needsMakers()) return [];
+
+  const [{ MakerSquirrel }, { MakerZIP }, { MakerRpm }, { MakerDeb }] = await Promise.all([
+    import('@electron-forge/maker-squirrel'),
+    import('@electron-forge/maker-zip'),
+    import('@electron-forge/maker-rpm'),
+    import('@electron-forge/maker-deb')
+  ]);
+
+  return [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})];
+}
+
+const config: Omit<ForgeConfig, 'makers'> = {
   packagerConfig: {
     name: 'Wavegrid Desktop',
     // Constructive company mark (assets/icon.{icns,ico}) until Wavegrid has its own.
@@ -19,7 +43,6 @@ const config: ForgeConfig = {
     extraResource: ['../../tools/traffic']
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
   plugins: [
     new AutoUnpackNativesPlugin({}),
     new VitePlugin({
@@ -55,4 +78,7 @@ const config: ForgeConfig = {
   ]
 };
 
-export default config;
+// Forge awaits a function export, which is what keeps the maker imports lazy.
+export default async function forgeConfig(): Promise<ForgeConfig> {
+  return { ...config, makers: await makers() };
+}
