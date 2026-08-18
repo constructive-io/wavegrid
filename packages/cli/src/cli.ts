@@ -9,6 +9,12 @@ import { runInit } from './commands/init';
 import { runKeysEnabled, runKeysList, runKeysNew, runKeysRemove } from './commands/keys';
 import { pickCommand, pickSubcommand, printSubcommands, type SubCommand } from './commands/menu';
 import { runOscSetup } from './commands/osc';
+import {
+  runSignalsListen,
+  runSignalsProbe,
+  runSignalsSend,
+  SIGNALS_USAGE
+} from './commands/osc-signals';
 import { runPrintConfig } from './commands/print-config';
 import { runProjectsExport, runProjectsImport } from './commands/project-io';
 import { runProjects, runUse } from './commands/projects';
@@ -63,6 +69,11 @@ ${c.bold('Run')}
   receiver                      Run a receiver only — connects to a brain, drives its shard
   doctor                        Diagnose this laptop + the whole installation
 
+${c.bold('Signals')} — hand-driven OSC for debugging Pangolin
+  signals send <addr> [args]    Send one OSC message to the configured target
+  signals probe [--zones 0-11]  Light one zone/fixture at a time, to find the mapping
+  signals listen [--port 7001]  Print every OSC message arriving on a port
+
 ${c.bold('Receiver options')}
   --server <ws-url>   Brain to connect to (e.g. ws://192.168.1.42:3333)
   --shard <a-b>       Cannon range this receiver drives (e.g. 0-24)
@@ -84,7 +95,14 @@ const COMMANDS: SubCommand[] = [
   { value: 'start', description: 'Run the active project — server + UI + receiver (one laptop)' },
   { value: 'server', description: 'Run the brain only — server + UI + API + WebSocket (no receiver)' },
   { value: 'receiver', description: 'Run a receiver only — connects to a brain, drives its shard' },
-  { value: 'doctor', description: 'Diagnose this laptop + the whole installation' }
+  { value: 'doctor', description: 'Diagnose this laptop + the whole installation' },
+  { value: 'signals', description: 'Hand-driven OSC: send one message, probe zones, listen to a port' }
+];
+
+const SIGNALS_SUBS: SubCommand[] = [
+  { value: 'send', description: 'Send one OSC message to the configured target (or --host/--port)' },
+  { value: 'probe', description: 'Light one zone/fixture at a time to find which laser is which' },
+  { value: 'listen', description: 'Print every OSC message arriving on a port' }
 ];
 
 const PROJECTS_SUBS: SubCommand[] = [
@@ -203,7 +221,8 @@ const KNOWN_COMMANDS = [
   'keys',
   'devices',
   'env',
-  'doctor'
+  'doctor',
+  'signals'
 ];
 
 /**
@@ -336,6 +355,21 @@ async function dispatchDevices(
   } else if (sub === 'rm' || sub === 'remove' || sub === 'forget') {
     await runDevicesRemove(flags, args[1], nonInteractive ? undefined : prompter);
   } else unknownSub('devices', sub);
+}
+
+async function dispatchSignals(
+  args: string[],
+  flags: Flags,
+  prompter: Inquirerer,
+  nonInteractive: boolean
+): Promise<void> {
+  const sub = (await resolveSub(args[0], 'signals', SIGNALS_SUBS, prompter, nonInteractive)) ?? undefined;
+  if (sub == null) return;
+  if (sub === 'send') await runSignalsSend(args.slice(1), flags);
+  else if (sub === 'probe' || sub === 'walk') await runSignalsProbe(flags);
+  else if (sub === 'listen' || sub === 'watch') await runSignalsListen(flags);
+  else if (sub === 'help') console.log(SIGNALS_USAGE);
+  else unknownSub('signals', sub);
 }
 
 function dispatchEnv(args: string[], flags: Flags): void {
@@ -510,6 +544,12 @@ export async function run(argvInput: string[] = process.argv.slice(2)): Promise<
       break;
     case 'doctor':
       await runDoctor(flags);
+      break;
+    case 'signals':
+      // `listen` runs until Ctrl-C; keep the prompter attached so the signal
+      // handling isn't fighting a half-closed stdin.
+      keepOpen = !nonInteractive && positionals[1] === 'listen';
+      await dispatchSignals(positionals.slice(1), flags, prompter, nonInteractive);
       break;
     default:
       console.log(c.red(`Unknown command: ${command}`));

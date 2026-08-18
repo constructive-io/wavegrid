@@ -43,6 +43,7 @@
     "@wavegrid/discovery": "workspace:*",
     "@wavegrid/doctor": "workspace:*",
     "@wavegrid/layout": "workspace:*",
+    "@wavegrid/osc": "workspace:*",
     "@wavegrid/receiver": "workspace:*",
     "@wavegrid/server": "workspace:*",
     "@wavegrid/settings": "workspace:*",
