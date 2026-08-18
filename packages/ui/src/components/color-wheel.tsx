@@ -19,6 +19,9 @@ interface ColorWheelProps {
   compact?: boolean;
 }
 
+/** Where the brush lands when a colour is picked out of black. */
+const DEFAULT_BRIGHTNESS = 100;
+
 function hslRgb(h: number, s: number, l: number): [number, number, number] {
   s /= 100; l /= 100;
   const a = s * Math.min(l, 1 - l);
@@ -130,6 +133,23 @@ export function ColorWheel({
     };
   }, [pickWheel, pickBright]);
 
+  // Black is the one swatch that is a brightness, not a hue: painting with it
+  // sends brightness 0, which turns lasers off. Picking a colour again brings
+  // back the brightness the operator was painting at.
+  const isBlack = brightness === 0;
+  const litBrightness = useRef(brightness > 0 ? brightness : DEFAULT_BRIGHTNESS);
+  if (brightness > 0) litBrightness.current = brightness;
+
+  const pickColor = useCallback((h: number, s: number) => {
+    onHueChange(h);
+    onSatChange(s);
+    if (brightness === 0) onBrightChange(litBrightness.current);
+  }, [brightness, onBrightChange, onHueChange, onSatChange]);
+
+  const pickBlack = useCallback(() => {
+    onBrightChange(0);
+  }, [onBrightChange]);
+
   const radius = wheelSize / 2 - 2;
   const cursorAngle = (hue * Math.PI) / 180;
   const cursorDist = (saturation / 100) * radius;
@@ -209,9 +229,9 @@ export function ColorWheel({
       style={{
         width: compact ? 48 : 56,
         height: compact ? 48 : 56,
-        background: previewColor,
-        boxShadow: `0 0 24px ${previewGlow}`,
-        border: '1px solid rgba(255,255,255,0.1)'
+        background: isBlack ? '#000' : previewColor,
+        boxShadow: isBlack ? 'none' : `0 0 24px ${previewGlow}`,
+        border: isBlack ? '1px solid rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.1)'
       }}
     />
   );
@@ -227,7 +247,7 @@ export function ColorWheel({
 
       {/* Cell 2: quick colors + brush controls */}
       <ControlGroup label="Brush">
-        {/* ROYGBIV quick-pick swatches */}
+        {/* ROYGBIV quick-pick swatches, plus black to paint lasers off */}
         <div className="flex items-center gap-2 pb-1">
           {[
             { h: 0, s: 100, label: 'Red' },
@@ -241,11 +261,11 @@ export function ColorWheel({
           ].map((c) => {
             const [r, g, b] = hslRgb(c.h, c.s, 50);
             const bg = c.s === 0 ? '#fff' : `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
-            const isActive = Math.abs(hue - c.h) < 5 && Math.abs(saturation - c.s) < 5;
+            const isActive = !isBlack && Math.abs(hue - c.h) < 5 && Math.abs(saturation - c.s) < 5;
             return (
               <button
                 key={c.label}
-                onClick={() => { onHueChange(c.h); onSatChange(c.s); }}
+                onClick={() => pickColor(c.h, c.s)}
                 title={c.label}
                 className="shrink-0 rounded-full transition-transform"
                 style={{
@@ -259,6 +279,22 @@ export function ColorWheel({
               />
             );
           })}
+
+          {/* Black is no brightness at all, so it paints lasers off. The outline
+              is what makes it visible against the panel. */}
+          <button
+            onClick={pickBlack}
+            title="Black — paints lasers off"
+            className="shrink-0 rounded-full transition-transform"
+            style={{
+              width: 26,
+              height: 26,
+              background: '#000',
+              border: isBlack ? '2.5px solid #fff' : '2px solid rgba(255,255,255,0.55)',
+              boxShadow: isBlack ? '0 0 8px rgba(255,255,255,0.5)' : 'none',
+              transform: isBlack ? 'scale(1.15)' : 'scale(1)'
+            }}
+          />
         </div>
 
         <div className="flex items-center gap-3">
