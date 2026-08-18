@@ -82,6 +82,13 @@ pnpm run build    # typecheck (tsc --noEmit) — the CI check
 pnpm run lint
 ```
 
+If `pnpm start` fails its preflight with *“When using pnpm, `node-linker` must be
+set to "hoisted"”*, the `.npmrc` beside this README is what satisfies it — Forge
+runs `pnpm config get hoist-pattern` in this directory, and some pnpm versions
+read only the .npmrc next to the cwd rather than the workspace root's. Check the
+file is present (`git pull`), and that no user- or global-level pnpm config
+overrides it (`pnpm config get hoist-pattern --json` here should print `["*"]`).
+
 ## Packaging (later phase)
 
 `pnpm run package` / `pnpm run make` build a distributable. Electron Forge
