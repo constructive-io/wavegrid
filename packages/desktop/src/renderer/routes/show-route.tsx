@@ -11,6 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@/components/ui/empty';
+import { watchOverlays } from '@/renderer/lib/overlay-present';
 import { ShareShow } from '@/renderer/routes/share-show';
 import type { BrainStatus } from '@/types/ipc';
 
@@ -30,9 +31,11 @@ interface ShowRouteProps {
  */
 export function ShowRoute({ status, activeProject, onStart, onStop, busy }: ShowRouteProps) {
   const slotRef = React.useRef<HTMLDivElement>(null);
-  // The laser UI is a native view stacked above the page, so any popover that
-  // overlaps it would be invisible. Hide it while the QR is open.
-  const [sharing, setSharing] = React.useState(false);
+  // The laser UI is a native view stacked above the page, so anything the app
+  // draws over it — the QR popover, the switch-project confirmation, a menu —
+  // would be buried under it. Hide it for as long as an overlay is up.
+  const [overlay, setOverlay] = React.useState(false);
+  React.useEffect(() => watchOverlays(document, setOverlay), []);
 
   const running = status.running;
   const url = status.url;
@@ -40,7 +43,7 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
   // Report the laser view's target bounds to the main process on every layout
   // change while the show is running; hide it whenever we leave this route.
   React.useEffect(() => {
-    if (!running || !url || sharing) {
+    if (!running || !url || overlay) {
       window.wavegridLaser.sync({ url: null, bounds: { x: 0, y: 0, width: 0, height: 0 }, visible: false });
       return;
     }
@@ -63,7 +66,7 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
       window.removeEventListener('resize', sync);
       window.wavegridLaser.sync({ url: null, bounds: { x: 0, y: 0, width: 0, height: 0 }, visible: false });
     };
-  }, [running, url, sharing]);
+  }, [running, url, overlay]);
 
   return (
     <div className='flex h-full flex-col gap-4 p-4'>
@@ -79,7 +82,7 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
           <span className='text-muted-foreground font-mono text-sm'>{status.url}</span>
         )}
         {running && status.lanUrls.length > 0 && (
-          <ShareShow lanUrls={status.lanUrls} onOpenChange={setSharing} />
+          <ShareShow lanUrls={status.lanUrls} />
         )}
       </div>
 
