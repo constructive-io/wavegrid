@@ -4,6 +4,7 @@
 import {
   DEFAULT_BEYOND_PORT,
   DEFAULT_FB4_PORT,
+  LOOPBACK_HOST,
   normalizeOscHost,
   type OscConfig
 } from '@wavegrid/layout';
@@ -39,16 +40,18 @@ export function toOscTarget(stored: ProjectConfig | null): OscTarget {
   if (osc.routingConfig) {
     return {
       kind: 'routing',
-      host: '',
+      host: LOOPBACK_HOST,
       port: DEFAULT_BEYOND_PORT,
       gridOrder: 'row',
       file: osc.routingConfig,
       hasUnifiedRouting: osc.routing != null
     };
   }
+  // Nothing stored yet: BEYOND almost always runs on this laptop, so offer
+  // loopback rather than a blank field that saves as an error.
   return {
     kind: 'none',
-    host: '',
+    host: LOOPBACK_HOST,
     port: DEFAULT_BEYOND_PORT,
     gridOrder: 'row',
     file: '',
@@ -69,10 +72,8 @@ export function applyOscTarget(existing: ProjectConfig | null, target: OscTarget
   const keep = routing ? { routing } : {};
 
   if (target.kind === 'beyond') {
-    const host = normalizeOscHost(target.host);
-    if (!host) {
-      throw new Error('BEYOND needs the host running BEYOND — 127.0.0.1 for this laptop, or its LAN IP.');
-    }
+    // An empty field means "the usual setup": BEYOND on this machine.
+    const host = normalizeOscHost(target.host) || LOOPBACK_HOST;
     return {
       ...prev,
       osc: {

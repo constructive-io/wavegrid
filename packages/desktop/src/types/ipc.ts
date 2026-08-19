@@ -413,7 +413,7 @@ export interface WavegridApi {
   sessions: {
     /** Active (non-expired) UI login sessions for a project, newest first. */
     list(project: string): Promise<SessionInfo[]>;
-    /** Revoke a session by id (takes effect on the client's next token refresh). */
+    /** Revoke a session by id (rejects its next request and closes its socket). */
     revoke(project: string, id: string): Promise<SessionInfo[]>;
   };
   keys: {

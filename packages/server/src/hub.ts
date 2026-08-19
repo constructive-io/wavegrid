@@ -1,5 +1,11 @@
 export const OPEN_READY_STATE = 1;
 
+/** Application close code for "your session is gone". An application code
+ *  survives where a rejected handshake doesn't: browsers flatten those to 1006,
+ *  so only a post-handshake close can tell the client why it was dropped. */
+export const WS_CLOSE_SESSION_REVOKED = 4001;
+export const WS_REASON_SESSION_REVOKED = 'session revoked';
+
 export interface HubSocket {
   readyState: number;
   send(payload: string): void;

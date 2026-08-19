@@ -27,6 +27,14 @@ export interface ConnectionInfo {
   attempts: number;
 }
 
+/** The brain closes a socket with this code when its session was revoked. */
+export const WS_CLOSE_SESSION_REVOKED = 4001;
+
+/** A close code that means "this token is finished" — never worth retrying. */
+export function isSessionEndedCode(code: number | null): boolean {
+  return code === WS_CLOSE_SESSION_REVOKED;
+}
+
 export const OPEN_CONNECTION: ConnectionInfo = {
   state: 'open',
   cause: 'unknown',
@@ -47,6 +55,14 @@ export async function diagnoseConnection(
   code: number | null,
   token: string | null
 ): Promise<{ cause: ConnectionCause; detail: string }> {
+  // The brain said why it closed, so there is nothing to probe for.
+  if (isSessionEndedCode(code)) {
+    return {
+      cause: 'sessionExpired',
+      detail: 'Your session was ended by an administrator — sign in again.'
+    };
+  }
+
   let config: { ok: boolean; status: number };
   try {
     config = await probe('/api/config');

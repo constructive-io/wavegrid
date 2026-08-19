@@ -459,7 +459,7 @@ function MasterSliders({
 export default function Home() {
   const [configRev, setConfigRev] = useState(0);
   const config = useConfig(configRev);
-  const { user, token, checked, endedSession, lastUser, login, sessionEnded } = useAuth();
+  const { user, token, checked, endedSession, lastUser, login, logout, sessionEnded } = useAuth();
   const { connection, grid, orientation, playlistState, settings, epoch, send } = useSocket(
     config?.simulatorUrl ?? null,
     token,
@@ -985,6 +985,27 @@ export default function Home() {
                 }}
               >
                 {viewFlip ? 'My View' : 'Sky View'}
+              </button>
+            </div>
+            <div className="flex items-center gap-3 px-4 pb-4">
+              <span className="text-sm font-medium" style={{ color: '#888898', minWidth: 56 }}>{user}</span>
+              <button
+                onClick={logout}
+                className="flex items-center justify-center transition-all"
+                title="Sign out on this device"
+                style={{
+                  height: 44,
+                  borderRadius: 10,
+                  paddingLeft: 14,
+                  paddingRight: 14,
+                  background: '#12121a',
+                  border: '1px solid #1a1a25',
+                  color: '#d44',
+                  fontSize: 14,
+                  fontWeight: 600
+                }}
+              >
+                Sign out
               </button>
             </div>
           </div>

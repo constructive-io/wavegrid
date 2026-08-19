@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ConnectionInfo,
   diagnoseConnection,
+  isSessionEndedCode,
   OPEN_CONNECTION,
   retryDelay
 } from '@/lib/connection';
@@ -73,7 +74,9 @@ export function useSocket(
         void diagnoseConnection(probe, e.code, token).then(({ cause, detail }) => {
           if (!disposed) setConnection({ state: 'down', cause, detail, code: e.code, attempts });
         });
-        retry = setTimeout(connect, retryDelay(attempts));
+        // A revoked session can only reconnect into the same rejection, so stop
+        // hammering the brain and let the app hand back the login screen.
+        if (!isSessionEndedCode(e.code)) retry = setTimeout(connect, retryDelay(attempts));
       };
 
       ws.onerror = () => ws.close();

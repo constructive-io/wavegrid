@@ -1,9 +1,11 @@
 import {
   connectionLabel,
   diagnoseConnection,
+  isSessionEndedCode,
   OPEN_CONNECTION,
   type Probe,
-  retryDelay
+  retryDelay,
+  WS_CLOSE_SESSION_REVOKED
 } from '../src/lib/connection';
 
 /** A probe returning a fixed status per path, or throwing for "unreachable". */
@@ -60,6 +62,24 @@ describe('diagnoseConnection', () => {
       'tok'
     );
     expect(cause).toBe('closed');
+  });
+});
+
+describe('a session ended by an admin', () => {
+  it('is recognised from the close code alone, without probing', async () => {
+    const probe: Probe = () => {
+      throw new Error('should not probe');
+    };
+    const { cause, detail } = await diagnoseConnection(probe, WS_CLOSE_SESSION_REVOKED, 'tok');
+    expect(cause).toBe('sessionExpired');
+    expect(detail).toMatch(/administrator/i);
+  });
+
+  it('is the only close code that means "stop reconnecting"', () => {
+    expect(isSessionEndedCode(WS_CLOSE_SESSION_REVOKED)).toBe(true);
+    expect(isSessionEndedCode(1006)).toBe(false);
+    expect(isSessionEndedCode(1000)).toBe(false);
+    expect(isSessionEndedCode(null)).toBe(false);
   });
 });
 
