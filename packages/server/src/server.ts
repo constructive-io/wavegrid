@@ -12,7 +12,7 @@ import { computeCoverage } from './coverage';
 import type { BlendMode, CannonState, Orientation, Rotation } from './grid';
 import {compositeLayer, createGrid, DEFAULT_ALPHA, defaultOrientation, mapUiToGrid, remapGridForUi, resetGrid, setAllTargets, setCannonTarget, shiftGrid, tickGrid } from './grid';
 import { createHttpApp, lanVisitors, resolveUiDir } from './http-app';
-import { fanout, type LivenessState,selectRevokedSockets, sweepLiveness, WS_CLOSE_SESSION_REVOKED, WS_REASON_SESSION_REVOKED } from './hub';
+import { fanout, fanoutLossy, type LivenessState,selectRevokedSockets, sweepLiveness, WS_CLOSE_SESSION_REVOKED, WS_REASON_SESSION_REVOKED } from './hub';
 import type { JwtPayload } from './jwt';
 import { verifyJwt } from './jwt';
 import { ServerPatternEngine } from './pattern-engine';
@@ -305,7 +305,10 @@ function broadcastState() {
       GRID_COLUMNS, GRID_ROWS, orientation
     );
   const payload = JSON.stringify({ type: 'state', grid: output });
-  fanout(wss.clients, payload, dropClient);
+  // Lossy: this goes out 60 times a second and each frame replaces the last, so
+  // a client that cannot keep up must skip frames rather than build a backlog
+  // that leaves it rendering the past while the rig runs on the present.
+  fanoutLossy(wss.clients, payload, dropClient);
 }
 
 function getCalibrationOutput(): CannonState[] {
