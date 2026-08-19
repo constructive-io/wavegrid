@@ -35,6 +35,8 @@ export interface ClientInfo {
   remote: string;
   connectedAt: number;
   lastSeen: number;
+  sid?: string;
+  username?: string;
   hello?: Omit<HelloMessage, 'type' | 'role'>;
 }
 

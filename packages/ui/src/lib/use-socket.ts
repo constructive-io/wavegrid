@@ -6,36 +6,20 @@ import {
   OPEN_CONNECTION,
   retryDelay
 } from '@/lib/connection';
+import {
+  applySocketMessage,
+  beginConnection,
+  createSocketSnapshot,
+  isFeedStale,
+  SOCKET_FEED_STALE_MS,
+  type CannonColor,
+  type Orientation,
+  type PlaylistState,
+  type Settings,
+  type SocketSnapshot
+} from '@/lib/socket-state';
 
-export interface CannonColor {
-  h: number;
-  s: number;
-  b: number;
-}
-
-export interface Orientation {
-  rotation: 0 | 90 | 180 | 270;
-  flipH: boolean;
-  flipV: boolean;
-}
-
-export interface PlaylistState {
-  active: boolean;
-  currentStep: number;
-  playlist: {
-    steps: Array<{ type: string; name?: string; code?: string; duration: number }>;
-    loop: boolean;
-    transition: 'cut' | 'fade';
-    transitionDuration: number;
-  } | null;
-}
-
-export interface Settings {
-  alpha: number;
-  attack: number;
-  speed: number;
-  animation: string | null;
-}
+export type { CannonColor, Orientation, PlaylistState, Settings } from '@/lib/socket-state';
 
 export function useSocket(
   url: string | null,
@@ -46,6 +30,7 @@ export function useSocket(
   // Keep the latest callback without re-subscribing the socket on every render.
   const onSyncConfigRef = useRef(onSyncConfig);
   onSyncConfigRef.current = onSyncConfig;
+  const snapshotRef = useRef<SocketSnapshot>(createSocketSnapshot());
   const [connection, setConnection] = useState<ConnectionInfo>({
     state: 'connecting',
     cause: 'unknown',
@@ -53,10 +38,7 @@ export function useSocket(
     code: null,
     attempts: 0
   });
-  const [grid, setGrid] = useState<CannonColor[]>([]);
-  const [orientation, setOrientation] = useState<Orientation>({ rotation: 0, flipH: false, flipV: false });
-  const [playlistState, setPlaylistState] = useState<PlaylistState | null>(null);
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [snapshot, setSnapshot] = useState<SocketSnapshot>(() => createSocketSnapshot());
 
   useEffect(() => {
     if (!token || !url) return;
@@ -64,6 +46,7 @@ export function useSocket(
     let disposed = false;
     let attempts = 0;
     let retry: ReturnType<typeof setTimeout> | null = null;
+    let watchdog: ReturnType<typeof setInterval> | null = null;
 
     const probe = async (path: string) => {
       const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
@@ -79,6 +62,11 @@ export function useSocket(
 
       ws.onopen = () => {
         attempts = 0;
+        setSnapshot((prev) => {
+          const next = beginConnection(prev);
+          snapshotRef.current = next;
+          return next;
+        });
         setConnection(OPEN_CONNECTION);
       };
 
@@ -99,24 +87,11 @@ export function useSocket(
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
-          if (msg.type === 'state' && Array.isArray(msg.grid)) {
-            setGrid(msg.grid);
-          } else if (msg.type === 'orientation') {
-            setOrientation({ rotation: msg.rotation ?? 0, flipH: !!msg.flipH, flipV: !!msg.flipV });
-          } else if (msg.type === 'playlist_state') {
-            setPlaylistState({ active: !!msg.active, currentStep: msg.currentStep ?? 0, playlist: msg.playlist ?? null });
-          } else if (msg.type === 'settings') {
-            setSettings({
-              alpha: msg.alpha ?? 0.06,
-              attack: msg.attack ?? 1.0,
-              speed: msg.speed ?? 1.0,
-              animation: msg.animation ?? null
-            });
-          } else if (msg.type === 'sync_update' || msg.type === 'sync_state') {
-            // A config change was replicated from another device — refetch it so
-            // the browser reflects the new layout/light-map without a reload.
-            onSyncConfigRef.current?.();
-          }
+          setSnapshot((prev) => {
+            const next = applySocketMessage(prev, msg, onSyncConfigRef.current);
+            snapshotRef.current = next;
+            return next;
+          });
         } catch {
           // ignore
         }
@@ -124,10 +99,15 @@ export function useSocket(
     };
 
     connect();
+    watchdog = setInterval(() => {
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN && isFeedStale(snapshotRef.current)) ws.close();
+    }, Math.min(1_000, SOCKET_FEED_STALE_MS));
 
     return () => {
       disposed = true;
       if (retry) clearTimeout(retry);
+      if (watchdog) clearInterval(watchdog);
       wsRef.current?.close();
       wsRef.current = null;
     };
@@ -142,10 +122,11 @@ export function useSocket(
   return {
     connected: connection.state === 'open',
     connection,
-    grid,
-    orientation,
-    playlistState,
-    settings,
+    grid: snapshot.grid,
+    orientation: snapshot.orientation,
+    playlistState: snapshot.playlistState,
+    settings: snapshot.settings,
+    epoch: snapshot.epoch,
     send
   };
 }

@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import http from 'http';
 import { resolve } from 'path';
 import { URL } from 'url';
-import { WebSocket,WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 
 import { animations } from './animations';
 import { computeCoverage } from './coverage';
@@ -13,6 +13,8 @@ import type { BlendMode, CannonState, Orientation, Rotation } from './grid';
 import {compositeLayer, createGrid, DEFAULT_ALPHA, defaultOrientation, mapUiToGrid, remapGridForUi, resetGrid, setAllTargets, setCannonTarget, shiftGrid, tickGrid } from './grid';
 import { createHttpApp, lanVisitors, resolveUiDir } from './http-app';
 import { verifyJwt } from './jwt';
+import type { JwtPayload } from './jwt';
+import { fanout, selectRevokedSockets, sweepLiveness, type LivenessState } from './hub';
 import { ServerPatternEngine } from './pattern-engine';
 import { compilePlaylist, type PlaylistDef, type PlaylistStep } from './playlist-compiler';
 import type {
@@ -195,6 +197,8 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ noServer: true });
+const verifiedPayloads = new WeakMap<http.IncomingMessage, JwtPayload>();
+const liveness = new Map<WebSocket, LivenessState>();
 
 const RECEIVER_KEY = process.env.WG_RECEIVER_KEY || '';
 
@@ -212,6 +216,15 @@ server.on('upgrade', (req, socket, head) => {
       socket.destroy();
       return;
     }
+    if (payload.sid) {
+      const target = resolveSyncTarget();
+      if (target && !target.store.getSession(target.project, payload.sid)) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+    }
+    verifiedPayloads.set(req, payload);
   } else if (key && RECEIVER_KEY && key === RECEIVER_KEY) {
     // valid receiver key — allow
   } else {
@@ -224,6 +237,34 @@ server.on('upgrade', (req, socket, head) => {
     wss.emit('connection', ws, req);
   });
 });
+
+function dropClient(ws: WebSocket, error?: unknown): void {
+  const wasTracked = clients.delete(ws);
+  liveness.delete(ws);
+  if (!wasTracked) return;
+  if (error) {
+    console.error('  ◈ WebSocket client error:', error instanceof Error ? error.message : String(error));
+  }
+  try {
+    ws.terminate();
+  } catch {
+    // The peer is already gone.
+  }
+}
+
+function sendToClient(ws: WebSocket, payload: string): boolean {
+  return fanout([ws], payload, (socket, error) => dropClient(socket as WebSocket, error)) === 1;
+}
+
+function revokeClient(ws: WebSocket): void {
+  clients.delete(ws);
+  liveness.delete(ws);
+  try {
+    ws.close(4001, 'session revoked');
+  } catch {
+    ws.terminate();
+  }
+}
 
 // Broadcast the current grid snapshot to all UI clients.
 // Used for calibration, orientation changes, and paint/clear — so the
@@ -242,11 +283,7 @@ function broadcastState() {
       GRID_COLUMNS, GRID_ROWS, orientation
     );
   const payload = JSON.stringify({ type: 'state', grid: output });
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-    }
-  });
+  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
 }
 
 function getCalibrationOutput(): CannonState[] {
@@ -285,20 +322,12 @@ function loadPhysicalLightMap(): number[] {
 
 function broadcastOrientation() {
   const payload = JSON.stringify({ type: 'orientation', ...orientation });
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-    }
-  });
+  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
 }
 
 function broadcastCommand(cmd: Record<string, unknown>) {
   const payload = JSON.stringify({ type: 'command', ...cmd });
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-    }
-  });
+  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
 }
 
 function broadcastPlaylistState() {
@@ -308,11 +337,7 @@ function broadcastPlaylistState() {
     playlist: activePlaylist,
     currentStep: playlistCurrentStep
   });
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-    }
-  });
+  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
 }
 
 /** Cancel any active playlist when another visual command arrives. */
@@ -383,9 +408,7 @@ function isSecretScope(scope: string): boolean {
 /** Broadcast an accepted config revision to every connected client. */
 function broadcastSync(update: SyncUpdateMessage): void {
   const payload = JSON.stringify(update);
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) client.send(payload);
-  });
+  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
 }
 
 /** Serialize + persist a client's config push, then broadcast the revision. */
@@ -416,7 +439,7 @@ function handleSyncPush(msg: SyncPushMessage): void {
 function sendSyncState(ws: WebSocket, msg: SyncRequestMessage): void {
   const target = resolveSyncTarget();
   if (!target) {
-    ws.send(JSON.stringify({ type: 'sync_state', revision: 0, entries: {} }));
+    sendToClient(ws, JSON.stringify({ type: 'sync_state', revision: 0, entries: {} }));
     return;
   }
   const state = target.store.getSyncState(target.project);
@@ -428,7 +451,7 @@ function sendSyncState(ws: WebSocket, msg: SyncRequestMessage): void {
       /* ignore */
     }
   }
-  ws.send(JSON.stringify({ type: 'sync_state', revision: state.revision, entries: state.entries }));
+  sendToClient(ws, JSON.stringify({ type: 'sync_state', revision: state.revision, entries: state.entries }));
 }
 
 /** Record a client's acknowledgement of the revision it applied. */
@@ -480,9 +503,7 @@ function filterSecretScopes<T>(entries: Record<string, T>): Record<string, T> {
 /** Broadcast the full replicated document to every client (post-merge convergence). */
 function broadcastSyncStateTo(state: { revision: number; entries: unknown }): void {
   const payload = JSON.stringify({ type: 'sync_state', revision: state.revision, entries: state.entries });
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) client.send(payload);
-  });
+  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
 }
 
 /** Sync summary for `system_status` (revision + devices that lag it). */
@@ -530,26 +551,43 @@ function buildSystemStatus(): SystemStatus {
 
 wss.on('connection', (ws, req: http.IncomingMessage) => {
   const remote = req.socket.remoteAddress ?? 'unknown';
-  const isUi = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`).searchParams.has('token');
+  const payload = verifiedPayloads.get(req);
+  const isUi = payload !== undefined;
   const now = Date.now();
-  clients.set(ws, { role: isUi ? 'ui' : 'unknown', remote, connectedAt: now, lastSeen: now });
-  ws.on('close', () => clients.delete(ws));
+  clients.set(ws, {
+    role: isUi ? 'ui' : 'unknown',
+    remote,
+    connectedAt: now,
+    lastSeen: now,
+    sid: payload?.sid,
+    username: payload?.sub
+  });
+  liveness.set(ws, { alive: true });
+  ws.on('close', () => {
+    clients.delete(ws);
+    liveness.delete(ws);
+  });
+  ws.on('error', (error) => dropClient(ws, error));
+  ws.on('pong', () => {
+    const state = liveness.get(ws);
+    if (state) state.alive = true;
+  });
 
   // Send the resolved layout first — the single source of truth for geometry —
   // so UI and receiver render/route from the same fixtures the server uses.
-  ws.send(JSON.stringify({ type: 'layout', layout, runMode: RUN_MODE }));
+  sendToClient(ws, JSON.stringify({ type: 'layout', layout, runMode: RUN_MODE }));
   // Send initial state + orientation
   const initGrid = remapGridForUi(
     grid.map(c => ({ h: c.h, s: c.s, b: c.b })),
     GRID_COLUMNS, GRID_ROWS, orientation
   );
-  ws.send(JSON.stringify({ type: 'state', grid: initGrid }));
-  ws.send(JSON.stringify({ type: 'orientation', ...orientation }));
-  ws.send(JSON.stringify({ type: 'command', action: 'setOrientation', rotation: orientation.rotation, flipH: orientation.flipH, flipV: orientation.flipV }));
-  ws.send(JSON.stringify({ type: 'command', action: 'setSmoothness', value: currentAlpha }));
-  ws.send(JSON.stringify({ type: 'command', action: 'setAttack', value: currentAttack }));
-  ws.send(JSON.stringify({ type: 'command', action: 'setSpeed', value: animSpeed }));
-  ws.send(JSON.stringify({
+  sendToClient(ws, JSON.stringify({ type: 'state', grid: initGrid }));
+  sendToClient(ws, JSON.stringify({ type: 'orientation', ...orientation }));
+  sendToClient(ws, JSON.stringify({ type: 'command', action: 'setOrientation', rotation: orientation.rotation, flipH: orientation.flipH, flipV: orientation.flipV }));
+  sendToClient(ws, JSON.stringify({ type: 'command', action: 'setSmoothness', value: currentAlpha }));
+  sendToClient(ws, JSON.stringify({ type: 'command', action: 'setAttack', value: currentAttack }));
+  sendToClient(ws, JSON.stringify({ type: 'command', action: 'setSpeed', value: animSpeed }));
+  sendToClient(ws, JSON.stringify({
     type: 'settings',
     alpha: currentAlpha,
     attack: currentAttack,
@@ -557,16 +595,16 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     animation: currentAnimation
   }));
   if (currentAnimation) {
-    ws.send(JSON.stringify({ type: 'command', action: 'setAnimation', name: currentAnimation, speed: animSpeed }));
+    sendToClient(ws, JSON.stringify({ type: 'command', action: 'setAnimation', name: currentAnimation, speed: animSpeed }));
   }
   if (activePlaylist) {
-    ws.send(JSON.stringify({ type: 'playlist_state', active: true, playlist: activePlaylist }));
+    sendToClient(ws, JSON.stringify({ type: 'playlist_state', active: true, playlist: activePlaylist }));
     // Re-send compiled playlist to receiver on reconnect
     const compiled = compilePlaylist(activePlaylist);
-    ws.send(JSON.stringify({ type: 'command', action: 'evalPattern', code: compiled, params: {} }));
+    sendToClient(ws, JSON.stringify({ type: 'command', action: 'evalPattern', code: compiled, params: {} }));
   }
   if (shiftVx !== 0 || shiftVy !== 0) {
-    ws.send(JSON.stringify({ type: 'command', action: 'setShift', vx: shiftVx, vy: shiftVy }));
+    sendToClient(ws, JSON.stringify({ type: 'command', action: 'setShift', vx: shiftVx, vy: shiftVy }));
   }
 
   ws.on('message', (raw) => {
@@ -597,7 +635,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         return;
       }
       if (msg.type === 'system_status') {
-        ws.send(JSON.stringify(buildSystemStatus()));
+        sendToClient(ws, JSON.stringify(buildSystemStatus()));
         return;
       }
       // Config synchronization (Phase D): the socket is already authenticated
@@ -937,6 +975,34 @@ const tickTimer = setInterval(() => {
   }
 }, TICK_MS);
 
+const heartbeatMs = Number(process.env.WG_HEARTBEAT_MS);
+const heartbeatIntervalMs = Number.isFinite(heartbeatMs) && heartbeatMs > 0 ? heartbeatMs : 15_000;
+const heartbeatTimer = setInterval(() => {
+  sweepLiveness(
+    liveness,
+    (ws) => {
+      const client = ws as WebSocket;
+      clients.delete(client);
+      liveness.delete(client);
+      try {
+        client.terminate();
+      } catch {
+        // The peer is already gone.
+      }
+    },
+    (ws, error) => dropClient(ws as WebSocket, error)
+  );
+
+  const target = resolveSyncTarget();
+  if (!target) return;
+  try {
+    const revoked = selectRevokedSockets(clients, (sid) => target.store.getSession(target.project, sid) !== null);
+    for (const ws of revoked) revokeClient(ws as WebSocket);
+  } catch {
+    // Session checks are best-effort when the project store is unavailable.
+  }
+}, heartbeatIntervalMs);
+
 let advertiseHandle: AdvertiseHandle | null = null;
 
 const ready = new Promise<void>((resolveReady, rejectReady) => {
@@ -975,6 +1041,7 @@ server.listen(PORT, resolved.config.server.host, () => {
 
 const stop = () => {
   clearInterval(tickTimer);
+  clearInterval(heartbeatTimer);
   if (saveTimer) clearTimeout(saveTimer);
   if (advertiseHandle) advertiseHandle.stop();
   wss.close();
