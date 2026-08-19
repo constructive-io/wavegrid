@@ -292,8 +292,8 @@ export function useProjectUsers({ project, rev }: ProjectScope): {
 }
 
 /** Active UI login sessions for a project (who's logged in). Local admin reads
- *  straight from the shared store; revoke removes the row (the client loses
- *  access on its next token refresh — sockets are untouched). */
+ *  straight from the shared store; revoke removes the row, which the server
+ *  enforces on the next request and by closing that user's socket. */
 export function useSessions({ project, rev }: ProjectScope): {
   sessions: SessionInfo[];
   refresh: () => Promise<void>;

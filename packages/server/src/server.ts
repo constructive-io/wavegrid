@@ -12,7 +12,7 @@ import { computeCoverage } from './coverage';
 import type { BlendMode, CannonState, Orientation, Rotation } from './grid';
 import {compositeLayer, createGrid, DEFAULT_ALPHA, defaultOrientation, mapUiToGrid, remapGridForUi, resetGrid, setAllTargets, setCannonTarget, shiftGrid, tickGrid } from './grid';
 import { createHttpApp, lanVisitors, resolveUiDir } from './http-app';
-import { fanout, type LivenessState,selectRevokedSockets, sweepLiveness } from './hub';
+import { fanout, type LivenessState,selectRevokedSockets, sweepLiveness, WS_CLOSE_SESSION_REVOKED, WS_REASON_SESSION_REVOKED } from './hub';
 import type { JwtPayload } from './jwt';
 import { verifyJwt } from './jwt';
 import { ServerPatternEngine } from './pattern-engine';
@@ -187,7 +187,11 @@ if (restored) {
 
 // One origin: static UI + JSON API on the same port the WebSocket upgrades on.
 const uiDir = opts.uiDir !== undefined ? opts.uiDir : resolveUiDir();
-const httpApp = createHttpApp(resolved, { uiDir });
+const httpApp = createHttpApp(resolved, {
+  uiDir,
+  // An admin revoking through the API shouldn't have to wait for the sweep.
+  onSessionsRevoked: () => disconnectRevokedSessions()
+});
 const server = http.createServer((req, res) => {
   httpApp(req, res).catch((err) => {
     console.error('  ◈ HTTP error:', err instanceof Error ? err.message : String(err));
@@ -207,8 +211,8 @@ server.on('upgrade', (req, socket, head) => {
   const token = reqUrl.searchParams.get('token');
   const key = reqUrl.searchParams.get('key');
 
-  // Require either a valid JWT token or a valid receiver key.
-  // Connections with neither are rejected.
+  // Require either a valid JWT token whose session is still live, or a valid
+  // receiver key. Connections with neither are rejected.
   if (token) {
     const payload = verifyJwt(token);
     if (!payload) {
@@ -260,9 +264,27 @@ function revokeClient(ws: WebSocket): void {
   clients.delete(ws);
   liveness.delete(ws);
   try {
-    ws.close(4001, 'session revoked');
+    ws.close(WS_CLOSE_SESSION_REVOKED, WS_REASON_SESSION_REVOKED);
   } catch {
     ws.terminate();
+  }
+}
+
+/**
+ * Close every socket whose session record is gone. Called on the heartbeat —
+ * revocation also happens in another process (the desktop app writes the same
+ * store), so the session row is the only thing that can tell us — and directly
+ * from the API routes that revoke, so an operator booting someone off doesn't
+ * wait out a heartbeat.
+ */
+function disconnectRevokedSessions(): void {
+  const target = resolveSyncTarget();
+  if (!target) return;
+  try {
+    const live = new Set(target.store.listSessions(target.project).map((session) => session.id));
+    for (const ws of selectRevokedSockets(clients, (sid) => live.has(sid))) revokeClient(ws);
+  } catch {
+    // Session checks are best-effort when the project store is unavailable.
   }
 }
 
@@ -984,15 +1006,7 @@ const heartbeatTimer = setInterval(() => {
     dropClient
   );
 
-  const target = resolveSyncTarget();
-  if (!target) return;
-  try {
-    const liveSessionIds = new Set(target.store.listSessions(target.project).map((session) => session.id));
-    const revoked = selectRevokedSockets(clients, (sid) => liveSessionIds.has(sid));
-    for (const ws of revoked) revokeClient(ws);
-  } catch {
-    // Session checks are best-effort when the project store is unavailable.
-  }
+  disconnectRevokedSessions();
 }, heartbeatIntervalMs);
 
 let advertiseHandle: AdvertiseHandle | null = null;

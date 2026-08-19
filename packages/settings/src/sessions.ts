@@ -8,8 +8,8 @@ import type { UserRole } from './users';
  * A lightweight, server-visible record of a logged-in UI user. This is *not* a
  * new auth protocol — the JWT minted at login stays the credential. A session
  * is just a cheap, bounded row so an admin can answer "who's logged in?" and
- * revoke access; sockets are untouched. Revoking a session takes effect on the
- * next token refresh (JWTs are short-lived), never by kicking an open socket.
+ * revoke access. Deleting the row is what revocation means: the server rejects
+ * requests carrying the matching `sid` and closes the socket opened with it.
  */
 export interface Session {
   /** Opaque session id; also carried as the JWT `sid` claim. */

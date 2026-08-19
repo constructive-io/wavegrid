@@ -15,6 +15,12 @@ import { signJwt, verifyJwt } from './jwt';
 export interface HttpAppOptions {
   /** Directory of the built UI (Vite `dist`). Static serving is skipped if unset/missing. */
   uiDir?: string | null;
+  /**
+   * Called after sessions were revoked through the API, so the embedding server
+   * can drop the sockets those sessions are still holding open instead of
+   * waiting for its next sweep.
+   */
+  onSessionsRevoked?: () => void;
 }
 
 const MIME: Record<string, string> = {
@@ -219,6 +225,7 @@ function normalizeLightMap(
  */
 export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {}) {
   const layout = resolved.layout;
+  const sessionsRevoked = () => opts.onSessionsRevoked?.();
   const uiDir = opts.uiDir && fs.existsSync(opts.uiDir) ? opts.uiDir : null;
   const dims = { numCannons: layout.count, gridColumns: layout.cols };
 
@@ -307,8 +314,8 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
         return;
       }
       // Record a cheap server-side session and bind the JWT to it, so admins
-      // can see who's logged in and revoke on the next refresh. Sockets are
-      // untouched — the token remains the only credential they check.
+      // can see who's logged in and revoke it. The socket opened with this
+      // token is bound to the same session and dies with it.
       const session = store.createSession(project, {
         username: user.username,
         role: user.role,
@@ -328,6 +335,22 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
         token,
         expiresAt: session.expiresAt
       });
+      return;
+    }
+
+    // ── POST /api/logout — end my own session ───────────────────────
+    // Signing out has to reach the server: the token alone stays valid until it
+    // expires, and the socket it opened would keep running as that user.
+    if (pathname === '/api/logout' && method === 'POST') {
+      const token = bearerToken(req, url);
+      const payload = token ? verifyJwt(token) : null;
+      const project = activeProject();
+      if (payload?.sid && project && openStore().revokeSession(project, payload.sid)) {
+        sessionsRevoked();
+      }
+      // Never an error: a client that is throwing its token away is done either
+      // way, and telling it otherwise would only strand it signed in.
+      sendJson(res, 200, { ok: true });
       return;
     }
 
@@ -371,6 +394,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
         const caller = requireAdmin(req, url, res);
         if (!caller) return;
         const removed = openStore().revokeSession(caller.project, decodeURIComponent(m[1]));
+        if (removed) sessionsRevoked();
         sendJson(res, removed ? 200 : 404, { ok: removed });
         return;
       }
@@ -440,7 +464,10 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
         const store = openStore();
         try {
           const removed = store.removeUser(caller.project, username);
-          if (removed) store.revokeUserSessions(caller.project, username);
+          if (removed) {
+            store.revokeUserSessions(caller.project, username);
+            sessionsRevoked();
+          }
           sendJson(res, removed ? 200 : 404, { ok: removed });
         } catch (e) {
           sendJson(res, 400, { ok: false, error: (e as Error).message });
