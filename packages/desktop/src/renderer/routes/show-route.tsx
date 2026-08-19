@@ -1,4 +1,4 @@
-import { AlertTriangle, MonitorPlay, Play, Square } from 'lucide-react';
+import { AlertTriangle, Maximize2, Minimize2, MonitorPlay, Play, Square } from 'lucide-react';
 import * as React from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -37,9 +37,31 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
   // would be buried under it. Hide it for as long as an overlay is up.
   const [overlay, setOverlay] = React.useState(false);
   React.useEffect(() => watchOverlays(document, setOverlay), []);
+  // In the windowed panel the grid is a postage stamp; full screen hands the
+  // embedded UI the whole window and keeps only the bar that gets back out.
+  const [expanded, setExpanded] = React.useState(false);
 
   const running = status.running;
   const url = status.url;
+
+  React.useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', onKey);
+    // The embedded UI has focus, so its own web contents — not this document —
+    // is what sees a keypress while it is full screen.
+    const offEmbedded = window.wavegridLaser.onEscape(() => setExpanded(false));
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      offEmbedded();
+    };
+  }, [expanded]);
+
+  React.useEffect(() => {
+    if (!running) setExpanded(false);
+  }, [running]);
 
   // Report the laser view's target bounds to the main process on every layout
   // change while the show is running; hide it whenever we leave this route.
@@ -67,7 +89,26 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
       window.removeEventListener('resize', sync);
       window.wavegridLaser.sync({ url: null, bounds: { x: 0, y: 0, width: 0, height: 0 }, visible: false });
     };
-  }, [running, url, overlay]);
+    // Full screen moves the slot, and the native view only follows the bounds we report.
+  }, [running, url, overlay, expanded]);
+
+  if (running && expanded) {
+    return (
+      <div className='bg-background fixed inset-0 z-40 flex flex-col'>
+        <div className='flex items-center justify-between gap-3 border-b px-3 py-1.5'>
+          <span className='text-muted-foreground truncate text-xs'>
+            {activeProject ?? 'Show'} · full screen
+          </span>
+          <Button size='sm' variant='ghost' onClick={() => setExpanded(false)}>
+            <Minimize2 />
+            Exit full screen (Esc)
+          </Button>
+        </div>
+        {/* The native laser WebContentsView is positioned over this slot. */}
+        <div ref={slotRef} className='flex-1' />
+      </div>
+    );
+  }
 
   return (
     <div className='flex h-full flex-col gap-4 p-4'>
@@ -84,6 +125,12 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
         )}
         {running && status.lanUrls.length > 0 && (
           <ShareShow lanUrls={status.lanUrls} />
+        )}
+        {running && (
+          <Button size='sm' variant='outline' className='ml-auto' onClick={() => setExpanded(true)}>
+            <Maximize2 />
+            Full screen
+          </Button>
         )}
       </div>
 
