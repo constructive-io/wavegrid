@@ -1,9 +1,10 @@
 # What BEYOND and an FB4 actually say to each other
 
-Findings from two captures taken on the Grace Cathedral show machine
+Findings from captures taken on the Grace Cathedral show machine
 (`169.254.42.165`, hostname `WIN-R4FTH86FTV5`) with six FB4s on a link-local
 network: `169.254.45.4`, `.53.5`, `.200.242`, `.210.242`, `.213.242`, `.214.242`.
-One capture is idle-ish, one is a paint session.
+One capture is idle-ish, one is a paint session, and a later set is sliced by
+action (idle baseline, hand-sent OSC, `signals probe` walk, idle tail).
 
 Everything below was read off the wire. Where the evidence stops, this document
 says so — nothing here is inferred from how we imagine Pangolin works. Reproduce
@@ -80,7 +81,7 @@ Types observed:
 
 | type | name used here | size | rate | direction |
 | --- | --- | --- | --- | --- |
-| `0x00030E02` | frame | 2392 B | 16–23/s per device | BEYOND → FB4 |
+| `0x00030E02` | frame | 2392 B | 16–62/s per device | BEYOND → FB4 |
 | `0x00010E02` | control | 80 B | 31–37/s per device | BEYOND → FB4 |
 | `0x00008A0D` | telemetry | 2432 B | ~1/s | FB4 → BEYOND |
 | `0x00008A0B` | unknown | 72 B | ~0.2/s | FB4 → BEYOND |
@@ -107,11 +108,50 @@ provide (key material, instrumented software, or vendor documentation) — and
 per the standing constraint on this toolkit, nothing here transmits toward the
 hardware regardless.
 
+## Two things the sliced capture set settled
+
+**One FB4 was getting no frames at all.** `169.254.45.4` (`FB4E`, id 566604)
+announced itself on 9022 in every capture, but has zero TCP 3348 traffic in any
+of them: BEYOND was streaming to five devices, not six, so that projector could
+only ever have been dark. `decode` now says so per device — being on the network
+and being driven are different things, and only the second one lights a laser.
+
+**A closed RGBA panel is why OSC can land and do nothing.** Those captures show
+90 OSC packets delivered to port 8000 with no ICMP port-unreachable in reply —
+delivery proven — and *zero* packets on 16062, where the earlier paint capture
+had 675. With the panel closed BEYOND does not broadcast, and the `livecontrol`
+colour addresses are gated, so "the messages arrived" and "the colour changed"
+were never the same claim. Silence on 16062 is the signal to check
+`ShowRGBAPanel` before debugging anything else.
+
+What they did *not* settle: none of them contains a TCP SYN, so BEYOND's
+connection setup has still never been captured. If key material is negotiated
+there, it remains unseen — capture with the FB4s power-cycled and BEYOND started
+afterwards to catch it.
+
+## Ports, precisely
+
+Worth stating because it is easy to get backwards from packet counts: 9022 is
+*only* discovery — 38 packets across a 7-second idle baseline. The frames are
+TCP 3348, ~62 messages/s per device, continuous even through a blackout. A high
+packet rate on the wire is the frame stream, never discovery.
+
+## Ways in that are not this protocol
+
+Since the frame stream can't be driven, the documented non-BEYOND routes matter.
+Per Pangolin's wiki, an FB4 listens for OSC on port 8000 for its own settings
+including `operation_mode`, and in ArtNet mode presents a 16- or 39-channel DMX
+fixture profile over ethernet. Both are colour/brightness/playback control over
+content stored on the FB4's SD card — not arbitrary geometry from us, which the
+encrypted stream is the only path to. Untested here; noted so the option isn't
+rediscovered from scratch.
+
 ## What this is good for
 
 - Confirming an OSC message reached BEYOND, and what value it set, per zone
   (`./bin/rgba`, or `./bin/decode --timeline` on a capture).
-- Confirming every FB4 is present, with its id/MAC, without opening BEYOND.
+- Confirming every FB4 is present, with its id/MAC, without opening BEYOND —
+  and which of them BEYOND is actually streaming to.
 - Confirming BEYOND is streaming to each FB4, at what rate, and whether frames
   are being dropped — i.e. telling "the show isn't reaching the lasers" apart
   from "the lasers are being told to draw nothing".
