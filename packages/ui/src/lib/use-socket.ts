@@ -44,6 +44,8 @@ export function useSocket(
     let attempts = 0;
     let retry: ReturnType<typeof setTimeout> | null = null;
     let watchdog: ReturnType<typeof setInterval> | null = null;
+    /** Closed on purpose because the page is hidden, not because it broke. */
+    let suspended = false;
 
     const probe = async (path: string) => {
       const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
@@ -76,6 +78,7 @@ export function useSocket(
         });
         // A revoked session can only reconnect into the same rejection, so stop
         // hammering the brain and let the app hand back the login screen.
+        if (suspended) return;
         if (!isSessionEndedCode(e.code)) retry = setTimeout(connect, retryDelay(attempts));
       };
 
@@ -94,6 +97,28 @@ export function useSocket(
     };
 
     connect();
+
+    // A hidden page cannot paint the 60fps state feed and its timers are
+    // throttled, so the frames pile up in the socket instead: it comes back to
+    // a backlog of stale state on a socket that never looked broken. Dropping
+    // the connection while hidden and taking a fresh one on return means what
+    // the operator sees is always the present.
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        suspended = true;
+        if (retry) clearTimeout(retry);
+        retry = null;
+        wsRef.current?.close();
+        wsRef.current = null;
+        return;
+      }
+      if (!suspended) return;
+      suspended = false;
+      attempts = 0;
+      if (!wsRef.current) connect();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     watchdog = setInterval(() => {
       const ws = wsRef.current;
       if (
@@ -104,6 +129,7 @@ export function useSocket(
 
     return () => {
       disposed = true;
+      document.removeEventListener('visibilitychange', onVisibility);
       if (retry) clearTimeout(retry);
       if (watchdog) clearInterval(watchdog);
       wsRef.current?.close();
