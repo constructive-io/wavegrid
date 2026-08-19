@@ -171,8 +171,11 @@ export function useAudio(
     currentTime: 0,
     bpm: null
   });
-  const [mode, setMode] = useState<AudioMode>('plasma');
-  const [blend, setBlend] = useState<BlendMode>('brighten');
+  // Energy over replace: the reading an operator wants from audio is level, and
+  // replace means what they hear is what the rig shows rather than a tint on
+  // whatever was already running.
+  const [mode, setMode] = useState<AudioMode>('energy');
+  const [blend, setBlend] = useState<BlendMode>('replace');
   const [palette, setPalette] = useState<AudioPalette>('civic');
   const [sensitivity, setSensitivity] = useState(70);
   const [sineSpread, setSineSpread] = useState(true);

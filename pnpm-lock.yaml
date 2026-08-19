@@ -380,6 +380,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@wavegrid/animations':
+        specifier: workspace:*
+        version: link:../animations/dist
       '@wavegrid/layout':
         specifier: workspace:*
         version: link:../layout/dist

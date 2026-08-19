@@ -34,7 +34,9 @@ input[type="range"] {
   appearance: none;
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(to right, #1a1a2a, var(--color-accent));
+  /* Only the gutter lifts off the black page — a very dark blue, enough to see
+     how far the thumb can travel without putting a grey bar in the panel. */
+  background: linear-gradient(to right, #16203a, var(--color-accent));
   outline: none;
   padding: 8px 0;
   background-clip: content-box;

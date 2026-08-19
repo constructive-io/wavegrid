@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { layoutFilters, type LookDef, looksForLayout, type ShowPreset, showPresetsForLayout } from '@wavegrid/animations';
+import type { Layout } from '@wavegrid/layout/client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { LayoutFilterChips, useLayoutFilter } from './layout-filter';
 
 interface PlaylistStep {
   type: 'animation' | 'scene' | 'evalPattern';
@@ -7,6 +11,8 @@ interface PlaylistStep {
   duration: number;
 }
 
+type Look = LookDef & { reason: string };
+
 interface PlaylistDef {
   steps: PlaylistStep[];
   loop: boolean;
@@ -14,77 +20,40 @@ interface PlaylistDef {
   transitionDuration: number;
 }
 
-const AVAILABLE_ANIMATIONS = [
-  'wave', 'breathe', 'rainbow', 'pacman', 'spiral', 'rain',
-  'i-heart-sf', 'heart-breathe',
-  'pride-flow', 'pride-breathe', 'pride-rotate', 'pride-ring'
-];
-
-const AVAILABLE_SCENES = [
-  'civic', 'pride', 'gold', 'white', 'solstice', 'ocean',
-  'sunset', 'heart', 'sf', 'forest', 'fire', 'night', 'checker', 'off'
-];
-
-const PRESETS: { name: string; playlist: PlaylistDef }[] = [
-  {
-    name: 'Pride Show',
-    playlist: {
-      steps: [
-        { type: 'animation', name: 'pride-flow', duration: 120 },
-        { type: 'animation', name: 'pride-ring', duration: 120 },
-        { type: 'animation', name: 'pride-breathe', duration: 60 },
-        { type: 'animation', name: 'rainbow', duration: 120 },
-        { type: 'animation', name: 'pride-rotate', duration: 60 }
-      ],
-      loop: true,
-      transition: 'fade',
-      transitionDuration: 2
-    }
-  },
-  {
-    name: 'SF Night',
-    playlist: {
-      steps: [
-        { type: 'animation', name: 'i-heart-sf', duration: 180 },
-        { type: 'animation', name: 'heart-breathe', duration: 120 },
-        { type: 'scene', name: 'sf', duration: 60 },
-        { type: 'animation', name: 'rainbow', duration: 120 }
-      ],
-      loop: true,
-      transition: 'fade',
-      transitionDuration: 3
-    }
-  },
-  {
-    name: 'Ambient',
-    playlist: {
-      steps: [
-        { type: 'animation', name: 'wave', duration: 180 },
-        { type: 'animation', name: 'breathe', duration: 120 },
-        { type: 'animation', name: 'rain', duration: 180 },
-        { type: 'animation', name: 'spiral', duration: 120 }
-      ],
-      loop: true,
-      transition: 'fade',
-      transitionDuration: 3
-    }
-  }
-];
-
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m > 0 ? `${m}m ${s > 0 ? s + 's' : ''}`.trim() : `${s}s`;
 }
 
+/**
+ * One option per look, labelled with what it needs when this rig can't give it
+ * — the list stays complete so a look is never silently missing.
+ */
+function LookOptions({ looks }: { looks: Look[] }) {
+  return (
+    <>
+      {looks.map(l => (
+        <option key={l.id} value={l.id}>
+          {l.label}{l.reason ? ` — ${l.reason}` : ''}
+        </option>
+      ))}
+    </>
+  );
+}
+
 function StepRow({
   step,
   index,
+  animations,
+  scenes,
   onRemove,
   onUpdate
 }: {
   step: PlaylistStep;
   index: number;
+  animations: Look[];
+  scenes: Look[];
   onRemove: () => void;
   onUpdate: (s: PlaylistStep) => void;
 }) {
@@ -105,8 +74,8 @@ function StepRow({
         value={step.type}
         onChange={(e) => {
           const type = e.target.value as PlaylistStep['type'];
-          if (type === 'animation') onUpdate({ type, name: AVAILABLE_ANIMATIONS[0], duration: step.duration });
-          else if (type === 'scene') onUpdate({ type, name: AVAILABLE_SCENES[0], duration: step.duration });
+          if (type === 'animation') onUpdate({ type, name: animations[0]?.id, duration: step.duration });
+          else if (type === 'scene') onUpdate({ type, name: scenes[0]?.id, duration: step.duration });
           else onUpdate({ type, code: '({ render(ctx) { ctx.fill(ctx.t * 30 % 360, 100, 80); } })', duration: step.duration });
         }}
         style={{
@@ -138,7 +107,7 @@ function StepRow({
             color: '#c8c8d8'
           }}
         >
-          {AVAILABLE_ANIMATIONS.map(a => <option key={a} value={a}>{a}</option>)}
+          <LookOptions looks={animations} />
         </select>
       )}
 
@@ -156,7 +125,7 @@ function StepRow({
             color: '#c8c8d8'
           }}
         >
-          {AVAILABLE_SCENES.map(s => <option key={s} value={s}>{s}</option>)}
+          <LookOptions looks={scenes} />
         </select>
       )}
 
@@ -222,15 +191,30 @@ function StepRow({
 
 export function PlaylistTab({
   send,
-  playlistState
+  playlistState,
+  layout
 }: {
   send: (msg: Record<string, unknown>) => void;
   playlistState: { active: boolean; playlist: PlaylistDef | null } | null;
+  layout: Layout;
 }) {
+  const [filter, setFilter] = useLayoutFilter('wavegrid-playlist-filter');
+
+  // "All" means this installation; a named rig lets an operator build a show
+  // for a rig they are not standing in front of.
+  const judgedAgainst = useMemo(() => {
+    const chosen = layoutFilters().find(f => f.id === filter);
+    return chosen?.layout ?? layout;
+  }, [filter, layout]);
+
+  const animationLooks = useMemo(() => looksForLayout(judgedAgainst, 'animation'), [judgedAgainst]);
+  const sceneLooks = useMemo(() => looksForLayout(judgedAgainst, 'scene'), [judgedAgainst]);
+  const presets = useMemo(() => showPresetsForLayout(judgedAgainst, 'playlist'), [judgedAgainst]);
+
   const [steps, setSteps] = useState<PlaylistStep[]>([
-    { type: 'animation', name: 'heart-breathe', duration: 120 },
-    { type: 'animation', name: 'i-heart-sf', duration: 180 },
-    { type: 'animation', name: 'rainbow', duration: 300 }
+    { type: 'animation', name: 'rainbow', duration: 180 },
+    { type: 'animation', name: 'wave', duration: 180 },
+    { type: 'animation', name: 'breathe', duration: 120 }
   ]);
   const [loop, setLoop] = useState(true);
   const [transition, setTransition] = useState<'cut' | 'fade'>('fade');
@@ -261,8 +245,8 @@ export function PlaylistTab({
   }, [send]);
 
   const addStep = useCallback(() => {
-    setSteps(prev => [...prev, { type: 'animation', name: 'rainbow', duration: 60 }]);
-  }, []);
+    setSteps(prev => [...prev, { type: 'animation', name: animationLooks[0]?.id ?? 'rainbow', duration: 60 }]);
+  }, [animationLooks]);
 
   const removeStep = useCallback((idx: number) => {
     setSteps(prev => prev.filter((_, i) => i !== idx));
@@ -272,11 +256,11 @@ export function PlaylistTab({
     setSteps(prev => prev.map((s, i) => i === idx ? step : s));
   }, []);
 
-  const loadPreset = useCallback((preset: typeof PRESETS[number]) => {
-    setSteps(preset.playlist.steps);
-    setLoop(preset.playlist.loop);
-    setTransition(preset.playlist.transition);
-    setTransitionDuration(preset.playlist.transitionDuration);
+  const loadPreset = useCallback((preset: ShowPreset) => {
+    setSteps(preset.steps);
+    setLoop(preset.loop);
+    setTransition(preset.transition);
+    setTransitionDuration(preset.transitionDuration);
   }, []);
 
   const totalDuration = steps.reduce((acc, s) => acc + s.duration, 0);
@@ -284,12 +268,15 @@ export function PlaylistTab({
 
   return (
     <div className="flex flex-col gap-4">
+      <LayoutFilterChips value={filter} onChange={setFilter} layout={layout} />
+
       {/* Presets */}
       <div className="flex gap-2 flex-wrap">
-        {PRESETS.map((p) => (
+        {presets.map((p) => (
           <button
-            key={p.name}
+            key={p.id}
             onClick={() => loadPreset(p)}
+            title={p.reason || p.description}
             style={{
               padding: '6px 12px',
               borderRadius: 16,
@@ -297,7 +284,8 @@ export function PlaylistTab({
               fontWeight: 500,
               background: '#12121a',
               border: '1px solid #1a1a25',
-              color: '#888898'
+              color: '#888898',
+              opacity: p.reason ? 0.55 : 1
             }}
           >
             {p.name}
@@ -312,6 +300,8 @@ export function PlaylistTab({
             key={idx}
             step={step}
             index={idx}
+            animations={animationLooks}
+            scenes={sceneLooks}
             onRemove={() => removeStep(idx)}
             onUpdate={(s) => updateStep(idx, s)}
           />
