@@ -10,12 +10,7 @@ import {
   applySocketMessage,
   beginConnection,
   createSocketSnapshot,
-  isFeedStale,
   SOCKET_FEED_STALE_MS,
-  type CannonColor,
-  type Orientation,
-  type PlaylistState,
-  type Settings,
   type SocketSnapshot
 } from '@/lib/socket-state';
 
@@ -30,7 +25,7 @@ export function useSocket(
   // Keep the latest callback without re-subscribing the socket on every render.
   const onSyncConfigRef = useRef(onSyncConfig);
   onSyncConfigRef.current = onSyncConfig;
-  const snapshotRef = useRef<SocketSnapshot>(createSocketSnapshot());
+  const lastMessageAtRef = useRef(0);
   const [connection, setConnection] = useState<ConnectionInfo>({
     state: 'connecting',
     cause: 'unknown',
@@ -62,11 +57,8 @@ export function useSocket(
 
       ws.onopen = () => {
         attempts = 0;
-        setSnapshot((prev) => {
-          const next = beginConnection(prev);
-          snapshotRef.current = next;
-          return next;
-        });
+        lastMessageAtRef.current = Date.now();
+        setSnapshot((prev) => beginConnection(prev, lastMessageAtRef.current));
         setConnection(OPEN_CONNECTION);
       };
 
@@ -87,11 +79,9 @@ export function useSocket(
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
-          setSnapshot((prev) => {
-            const next = applySocketMessage(prev, msg, onSyncConfigRef.current);
-            snapshotRef.current = next;
-            return next;
-          });
+          const now = Date.now();
+          lastMessageAtRef.current = now;
+          setSnapshot((prev) => applySocketMessage(prev, msg, onSyncConfigRef.current, now));
         } catch {
           // ignore
         }
@@ -101,7 +91,10 @@ export function useSocket(
     connect();
     watchdog = setInterval(() => {
       const ws = wsRef.current;
-      if (ws?.readyState === WebSocket.OPEN && isFeedStale(snapshotRef.current)) ws.close();
+      if (
+        ws?.readyState === WebSocket.OPEN &&
+        Date.now() - lastMessageAtRef.current > SOCKET_FEED_STALE_MS
+      ) ws.close();
     }, Math.min(1_000, SOCKET_FEED_STALE_MS));
 
     return () => {

@@ -58,7 +58,7 @@ describe('socket state snapshots', () => {
 
     expect(onSync).toHaveBeenCalledTimes(1);
     expect(updated.lastMessageAt).toBe(10);
-    expect(isFeedStale(updated, 2_011, 2_000)).toBe(true);
-    expect(isFeedStale(updated, 2_009, 2_000)).toBe(false);
+    expect(isFeedStale(updated, 8_011)).toBe(true);
+    expect(isFeedStale(updated, 8_009)).toBe(false);
   });
 });

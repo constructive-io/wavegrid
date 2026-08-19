@@ -12,9 +12,9 @@ import { computeCoverage } from './coverage';
 import type { BlendMode, CannonState, Orientation, Rotation } from './grid';
 import {compositeLayer, createGrid, DEFAULT_ALPHA, defaultOrientation, mapUiToGrid, remapGridForUi, resetGrid, setAllTargets, setCannonTarget, shiftGrid, tickGrid } from './grid';
 import { createHttpApp, lanVisitors, resolveUiDir } from './http-app';
-import { verifyJwt } from './jwt';
+import { fanout, type LivenessState,selectRevokedSockets, sweepLiveness } from './hub';
 import type { JwtPayload } from './jwt';
-import { fanout, selectRevokedSockets, sweepLiveness, type LivenessState } from './hub';
+import { verifyJwt } from './jwt';
 import { ServerPatternEngine } from './pattern-engine';
 import { compilePlaylist, type PlaylistDef, type PlaylistStep } from './playlist-compiler';
 import type {
@@ -253,7 +253,7 @@ function dropClient(ws: WebSocket, error?: unknown): void {
 }
 
 function sendToClient(ws: WebSocket, payload: string): boolean {
-  return fanout([ws], payload, (socket, error) => dropClient(socket as WebSocket, error)) === 1;
+  return fanout([ws], payload, dropClient) === 1;
 }
 
 function revokeClient(ws: WebSocket): void {
@@ -283,7 +283,7 @@ function broadcastState() {
       GRID_COLUMNS, GRID_ROWS, orientation
     );
   const payload = JSON.stringify({ type: 'state', grid: output });
-  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
+  fanout(wss.clients, payload, dropClient);
 }
 
 function getCalibrationOutput(): CannonState[] {
@@ -322,12 +322,12 @@ function loadPhysicalLightMap(): number[] {
 
 function broadcastOrientation() {
   const payload = JSON.stringify({ type: 'orientation', ...orientation });
-  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
+  fanout(wss.clients, payload, dropClient);
 }
 
 function broadcastCommand(cmd: Record<string, unknown>) {
   const payload = JSON.stringify({ type: 'command', ...cmd });
-  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
+  fanout(wss.clients, payload, dropClient);
 }
 
 function broadcastPlaylistState() {
@@ -337,7 +337,7 @@ function broadcastPlaylistState() {
     playlist: activePlaylist,
     currentStep: playlistCurrentStep
   });
-  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
+  fanout(wss.clients, payload, dropClient);
 }
 
 /** Cancel any active playlist when another visual command arrives. */
@@ -408,7 +408,7 @@ function isSecretScope(scope: string): boolean {
 /** Broadcast an accepted config revision to every connected client. */
 function broadcastSync(update: SyncUpdateMessage): void {
   const payload = JSON.stringify(update);
-  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
+  fanout(wss.clients, payload, dropClient);
 }
 
 /** Serialize + persist a client's config push, then broadcast the revision. */
@@ -503,7 +503,7 @@ function filterSecretScopes<T>(entries: Record<string, T>): Record<string, T> {
 /** Broadcast the full replicated document to every client (post-merge convergence). */
 function broadcastSyncStateTo(state: { revision: number; entries: unknown }): void {
   const payload = JSON.stringify({ type: 'sync_state', revision: state.revision, entries: state.entries });
-  fanout(wss.clients, payload, (client, error) => dropClient(client as WebSocket, error));
+  fanout(wss.clients, payload, dropClient);
 }
 
 /** Sync summary for `system_status` (revision + devices that lag it). */
@@ -980,24 +980,16 @@ const heartbeatIntervalMs = Number.isFinite(heartbeatMs) && heartbeatMs > 0 ? he
 const heartbeatTimer = setInterval(() => {
   sweepLiveness(
     liveness,
-    (ws) => {
-      const client = ws as WebSocket;
-      clients.delete(client);
-      liveness.delete(client);
-      try {
-        client.terminate();
-      } catch {
-        // The peer is already gone.
-      }
-    },
-    (ws, error) => dropClient(ws as WebSocket, error)
+    dropClient,
+    dropClient
   );
 
   const target = resolveSyncTarget();
   if (!target) return;
   try {
-    const revoked = selectRevokedSockets(clients, (sid) => target.store.getSession(target.project, sid) !== null);
-    for (const ws of revoked) revokeClient(ws as WebSocket);
+    const liveSessionIds = new Set(target.store.listSessions(target.project).map((session) => session.id));
+    const revoked = selectRevokedSockets(clients, (sid) => liveSessionIds.has(sid));
+    for (const ws of revoked) revokeClient(ws);
   } catch {
     // Session checks are best-effort when the project store is unavailable.
   }

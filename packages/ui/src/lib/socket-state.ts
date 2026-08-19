@@ -37,7 +37,9 @@ export interface SocketSnapshot {
   lastMessageAt: number;
 }
 
-export const SOCKET_FEED_STALE_MS = 3_000;
+// State is broadcast every frame by the brain, so 8 seconds allows temporary
+// event-loop stalls without masking a genuinely dead socket.
+export const SOCKET_FEED_STALE_MS = 8_000;
 
 export function createSocketSnapshot(now = 0): SocketSnapshot {
   return {

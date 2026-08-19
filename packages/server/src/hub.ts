@@ -13,10 +13,10 @@ export interface LivenessState {
 }
 
 /** Send to every open socket without letting one broken peer stop the fanout. */
-export function fanout(
-  sockets: Iterable<HubSocket>,
+export function fanout<T extends HubSocket>(
+  sockets: Iterable<T>,
   payload: string,
-  onFailure: (socket: HubSocket, error: unknown) => void
+  onFailure: (socket: T, error: unknown) => void
 ): number {
   let delivered = 0;
   for (const socket of sockets) {
@@ -35,10 +35,10 @@ export function fanout(
  * Mark responsive sockets for the next sweep and terminate peers that missed
  * the previous ping.
  */
-export function sweepLiveness(
-  sockets: Map<HubSocket, LivenessState>,
-  onDead: (socket: HubSocket) => void,
-  onPingFailure: (socket: HubSocket, error: unknown) => void
+export function sweepLiveness<T extends HubSocket>(
+  sockets: Map<T, LivenessState>,
+  onDead: (socket: T) => void,
+  onPingFailure: (socket: T, error: unknown) => void
 ): void {
   for (const [socket, state] of sockets) {
     if (!state.alive) {
@@ -55,11 +55,11 @@ export function sweepLiveness(
 }
 
 /** Select authenticated sockets whose server-side sessions are no longer live. */
-export function selectRevokedSockets<T extends { sid?: string }>(
-  clients: Iterable<[HubSocket, T]>,
+export function selectRevokedSockets<T extends HubSocket, C extends { sid?: string }>(
+  clients: Iterable<[T, C]>,
   isSessionLive: (sid: string) => boolean
-): HubSocket[] {
-  const revoked: HubSocket[] = [];
+): T[] {
+  const revoked: T[] = [];
   for (const [socket, info] of clients) {
     if (info.sid && !isSessionLive(info.sid)) revoked.push(socket);
   }
