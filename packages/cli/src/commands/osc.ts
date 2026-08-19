@@ -38,7 +38,7 @@ function confirm(project: string, osc: OscConfig | undefined): void {
 const USAGE = [
   '  Usage:',
   '    wavegrid projects osc                      (interactive wizard)',
-  `    wavegrid projects osc beyond --host <ip> [--port ${DEFAULT_BEYOND_PORT}] [--grid-order row|column]`,
+  `    wavegrid projects osc beyond [--host ${LOOPBACK_HOST}] [--port ${DEFAULT_BEYOND_PORT}] [--grid-order row|column]`,
   `    wavegrid projects osc fb4 --host <ip> [--port ${DEFAULT_FB4_PORT}]`,
   '    wavegrid projects osc routing --file <path-to-routing.json>',
   '    wavegrid projects osc show',
@@ -60,8 +60,8 @@ function num(flags: Flags, key: string): number | undefined {
 /** Non-interactive setters (no TTY / scripted). Return true on success. */
 function applyFromFlags(flags: Flags, kind: string): boolean {
   if (kind === 'beyond') {
-    const host = normalizeOscHost(str(flags, 'host') ?? '');
-    if (!host) return false;
+    // BEYOND normally runs on this machine, so `--host` is optional.
+    const host = normalizeOscHost(str(flags, 'host') ?? '') || LOOPBACK_HOST;
     const port = num(flags, 'port') ?? DEFAULT_BEYOND_PORT;
     const gridOrder = str(flags, 'grid-order') === 'column' ? 'column' : 'row';
     const project = save(flags, (config) => {

@@ -3,7 +3,7 @@ import type { OscTarget } from '@/types/ipc';
 
 const NONE: OscTarget = {
   kind: 'none',
-  host: '',
+  host: '127.0.0.1',
   port: 7001,
   gridOrder: 'row',
   file: '',
@@ -14,6 +14,13 @@ describe('toOscTarget', () => {
   it('reads no config as "none"', () => {
     expect(toOscTarget(null).kind).toBe('none');
     expect(toOscTarget({}).kind).toBe('none');
+  });
+
+  it('offers this machine as the host when nothing is configured', () => {
+    // BEYOND usually runs on the show laptop, and a blank field only ever
+    // produced a save error.
+    expect(toOscTarget(null).host).toBe('127.0.0.1');
+    expect(toOscTarget({ osc: { routingConfig: '/tmp/routing.json' } }).host).toBe('127.0.0.1');
   });
 
   it('reads a BEYOND target with its grid order', () => {
@@ -64,9 +71,10 @@ describe('applyOscTarget', () => {
     expect(out.ui).toEqual({ port: 4000 });
   });
 
-  it('trims the host and rejects an empty one', () => {
+  it('trims the host, defaulting BEYOND to this machine', () => {
     expect(applyOscTarget(null, { ...NONE, kind: 'beyond', host: '  10.0.0.2  ' }).osc?.beyond?.host).toBe('10.0.0.2');
-    expect(() => applyOscTarget(null, { ...NONE, kind: 'beyond', host: '   ' })).toThrow(/BEYOND needs/);
+    expect(applyOscTarget(null, { ...NONE, kind: 'beyond', host: '   ' }).osc?.beyond?.host).toBe('127.0.0.1');
+    // FB4 is separate hardware — there is no sane local default to guess.
     expect(() => applyOscTarget(null, { ...NONE, kind: 'fb4', host: '' })).toThrow(/FB4 needs/);
     expect(() => applyOscTarget(null, { ...NONE, kind: 'routing', file: '' })).toThrow(/routing JSON/);
   });

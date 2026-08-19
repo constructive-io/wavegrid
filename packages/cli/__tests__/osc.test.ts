@@ -43,6 +43,18 @@ describe('runOscSetup', () => {
     });
   });
 
+  it('defaults a BEYOND target to this machine when no host is given', async () => {
+    isolate();
+    const store = getStore();
+    store.createProject('local-show', { layout: { preset: 'ring-6' } });
+
+    await runOscSetup('beyond', {});
+
+    expect(store.getProjectConfig('local-show')?.osc).toEqual({
+      beyond: { host: '127.0.0.1', port: 8000, gridOrder: 'row' }
+    });
+  });
+
   it('honors explicit port + grid order', async () => {
     isolate();
     const store = getStore();
@@ -79,7 +91,8 @@ describe('runOscSetup', () => {
     isolate();
     getStore().createProject('p', { layout: { preset: 'ring-6' } });
     process.exitCode = 0;
-    await runOscSetup('beyond', {});
+    // FB4 is its own box on the network — unlike BEYOND, there is nothing to assume.
+    await runOscSetup('fb4', {});
     expect(process.exitCode).toBe(1);
     process.exitCode = 0;
   });
