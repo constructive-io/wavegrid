@@ -14,12 +14,12 @@ graph LR
 
     subgraph PangolinPC["🖥️ Pangolin PC (Windows, on-site)"]
         RX["Receiver"]
-        BEYOND["BEYOND :7001"]
+        BEYOND["BEYOND :8000"]
     end
 
     BROWSER -- "http + ws @ ‹CLOUD_IP›:3000" --> SIM
     SIM -- "ws://‹CLOUD_IP›:3000" --> RX
-    RX -- "OSC/UDP localhost:7001" --> BEYOND
+    RX -- "OSC/UDP localhost:8000" --> BEYOND
 ```
 
 **Three devices, three roles:**
@@ -52,7 +52,7 @@ Open **http://‹CLOUD_IP›:3000** in the browser (the browser derives its WebS
 ```powershell
 $env:SIMULATOR_URL = "ws://<CLOUD_IP>:3000"
 $env:BEYOND_HOST = "127.0.0.1"
-$env:BEYOND_PORT = "7001"
+$env:BEYOND_PORT = "8000"
 $env:SHARD_START = "0"
 $env:SHARD_END = "23"
 $env:DEBUG_OSC = "1"
@@ -66,8 +66,8 @@ Use a routing config instead of `BEYOND_HOST`. Save `routing.json` in the repo r
 ```json
 {
   "targets": {
-    "beyond-a": { "type": "beyond", "host": "<BEYOND_A_IP>", "port": 7001 },
-    "beyond-b": { "type": "beyond", "host": "<BEYOND_B_IP>", "port": 7001 }
+    "beyond-a": { "type": "beyond", "host": "<BEYOND_A_IP>", "port": 8000 },
+    "beyond-b": { "type": "beyond", "host": "<BEYOND_B_IP>", "port": 8000 }
   },
   "flushHz": 30,
   "cannons": [
@@ -134,10 +134,15 @@ graph TD
 
 ## Troubleshooting
 
+Advanced → OSC in the desktop app is the fastest first look: it shows the
+resolved target and port, probes it, reads BEYOND.ini where BEYOND is installed
+locally, sends blackout / full white / full amber (one zone or all) and tails
+every message in and out.
+
 | Symptom | Fix |
 |---------|-----|
 | UI loads but painting does nothing | The browser's WebSocket is same-origin — make sure you opened the UI at the server's real host:port (not localhost) and port 3000 is reachable |
-| Receiver connects but no laser response | Verify BEYOND's OSC server is on port 7001, and "Show R-G-B-A panel" is enabled in BEYOND settings |
+| Receiver connects but no laser response | Verify BEYOND's OSC server is on port 8000, and "Show R-G-B-A panel" is enabled in BEYOND settings |
 | Colors wrong in `rgb` mode | Confirm `alpha` is being sent (check `DEBUG_OSC=1` output for `/livecontrol/alpha 255`) |
 | Receiver can't connect to server | Check cloud firewall allows inbound on port 3000 |
 | White shows as red | Ensure BEYOND's RGBA panel is enabled: Settings → Configuration → Live Control → Extra Controls → "Show R-G-B-A panel" |

@@ -30,7 +30,7 @@ const receiver = new Receiver({
   input: new WebSocketInput({ url: 'ws://192.168.1.50:3000' }),
   output: new BeyondOscOutput({
     host: '192.168.50.10',
-    port: 7001,
+    port: 8000,
     projectorMap: { 0: 0, 1: 1, 2: 2 }
   })
 });
@@ -59,7 +59,7 @@ receiver.start();
 ```json
 {
   "targets": {
-    "beyond-a": { "type": "beyond", "host": "192.168.50.10", "port": 7001 },
+    "beyond-a": { "type": "beyond", "host": "192.168.50.10", "port": 8000 },
     "fb4-b":    { "type": "fb4",    "host": "192.168.50.20", "port": 8000 }
   },
   "flushHz": 30,

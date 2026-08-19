@@ -76,7 +76,9 @@ export {
 // Config loading (confstash) + run-mode derivation
 export {
   createWavegridLoader,
+  DEFAULT_BEYOND_PORT,
   DEFAULT_CONFIG,
+  DEFAULT_FB4_PORT,
   type LoadOptions,
   loadWavegridConfig,
   type ResolvedConfig,

@@ -20,10 +20,12 @@ describe('resolveTarget', () => {
 
   it('prefers flags over config, and defaults the port per kind', () => {
     const config = { osc: { beyond: { host: '192.168.1.50', port: 7001 } } };
+    // A --host makes the target explicit, so the port is BEYOND's default, not
+    // the configured project's.
     expect(resolveTarget({ host: '127.0.0.1' }, config)).toMatchObject({
       kind: 'beyond',
       host: '127.0.0.1',
-      port: 7001,
+      port: 8000,
       origin: 'flags'
     });
     expect(resolveTarget({ host: '127.0.0.1', kind: 'fb4' }, config)).toMatchObject({

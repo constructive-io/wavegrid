@@ -72,7 +72,8 @@ describe('applyOscTarget', () => {
   });
 
   it('falls back to the default port for an unusable one', () => {
-    expect(applyOscTarget(null, { ...NONE, kind: 'beyond', host: 'h', port: NaN }).osc?.beyond?.port).toBe(7001);
+    // BEYOND's factory OSC receive port, shared with the CLI and the receiver.
+    expect(applyOscTarget(null, { ...NONE, kind: 'beyond', host: 'h', port: NaN }).osc?.beyond?.port).toBe(8000);
     expect(applyOscTarget(null, { ...NONE, kind: 'fb4', host: 'h', port: 99999 }).osc?.fb4?.port).toBe(8000);
   });
 

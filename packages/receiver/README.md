@@ -70,7 +70,7 @@ receiver.start();
 | `SHARD_END` | — | Last cannon index (inclusive) |
 | `ROUTING_CONFIG` | — | Path to JSON routing config (enables OSC) |
 | `BEYOND_HOST` | — | Quick single-target BEYOND OSC host |
-| `BEYOND_PORT` | `7001` | BEYOND OSC port |
+| `BEYOND_PORT` | `8000` | BEYOND OSC port |
 | `DEBUG_OSC` | — | Set to `1` to log all OSC messages |
 | `FB4_HOST` | — | Quick single-target FB4 OSC host |
 | `FB4_PORT` | `8000` | FB4 OSC port |

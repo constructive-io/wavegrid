@@ -10,7 +10,7 @@
  * Aiming: the project's configured OSC target by default (so this debugs the
  * same path the show uses), or `--host/--port` for a one-off.
  */
-import { loadWavegridConfig } from '@wavegrid/layout';
+import { DEFAULT_BEYOND_PORT, DEFAULT_FB4_PORT, loadWavegridConfig } from '@wavegrid/layout';
 import {
   BeyondOscOutput,
   type CannonState,
@@ -31,11 +31,11 @@ export const SIGNALS_USAGE = [
   '    wavegrid signals send /beyond/zone/0/livecontrol/red 255',
   '    wavegrid signals send /FB4-12345/color_red 100 --host 192.168.1.50 --port 8000',
   '    wavegrid signals probe [--zones 0-11] [--hold 500] [--hue 40]',
-  '    wavegrid signals listen [--port 7001]',
+  `    wavegrid signals listen [--port ${DEFAULT_BEYOND_PORT}]`,
   '',
   '  Options:',
   '    --host <ip>      Override the project\'s OSC host',
-  '    --port <n>       Override the port (BEYOND 7001, FB4 8000)',
+  `    --port <n>       Override the port (BEYOND ${DEFAULT_BEYOND_PORT}, FB4 ${DEFAULT_FB4_PORT})`,
   '    --dry-run        Print what would be sent, send nothing',
   '',
   '  Arguments are floats unless tagged: `i:3` integer, `s:text` string.',
@@ -74,7 +74,12 @@ export function resolveTarget(flags: Flags, config: { osc: { beyond?: { host: st
 
   if (host) {
     const kind = kindFlag === 'fb4' ? 'fb4' : 'beyond';
-    return { kind, host, port: port ?? (kind === 'fb4' ? 8000 : 7001), origin: 'flags' };
+    return {
+      kind,
+      host,
+      port: port ?? (kind === 'fb4' ? DEFAULT_FB4_PORT : DEFAULT_BEYOND_PORT),
+      origin: 'flags'
+    };
   }
   if (config.osc.beyond) {
     return {
@@ -88,7 +93,7 @@ export function resolveTarget(flags: Flags, config: { osc: { beyond?: { host: st
     return {
       kind: 'fb4',
       host: config.osc.fb4.host,
-      port: port ?? config.osc.fb4.port ?? 8000,
+      port: port ?? config.osc.fb4.port ?? DEFAULT_FB4_PORT,
       origin: 'project config (FB4)'
     };
   }
@@ -218,7 +223,7 @@ export async function runSignalsProbe(flags: Flags): Promise<void> {
 
 /** Sit on a port and print what arrives. Ctrl-C to stop. */
 export async function runSignalsListen(flags: Flags): Promise<void> {
-  const port = num(flags, 'port') ?? 7001;
+  const port = num(flags, 'port') ?? DEFAULT_BEYOND_PORT;
   const host = str(flags, 'host') ?? '0.0.0.0';
   let seen = 0;
 

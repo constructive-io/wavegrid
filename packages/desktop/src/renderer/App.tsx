@@ -29,6 +29,7 @@ import { ConfigRoute } from '@/renderer/routes/config-route';
 import { DevicesRoute } from '@/renderer/routes/devices-route';
 import { LightsRoute } from '@/renderer/routes/lights-route';
 import { NovaRoute } from '@/renderer/routes/nova-route';
+import { OscRoute } from '@/renderer/routes/osc-route';
 import { OutputRoute } from '@/renderer/routes/output-route';
 import { ProjectSwitcher } from '@/renderer/routes/project-switcher';
 import { ProjectsRoute } from '@/renderer/routes/projects-route';
@@ -50,6 +51,7 @@ const ROUTE_ICON: Record<Route, AppIcon> = {
   lights: Lightbulb,
   output: Radio,
   devices: Cpu,
+  osc: Radio,
   traffic: Waves,
   settings: Cog
 };
@@ -523,6 +525,8 @@ export function App() {
       {/* Traffic loads itself: it is the only screen that touches Wireshark, and
           nothing may be looked for until you open it. */}
       {route === 'traffic' && <TrafficRoute />}
+      {/* OSC debugger: probes and single sends only, and only while open. */}
+      {route === 'osc' && <OscRoute activeProject={editingProject} />}
       {route === 'settings' && (
         <SettingsRoute
           info={storeInfo}

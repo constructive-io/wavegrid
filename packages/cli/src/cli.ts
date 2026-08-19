@@ -72,7 +72,7 @@ ${c.bold('Run')}
 ${c.bold('Signals')} — hand-driven OSC for debugging Pangolin
   signals send <addr> [args]    Send one OSC message to the configured target
   signals probe [--zones 0-11]  Light one zone/fixture at a time, to find the mapping
-  signals listen [--port 7001]  Print every OSC message arriving on a port
+  signals listen [--port 8000]  Print every OSC message arriving on a port
 
 ${c.bold('Receiver options')}
   --server <ws-url>   Brain to connect to (e.g. ws://192.168.1.42:3333)

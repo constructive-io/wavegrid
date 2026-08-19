@@ -165,7 +165,7 @@ When the UI/Server run on a cloud server and the laser hardware is on-site:
 │  Server (:3000)     ◄─────────────┼──────────────┼──  Receiver                  │
 │  UI (:3003)                       │              │       │                      │
 │                                   │              │       ▼ OSC/UDP (localhost)  │
-│  Artists connect via browser      │              │    BEYOND (:7001)            │
+│  Artists connect via browser      │              │    BEYOND (:8000)            │
 └───────────────────────────────────┘              └──────────────────────────────┘
 ```
 
@@ -184,7 +184,7 @@ PowerShell:
 ```powershell
 $env:SIMULATOR_URL = "ws://203.0.113.50:3000"
 $env:BEYOND_HOST = "127.0.0.1"
-$env:BEYOND_PORT = "7001"
+$env:BEYOND_PORT = "8000"
 $env:SHARD_START = "0"
 $env:SHARD_END = "23"
 $env:DEBUG_OSC = "1"
@@ -195,7 +195,7 @@ Bash (Linux/macOS):
 ```sh
 SIMULATOR_URL=ws://203.0.113.50:3000 \
 BEYOND_HOST=127.0.0.1 \
-BEYOND_PORT=7001 \
+BEYOND_PORT=8000 \
 SHARD_START=0 \
 SHARD_END=23 \
 DEBUG_OSC=1 \
@@ -223,7 +223,7 @@ When a single BEYOND PC can't handle all 49 zones, split the grid across multipl
           ▼                   ▼
   ┌──────────────┐    ┌──────────────┐
   │  BEYOND A    │    │  BEYOND B    │
-  │  .1.68:7001  │    │  .1.69:7001  │
+  │  .1.68:8000  │    │  .1.69:8000  │
   │  zones 0–23  │    │  zones 0–24  │
   └──────────────┘    └──────────────┘
 ```
@@ -233,8 +233,8 @@ Create a `routing.json` file (see `examples/routing-two-beyond.json` for a full 
 ```json
 {
   "targets": {
-    "beyond-a": { "type": "beyond", "host": "192.168.1.68", "port": 7001 },
-    "beyond-b": { "type": "beyond", "host": "192.168.1.69", "port": 7001 }
+    "beyond-a": { "type": "beyond", "host": "192.168.1.68", "port": 8000 },
+    "beyond-b": { "type": "beyond", "host": "192.168.1.69", "port": 8000 }
   },
   "flushHz": 30,
   "cannons": [
@@ -315,7 +315,7 @@ Project config lives in the store (`wavegrid projects config`) — env vars are 
 | `WG_RECEIVER_KEY` | store value | Receiver auth key (override to share across laptops) |
 | `SIMULATOR_URL` | `ws://localhost:3000` | WebSocket upstream for the receiver |
 | `BEYOND_HOST` | — | BEYOND PC IP (enables OSC output) |
-| `BEYOND_PORT` | `7001` | BEYOND OSC receive port |
+| `BEYOND_PORT` | `8000` | BEYOND OSC receive port |
 | `BEYOND_GRID_ORDER` | `row` | Grid-to-zone mapping: `row` or `column` |
 | `SHARD_START` / `SHARD_END` | — | Cannon index range for this receiver |
 | `DEBUG_OSC` | — | Set to `1` to log every OSC message |

@@ -39,7 +39,7 @@ describe('runOscSetup', () => {
     await runOscSetup('beyond', { host: '192.168.1.50' });
 
     expect(store.getProjectConfig('ring-demo')?.osc).toEqual({
-      beyond: { host: '192.168.1.50', port: 7001, gridOrder: 'row' }
+      beyond: { host: '192.168.1.50', port: 8000, gridOrder: 'row' }
     });
   });
 

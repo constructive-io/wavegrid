@@ -3,6 +3,16 @@ import { createConfigLoader } from 'confstash';
 import { resolveLayout } from './presets';
 import { Layout, RunMode, WavegridConfig } from './types';
 
+/**
+ * BEYOND's factory OSC receive port (`[OSC] PortIn` in BEYOND.ini). Every
+ * default in the repo comes from here: a wrong default is invisible, because
+ * OSC over UDP is silently dropped when nothing is bound.
+ */
+export const DEFAULT_BEYOND_PORT = 8000;
+
+/** FB4's OSC port. */
+export const DEFAULT_FB4_PORT = 8000;
+
 export const DEFAULT_CONFIG: WavegridConfig = {
   layout: { preset: 'grid-7x7' },
   mode: 'auto',
@@ -82,12 +92,12 @@ function envLayer(env: NodeJS.ProcessEnv): Partial<WavegridConfig> {
   if (env.BEYOND_HOST) {
     osc.beyond = {
       host: env.BEYOND_HOST,
-      port: toInt(env.BEYOND_PORT) ?? 7001,
+      port: toInt(env.BEYOND_PORT) ?? DEFAULT_BEYOND_PORT,
       gridOrder: env.BEYOND_GRID_ORDER === 'column' ? 'column' : 'row'
     };
   }
   if (env.FB4_HOST) {
-    osc.fb4 = { host: env.FB4_HOST, port: toInt(env.FB4_PORT) ?? 8000 };
+    osc.fb4 = { host: env.FB4_HOST, port: toInt(env.FB4_PORT) ?? DEFAULT_FB4_PORT };
   }
   if (env.ROUTING_CONFIG) osc.routingConfig = env.ROUTING_CONFIG;
   if (Object.keys(osc).length > 0) out.osc = osc;
