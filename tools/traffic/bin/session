@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+#
+# session — run one of the experiments PROTOCOL.md asks for, start to finish:
+# start the capture, walk you through what to do at the machine, stop the
+# capture, then decode it and say what the result means.
+#
+# Usage:
+#   ./bin/session handshake [--iface IF]     BEYOND's connection setup, incl. TCP SYN
+#   ./bin/session osc-rgba  [--iface IF]     our OSC going in and BEYOND's echo, in one file
+#   ./bin/session replay --host IP[,IP]      does anything act on the 16062 lines? (transmits)
+#   ./bin/session --list
+#
+# Everything is passive except the `replay` step inside the replay experiment,
+# which asks before it sends. Captures land in the capture directory with a
+# label naming the experiment, so tomorrow's file is still identifiable.
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+eval "$(parse_common_args "$@")"
+
+BIN="$TRAFFIC_ROOT/bin"
+iface_args=()
+experiment=""
+hosts=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --iface|-i) iface_args=(--iface "${2:-}"); shift 2 ;;
+    --iface=*) iface_args=(--iface "${1#--iface=}"); shift ;;
+    --host) hosts="${2:-}"; shift 2 ;;
+    --host=*) hosts="${1#--host=}"; shift ;;
+    --list) experiment=list; shift ;;
+    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) experiment="$1"; shift ;;
+  esac
+done
+
+if [[ "$experiment" == list || -z "$experiment" ]]; then
+  cat <<'LIST'
+experiments:
+  handshake  Capture BEYOND opening its connections. Every capture so far began
+             mid-stream, so we have never seen the TCP handshake on 3348 — the
+             only place a key exchange could be visible. Answers: is there one?
+  osc-rgba   Capture our OSC going into BEYOND and BEYOND's own broadcast of
+             what it did with it, in one file. Answers: which zone numbers we
+             should be sending, and whether the values land.
+  replay     Send BEYOND's plaintext live-control lines ourselves, BEYOND closed.
+             Answers: does anything on the network act on them, or is 16062
+             output only? This one transmits.
+LIST
+  exit 0
+fi
+
+pause() {
+  printf '\n\033[1m%s\033[0m\n' "$1"
+  shift
+  for line in "$@"; do printf '   %s\n' "$line"; done
+  printf '\nPress ENTER when done (Ctrl-C to abort) '
+  read -r _
+}
+
+start_capture() {
+  "$BIN/capture" --label "$1" --background ${iface_args+"${iface_args[@]}"} >/dev/null
+  printf 'capturing…\n'
+}
+
+stop_capture() {
+  local out
+  out="$("$BIN/capture" --stop)"
+  # Only the filename goes to stdout, so callers can capture it; the packet
+  # counts are for the operator to read.
+  printf '%s\n' "$out" >&2
+  printf '%s\n' "$out" | sed -n '1s/.*→ //p'
+}
+
+syn_count() {
+  local file="$1" tshark
+  tshark="$(need_tool tshark)"
+  "$tshark" -r "$file" -n -Y 'tcp.flags.syn==1 && tcp.port==3348' 2>/dev/null | wc -l | tr -d ' '
+}
+
+case "$experiment" in
+  handshake)
+    cat <<'INTRO'
+== handshake ==
+We need the moment BEYOND opens its connections to the FB4s. Capture first,
+BEYOND second — the other way round is why every existing capture starts
+mid-stream and tells us nothing about connection setup.
+INTRO
+    pause 'Close BEYOND completely.' \
+      'Quit the application, and check the tray — it can keep running there.' \
+      'The FB4s can stay powered; it is BEYOND connecting that we want to see.'
+    start_capture handshake
+    pause 'Now launch BEYOND and let it find the projectors.' \
+      'Wait until the projector list shows the heads as connected (~30s).' \
+      'Do not paint or send anything yet — setup is all we want in this file.'
+    file="$(stop_capture)"
+    [[ -n "$file" ]] || { echo 'no capture file — did the capture start?' >&2; exit 1; }
+    echo
+    syns="$(syn_count "$file")"
+    echo "TCP SYNs on 3348 in this capture: $syns"
+    if [[ "$syns" == 0 ]]; then
+      echo '  Still no handshake — BEYOND was probably already connected, or its'
+      echo '  traffic never crossed the capture interface. Check ./bin/interfaces.'
+    else
+      echo '  Got it. What matters now is the first few messages of each connection:'
+      echo '  a key exchange would be a short, structured, non-8.0-entropy prelude.'
+    fi
+    echo
+    "$BIN/decode" "$file" --hex 96
+    ;;
+
+  osc-rgba)
+    cat <<'INTRO'
+== osc-rgba ==
+One file containing both halves of the OSC path: what we send, and what BEYOND
+says it did with it. That link has only ever been inferred from two separate
+captures.
+INTRO
+    pause 'Open BEYOND, and open its RGBA panel.' \
+      'BEYOND only broadcasts live-control values while that panel is open' \
+      '(BEYOND.ini [Settings] ShowRGBAPanel=1 — verify the value on this machine).' \
+      'Put the zone you are testing under live control.'
+    start_capture osc-rgba
+    pause 'Send a few values from Wavegrid, one at a time.' \
+      'e.g. wavegrid signals send /beyond/zone/1/livecontrol/red 255' \
+      '     wavegrid signals send /beyond/zone/1/livecontrol/Brightness 50' \
+      'Change one thing at a time and note the order — the timeline below lines' \
+      'up against it.'
+    file="$(stop_capture)"
+    [[ -n "$file" ]] || { echo 'no capture file — did the capture start?' >&2; exit 1; }
+    echo
+    "$BIN/decode" "$file" --timeline
+    cat <<'AFTER'
+what to read out of that:
+  our OSC arrived        → packets to udp/8000 from this machine
+  BEYOND acted on it     → the same values appear under live control, on 16062
+  zone numbering settled → the zone BEYOND reports is the zone we addressed;
+                           if we send 240–245 and BEYOND reports 1–6, the
+                           project's projector map is what needs fixing
+AFTER
+    ;;
+
+  replay)
+    cat <<'INTRO'
+== replay ==
+Does anything act on BEYOND's plaintext live-control lines, or does only BEYOND
+emit them? BEYOND has to be closed, or a change in the room proves nothing about
+what caused it.
+
+This experiment transmits. Somebody watches the heads, E-stop in reach.
+INTRO
+    if [[ -z "$hosts" ]]; then
+      echo
+      echo 'error: this experiment needs --host with the addresses to send to,' >&2
+      echo '  e.g. --host 169.254.53.5,169.254.200.242 (the device inventory in' >&2
+      echo '  PROTOCOL.md lists them, or run ./bin/discover while BEYOND is up).' >&2
+      exit 2
+    fi
+    pause 'Close BEYOND completely, and confirm the heads are idle.' \
+      'Tray included. Nothing else should be driving the lasers.'
+    start_capture replay
+    echo
+    echo 'dry run first — these are the exact bytes:'
+    "$BIN/replay" --zone all --colour amber --sweep | head -20
+    pause 'Ready to transmit that sweep?' \
+      "ENTER runs it against each of ${hosts} in turn, brightness ramping 0→100→0." \
+      'Watch the heads. Ctrl-C now if anything is unsafe.'
+    for host in ${hosts//,/ }; do
+      echo "→ $host"
+      "$BIN/replay" --zone all --colour amber --sweep --transmit --host "$host" || true
+    done
+    file="$(stop_capture)"
+    [[ -n "$file" ]] || { echo 'no capture file — did the capture start?' >&2; exit 1; }
+    echo
+    "$BIN/decode" "$file"
+    cat <<'AFTER'
+record what happened in the room, because the wire cannot tell you:
+  heads moved   → something acts on these lines. Which host? Repeat one at a
+                  time to find out, then this is a control path we can use.
+  heads still   → 16062 is BEYOND narrating itself, as the captures suggested.
+                  Colour/brightness without Pangolin then needs an input the
+                  hardware actually listens on — a question for the vendor.
+AFTER
+    ;;
+
+  *)
+    echo "unknown experiment: $experiment (see ./bin/session --list)" >&2
+    exit 2 ;;
+esac

@@ -22,12 +22,14 @@ from pangolin import (
     STREAM_TYPE_FRAME,
     Header,
     Packet,
+    body_repeats,
     entropy,
     format_rate,
     parse_announce,
     parse_rgba_panel,
     parse_settings,
     report_devices,
+    report_repeats,
     report_rgba,
     report_stream,
     split_messages,
@@ -256,6 +258,50 @@ class ReportTest(unittest.TestCase):
                             tcp(b'', time=0.001)], 0)
         self.assertIn('1 msgs', text)
         self.assertNotIn('/s', text)
+
+
+class BodyRepeatsTest(unittest.TestCase):
+    """Whether a frame body is ever sent twice decides if replay is even possible."""
+
+    def test_identical_bodies_are_counted_as_repeats(self):
+        r = body_repeats([bytes(range(256))] * 3)
+        self.assertEqual(r.frames, 3)
+        self.assertEqual(r.distinct, 1)
+        self.assertEqual(r.repeated, 2)
+        self.assertEqual(r.constant_offsets, 256)
+
+    def test_unrelated_bodies_share_nothing_and_repeat_nothing(self):
+        bodies = [bytes(range(256)), bytes(reversed(range(256)))]
+        r = body_repeats(bodies)
+        self.assertEqual(r.distinct, 2)
+        self.assertEqual(r.repeated, 0)
+        self.assertEqual(r.constant_offsets, 0)
+
+    def test_one_body_cannot_be_compared(self):
+        self.assertIsNone(body_repeats([bytes(16)]))
+
+
+class ReportRepeatsTest(unittest.TestCase):
+    def render(self, fn, *args) -> str:
+        out = io.StringIO()
+        with redirect_stdout(out):
+            fn(*args)
+        return out.getvalue()
+
+    def test_says_so_when_there_are_no_frames(self):
+        self.assertIn('no frames', self.render(report_repeats, []))
+
+    def test_reports_repeated_bodies_when_a_body_recurs(self):
+        body = bytes(range(256))
+        stream = message(STREAM_TYPE_FRAME, body, 1) + message(STREAM_TYPE_FRAME, body, 2)
+        text = self.render(report_repeats, [tcp(stream)])
+        self.assertIn('2 frames, 1 distinct bodies, 1 repeated', text)
+
+    def test_reports_none_repeated_when_every_body_differs(self):
+        stream = (message(STREAM_TYPE_FRAME, bytes(range(256)), 1)
+                  + message(STREAM_TYPE_FRAME, bytes(reversed(range(256))), 2))
+        text = self.render(report_repeats, [tcp(stream)])
+        self.assertIn('2 distinct bodies, 0 repeated', text)
 
 
 class FormatRateTest(unittest.TestCase):
