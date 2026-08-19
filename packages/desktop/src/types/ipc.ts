@@ -515,6 +515,29 @@ export interface WavegridApi {
     /** Ask for a directory with the native picker. Null when cancelled. */
     chooseCaptureDir(): Promise<TrafficSettings | null>;
   };
+  /**
+   * OSC debugger (Advanced → OSC). Local only — the desktop process talks UDP
+   * to the project's configured target; there is no service and no key. Sends
+   * are single messages, never a running show.
+   */
+  oscDebug: {
+    state(project: string): Promise<OscDebugState>;
+    /** Probe the configured host:port for a refusal. Short, non-fatal. */
+    probe(project: string): Promise<OscDebugState>;
+    /** A known-good frame for one fixture (`zone`) or all of them (null). */
+    preset(
+      project: string,
+      preset: OscDebugPreset,
+      zone: number | null,
+      serial?: string
+    ): Promise<OscSignalResult>;
+    /** One hand-typed address and its arguments, exactly as given. */
+    send(project: string, address: string, args: string[]): Promise<OscSignalResult>;
+    /** Bind a port and log what arrives — proof a send left the machine. */
+    listen(project: string, port: number): Promise<OscDebugState & { error?: string }>;
+    stopListen(project: string): Promise<OscDebugState>;
+    clear(project: string): Promise<OscDebugState>;
+  };
 }
 
 // ── Traffic (Advanced → Traffic) ───────────────────────────────────────────
@@ -608,6 +631,56 @@ export interface TrafficResult {
   ok: boolean;
   stdout: string;
   stderr: string;
+}
+
+// ── OSC debugger (Advanced → OSC) ──────────────────────────────────────────
+//
+// OSC is UDP: a frame aimed at a closed port is dropped with no error, so a
+// silent rig looks identical to a working one. The panel makes that visible —
+// where we send, whether anything is bound there, what BEYOND's own settings
+// say, and the exact bytes of a hand-sent message.
+
+export interface OscDebugTarget {
+  kind: 'beyond' | 'fb4';
+  host: string;
+  port: number;
+}
+
+/** What one UDP liveness probe can honestly say. `no-rejection` is not proof of
+ *  delivery — UDP has no handshake — only the absence of a refusal. */
+export type OscProbeState = 'refused' | 'unreachable' | 'no-rejection';
+
+/** One line of the panel's message tail. */
+export interface OscSignalEntry {
+  at: number;
+  dir: 'out' | 'in';
+  address: string;
+  /** Arguments as rendered for the operator, not as encoded on the wire. */
+  args: string;
+  peer: string;
+}
+
+export interface OscSignalResult {
+  ok: boolean;
+  sent: number;
+  error?: string;
+}
+
+export type OscDebugPreset = 'blackout' | 'white' | 'amber';
+
+export interface OscDebugState {
+  target: OscDebugTarget | null;
+  probe: OscProbeState | null;
+  /** Port the panel is currently listening on, or null. */
+  listening: number | null;
+  log: OscSignalEntry[];
+  /** BEYOND's local settings, when BEYOND is installed on this machine. */
+  beyond: {
+    path: string;
+    oscPort: number | null;
+    showRgbaPanel: boolean | null;
+    checks: DoctorCheck[];
+  } | null;
 }
 
 export interface WavegridLaser {

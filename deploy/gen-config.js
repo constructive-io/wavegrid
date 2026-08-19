@@ -123,7 +123,7 @@ async function main() {
     cloudIp: args['cloud-ip'] || existing.cloudIp || env.CLOUD_IP || '',
     beyondA: args['beyond-a'] || (exTargets['beyond-a'] && exTargets['beyond-a'].host) || env.BEYOND_A_HOST || '192.168.1.68',
     beyondB: args['beyond-b'] || (exTargets['beyond-b'] && exTargets['beyond-b'].host) || env.BEYOND_B_HOST || '192.168.1.69',
-    port: parseInt(args.port || env.BEYOND_PORT || (exTargets['beyond-a'] && exTargets['beyond-a'].port) || '7001', 10),
+    port: parseInt(args.port || env.BEYOND_PORT || (exTargets['beyond-a'] && exTargets['beyond-a'].port) || '8000', 10),
     flushHz: parseInt(args['flush-hz'] || existing.flushHz || '30', 10),
     cannons: parseInt(args.cannons || env.NUM_CANNONS || '49', 10),
     columns: parseInt(args.columns || env.GRID_COLUMNS || '7', 10),

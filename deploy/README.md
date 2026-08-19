@@ -79,7 +79,7 @@ Configure OSC output in `deploy\.env` — either a single BEYOND target
 | `SIMULATOR_URL`             | pangolin| `ws://CLOUD_IP:SIM_PORT` | receiver → server (derived) |
 | `RECEIVER_ALPHA`            | pangolin| `0.06`           | smoothing                           |
 | `FALLBACK_DELAY`            | pangolin| `3000`           | ms before sine fallback             |
-| `BEYOND_HOST`/`BEYOND_PORT` | pangolin| — / `7001`       | single BEYOND OSC target            |
+| `BEYOND_HOST`/`BEYOND_PORT` | pangolin| — / `8000`       | single BEYOND OSC target            |
 | `BEYOND_GRID_ORDER`         | pangolin| `row`            | `row` or `column`                   |
 | `ROUTING_CONFIG`            | pangolin| —                | JSON routing file (multi-target)    |
 | `DEBUG_OSC`                 | pangolin| —                | set to `1` to log all OSC           |

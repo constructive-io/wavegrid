@@ -11,10 +11,11 @@ import {
   projectSecretsFile,
   type SettingsStore
 } from '@wavegrid/settings';
-import { accessSync, constants, existsSync, statSync } from 'fs';
+import { accessSync, constants, existsSync, readFileSync, statSync } from 'fs';
 import { dirname } from 'path';
 import { URL } from 'url';
 
+import { type BeyondSettings, checkBeyond, findBeyondIni, readBeyondSettings } from './beyond';
 import {
   type Check,
   checkEnvHijack,
@@ -22,9 +23,10 @@ import {
   checkShard,
   type CheckStatus,
   isSecureMode,
+  oscEndpoint,
   overallStatus
 } from './checks';
-import { type ProbeError, querySystemStatus, tcpProbe } from './probe';
+import { type ProbeError, querySystemStatus, tcpProbe, udpProbe, type UdpState } from './probe';
 
 const NODE_MIN_MAJOR = 18;
 
@@ -80,6 +82,22 @@ export interface LocalChecksInput {
   project: string;
   resolved: ResolvedConfig;
   env?: NodeJS.ProcessEnv;
+  /** Result of probing the configured OSC target, when one was probed. */
+  oscProbe?: UdpState;
+}
+
+/**
+ * BEYOND's own settings, when it is installed on this machine. Unreadable or
+ * absent means "no BEYOND here", which is the normal case off the show PC.
+ */
+function beyondSettings(env: NodeJS.ProcessEnv): BeyondSettings | null {
+  const path = findBeyondIni(env, existsSync);
+  if (!path) return null;
+  try {
+    return readBeyondSettings(readFileSync(path, 'utf8'));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -87,7 +105,7 @@ export interface LocalChecksInput {
  * resolution, because "which project" is answered differently by the CLI
  * (flags/env/active) and the desktop app (the selected one).
  */
-export function localChecks({ store, project, resolved, env = process.env }: LocalChecksInput): Check[] {
+export function localChecks({ store, project, resolved, env = process.env, oscProbe }: LocalChecksInput): Check[] {
   const checks: Check[] = [];
   const { config, layout, runMode } = resolved;
 
@@ -146,7 +164,9 @@ export function localChecks({ store, project, resolved, env = process.env }: Loc
     );
   }
 
-  checks.push(checkOsc(config));
+  checks.push(checkOsc(config, oscProbe));
+  const beyond = beyondSettings(env);
+  if (beyond) checks.push(...checkBeyond(beyond, config.osc.beyond?.port));
   checks.push(checkEnvHijack(env));
   return checks;
 }
@@ -155,12 +175,20 @@ export interface CollectInput extends LocalChecksInput {
   /** Override the probed brain URL (defaults to the project's server port). */
   serverUrl?: string;
   timeoutMs?: number;
+  /** Budget for the OSC liveness probe. Kept short: the target is often a
+   *  remote show PC, and a diagnostic must never hang on it. */
+  oscTimeoutMs?: number;
 }
 
 /** Run the local checks, then read the brain's own view if it is reachable. */
 export async function collectDiagnostics(input: CollectInput): Promise<Diagnostics> {
-  const { store, project, resolved, serverUrl, timeoutMs } = input;
-  const checks = localChecks(input);
+  const { store, project, resolved, serverUrl, timeoutMs, oscTimeoutMs } = input;
+
+  const endpoint = oscEndpoint(resolved.config);
+  const oscProbe =
+    input.oscProbe ??
+    (endpoint ? await udpProbe(endpoint.host, endpoint.port, oscTimeoutMs) : undefined);
+  const checks = localChecks({ ...input, oscProbe });
 
   const url = serverUrl ?? `ws://localhost:${resolved.config.server.port}`;
   const parsed = new URL(url);

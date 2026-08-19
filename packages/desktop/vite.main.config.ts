@@ -24,6 +24,7 @@ export default defineConfig({
         '@wavegrid/layout',
         '@wavegrid/discovery',
         '@wavegrid/doctor',
+        '@wavegrid/osc',
         'ws',
         'bonjour-service'
       ]

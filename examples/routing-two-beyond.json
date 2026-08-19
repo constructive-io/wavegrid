@@ -3,12 +3,12 @@
     "beyond-a": {
       "type": "beyond",
       "host": "192.168.1.68",
-      "port": 7001
+      "port": 8000
     },
     "beyond-b": {
       "type": "beyond",
       "host": "192.168.1.69",
-      "port": 7001
+      "port": 8000
     }
   },
   "flushHz": 30,

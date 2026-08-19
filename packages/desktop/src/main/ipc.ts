@@ -16,6 +16,15 @@ import { invalidateLaserView, type LaserSyncState, syncLaser } from '@/main/lase
 import { buildLightMapView } from '@/main/light-map';
 import { buildNetworkReport } from '@/main/network';
 import { applyNovaLook, novaBlackout, setNovaSpeed } from '@/main/nova';
+import {
+  clearOscLog,
+  oscDebugState,
+  probeOscTarget,
+  sendOscPreset,
+  sendOscSignal,
+  startOscListen,
+  stopOscListen
+} from '@/main/osc-debug';
 import { applyOscTarget, toOscTarget } from '@/main/osc-target';
 import {
   applyEditable,
@@ -44,6 +53,7 @@ import type {
   ImportRequest,
   LightMapView,
   NewProjectInput,
+  OscDebugPreset,
   OscTarget,
   ProjectSummary,
   RequiredSecretInfo,
@@ -391,6 +401,30 @@ export function registerAllIpc(): void {
     });
     if (canceled || !filePaths[0]) return null;
     return writeSettings(filePaths[0]);
+  });
+
+  // OSC debugger (Advanced → OSC). Local UDP only, single messages, at the
+  // project's own configured target — never a running show.
+  ipcMain.handle('oscDebug:state', (_e, project: string) => oscDebugState(project));
+  ipcMain.handle('oscDebug:probe', (_e, project: string) => probeOscTarget(project));
+  ipcMain.handle(
+    'oscDebug:preset',
+    (_e, project: string, preset: OscDebugPreset, zone: number | null, serial?: string) =>
+      sendOscPreset(project, preset, zone, serial)
+  );
+  ipcMain.handle('oscDebug:send', (_e, project: string, address: string, args: string[]) =>
+    sendOscSignal(project, address, args)
+  );
+  ipcMain.handle('oscDebug:listen', (_e, project: string, port: number) =>
+    startOscListen(project, port)
+  );
+  ipcMain.handle('oscDebug:stopListen', async (_e, project: string) => {
+    await stopOscListen();
+    return oscDebugState(project);
+  });
+  ipcMain.handle('oscDebug:clear', (_e, project: string) => {
+    clearOscLog();
+    return oscDebugState(project);
   });
 
   ipcMain.on('laser:sync', (_e, state: LaserSyncState) => syncLaser(state));

@@ -15,7 +15,7 @@
  *   FB4_HOST/PORT      Quick single-target FB4 OSC (alternative to routing file)
  */
 
-import { loadWavegridConfig, type ResolvedConfig } from '@wavegrid/layout';
+import { DEFAULT_BEYOND_PORT, loadWavegridConfig, type ResolvedConfig } from '@wavegrid/layout';
 import { BeyondOscOutput, createRoutedOutput, FB4OscOutput } from '@wavegrid/osc';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -116,7 +116,7 @@ export function startReceiver(resolved: ResolvedConfig = loadWavegridConfig()): 
 
   if (process.env.BEYOND_HOST) {
     const host = process.env.BEYOND_HOST;
-    const port = parseInt(process.env.BEYOND_PORT || '7001', 10);
+    const port = parseInt(process.env.BEYOND_PORT || String(DEFAULT_BEYOND_PORT), 10);
     const gridOrder = (process.env.BEYOND_GRID_ORDER || 'row').toLowerCase();
     const projectorMap: Record<number, number> = {};
     // Column-major reordering is only meaningful for grid layouts.

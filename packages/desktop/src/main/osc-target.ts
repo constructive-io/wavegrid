@@ -1,13 +1,15 @@
 // Pure helpers translating between the stored OscConfig and the flat
 // OscTarget the renderer binds to. Same four choices as the CLI's
 // `wavegrid projects osc` wizard: BEYOND, FB4, a routing file, or none.
-import { normalizeOscHost, type OscConfig } from '@wavegrid/layout';
+import {
+  DEFAULT_BEYOND_PORT,
+  DEFAULT_FB4_PORT,
+  normalizeOscHost,
+  type OscConfig
+} from '@wavegrid/layout';
 import type { ProjectConfig } from '@wavegrid/settings';
 
 import type { OscTarget } from '@/types/ipc';
-
-const DEFAULT_BEYOND_PORT = 7001;
-const DEFAULT_FB4_PORT = 8000;
 
 /** Read the stored config as the flat target the editor shows. */
 export function toOscTarget(stored: ProjectConfig | null): OscTarget {

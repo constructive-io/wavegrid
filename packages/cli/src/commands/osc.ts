@@ -1,4 +1,11 @@
-import { LOOPBACK_HOST, normalizeOscHost, type OscConfig, type WavegridConfig } from '@wavegrid/layout';
+import {
+  DEFAULT_BEYOND_PORT,
+  DEFAULT_FB4_PORT,
+  LOOPBACK_HOST,
+  normalizeOscHost,
+  type OscConfig,
+  type WavegridConfig
+} from '@wavegrid/layout';
 import type { Inquirerer, Question } from 'inquirerer';
 import c from 'yanse';
 
@@ -31,8 +38,8 @@ function confirm(project: string, osc: OscConfig | undefined): void {
 const USAGE = [
   '  Usage:',
   '    wavegrid projects osc                      (interactive wizard)',
-  '    wavegrid projects osc beyond --host <ip> [--port 7001] [--grid-order row|column]',
-  '    wavegrid projects osc fb4 --host <ip> [--port 8000]',
+  `    wavegrid projects osc beyond --host <ip> [--port ${DEFAULT_BEYOND_PORT}] [--grid-order row|column]`,
+  `    wavegrid projects osc fb4 --host <ip> [--port ${DEFAULT_FB4_PORT}]`,
   '    wavegrid projects osc routing --file <path-to-routing.json>',
   '    wavegrid projects osc show',
   '    wavegrid projects osc clear'
@@ -55,7 +62,7 @@ function applyFromFlags(flags: Flags, kind: string): boolean {
   if (kind === 'beyond') {
     const host = normalizeOscHost(str(flags, 'host') ?? '');
     if (!host) return false;
-    const port = num(flags, 'port') ?? 7001;
+    const port = num(flags, 'port') ?? DEFAULT_BEYOND_PORT;
     const gridOrder = str(flags, 'grid-order') === 'column' ? 'column' : 'row';
     const project = save(flags, (config) => {
       config.osc = { beyond: { host, port, gridOrder } };
@@ -66,7 +73,7 @@ function applyFromFlags(flags: Flags, kind: string): boolean {
   if (kind === 'fb4') {
     const host = normalizeOscHost(str(flags, 'host') ?? '');
     if (!host) return false;
-    const port = num(flags, 'port') ?? 8000;
+    const port = num(flags, 'port') ?? DEFAULT_FB4_PORT;
     const project = save(flags, (config) => {
       config.osc = { fb4: { host, port } };
     });
@@ -98,7 +105,7 @@ async function wizardBeyond(prompter: Inquirerer, current?: OscConfig): Promise<
       type: 'number',
       name: 'port',
       message: 'BEYOND OSC port',
-      default: current?.beyond?.port ?? 7001,
+      default: current?.beyond?.port ?? DEFAULT_BEYOND_PORT,
       required: true
     } as Question,
     {

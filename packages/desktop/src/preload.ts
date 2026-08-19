@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { AccessKeyInfo, BrainStatus, DeviceInfo, DiscoveredBrainInfo, DoctorReport, EditableConfig, ExportResult, ImportRequest, ImportSummary, LaserSyncState, LightMapView, NetworkReport, NewProjectInput, OscTarget, ProjectSummary, RequiredSecretInfo, SessionInfo, ShardRange, StoreClearResult, StoreInfo, TrafficCaptureFile, TrafficCaptureRequest, TrafficCaptureState, TrafficDiscovery, TrafficDoctorReport, TrafficInterfaceInfo, TrafficResult, TrafficSettings, UserAccount, UserRole, WavegridApi, WavegridLaser } from '@/types/ipc';
+import type { AccessKeyInfo, BrainStatus, DeviceInfo, DiscoveredBrainInfo, DoctorReport, EditableConfig, ExportResult, ImportRequest, ImportSummary, LaserSyncState, LightMapView, NetworkReport, NewProjectInput, OscDebugState, OscSignalResult, OscTarget, ProjectSummary, RequiredSecretInfo, SessionInfo, ShardRange, StoreClearResult, StoreInfo, TrafficCaptureFile, TrafficCaptureRequest, TrafficCaptureState, TrafficDiscovery, TrafficDoctorReport, TrafficInterfaceInfo, TrafficResult, TrafficSettings, UserAccount, UserRole, WavegridApi, WavegridLaser } from '@/types/ipc';
 
 // The single, narrow bridge exposed to the renderer. The renderer never imports
 // @wavegrid/settings or `fs`; everything goes through these typed calls.
@@ -127,6 +127,23 @@ const api: WavegridApi = {
       ipcRenderer.invoke('traffic:setCaptureDir', dir) as Promise<TrafficSettings>,
     chooseCaptureDir: () =>
       ipcRenderer.invoke('traffic:chooseCaptureDir') as Promise<TrafficSettings | null>
+  },
+  // OSC debugger. All local: the main process sends UDP to the project's own
+  // target, so there is no service to reach and no key to hold.
+  oscDebug: {
+    state: (project) => ipcRenderer.invoke('oscDebug:state', project) as Promise<OscDebugState>,
+    probe: (project) => ipcRenderer.invoke('oscDebug:probe', project) as Promise<OscDebugState>,
+    preset: (project, preset, zone, serial) =>
+      ipcRenderer.invoke('oscDebug:preset', project, preset, zone, serial) as Promise<OscSignalResult>,
+    send: (project, address, args) =>
+      ipcRenderer.invoke('oscDebug:send', project, address, args) as Promise<OscSignalResult>,
+    listen: (project, port) =>
+      ipcRenderer.invoke('oscDebug:listen', project, port) as Promise<
+        OscDebugState & { error?: string }
+      >,
+    stopListen: (project) =>
+      ipcRenderer.invoke('oscDebug:stopListen', project) as Promise<OscDebugState>,
+    clear: (project) => ipcRenderer.invoke('oscDebug:clear', project) as Promise<OscDebugState>
   },
   store: {
     info: () => ipcRenderer.invoke('store:info') as Promise<StoreInfo>,

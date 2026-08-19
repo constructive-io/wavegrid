@@ -6,6 +6,8 @@
 
 import type { WavegridConfig } from '@wavegrid/layout';
 
+import type { UdpState } from './probe';
+
 export type CheckStatus = 'pass' | 'warn' | 'fail';
 
 export interface Check {
@@ -66,16 +68,65 @@ export function isSecureMode(mode: number): boolean {
   return (mode & 0o077) === 0;
 }
 
-/** Summarize whether an OSC output target is configured (informational). */
-export function checkOsc(config: WavegridConfig): Check {
+/** The single OSC endpoint a probe can be aimed at, when there is one. */
+export interface OscEndpoint {
+  kind: 'BEYOND' | 'FB4';
+  host: string;
+  port: number;
+}
+
+/**
+ * The endpoint to probe. A routing file can name many targets, so it is left to
+ * `wavegrid signals` rather than guessed at here.
+ */
+export function oscEndpoint(config: WavegridConfig): OscEndpoint | null {
   if (config.osc.beyond) {
-    return { name: 'OSC target', status: 'pass', detail: `BEYOND → ${config.osc.beyond.host}:${config.osc.beyond.port}` };
+    return { kind: 'BEYOND', host: config.osc.beyond.host, port: config.osc.beyond.port };
   }
   if (config.osc.fb4) {
-    return { name: 'OSC target', status: 'pass', detail: `FB4 → ${config.osc.fb4.host}:${config.osc.fb4.port}` };
+    return { kind: 'FB4', host: config.osc.fb4.host, port: config.osc.fb4.port };
+  }
+  return null;
+}
+
+/**
+ * Report the OSC output target *and whether anything is listening on it*.
+ *
+ * `probe` comes from `udpProbe`. Without it this only says what is configured,
+ * which is how a wrong port stayed green through a whole show: OSC is UDP, so
+ * every frame aimed at an unbound port is dropped in silence.
+ */
+export function checkOsc(config: WavegridConfig, probe?: UdpState): Check {
+  const endpoint = oscEndpoint(config);
+  if (endpoint) {
+    const where = `${endpoint.kind} → ${endpoint.host}:${endpoint.port}`;
+    if (probe === 'refused') {
+      return {
+        name: 'OSC target',
+        status: 'fail',
+        detail: `${where} — nothing listening (port unreachable)`,
+        remedy:
+          endpoint.kind === 'BEYOND'
+            ? `enable BEYOND's OSC server and match its receive port ([OSC] port in BEYOND.ini), then \`wavegrid projects osc beyond --host ${endpoint.host} --port <that port>\``
+            : `check the FB4's OSC port, then \`wavegrid projects osc fb4 --host ${endpoint.host} --port <that port>\``
+      };
+    }
+    if (probe === 'unreachable') {
+      return {
+        name: 'OSC target',
+        status: 'warn',
+        detail: `${where} — host unreachable`,
+        remedy: `check the network route to ${endpoint.host} (\`ping ${endpoint.host}\`)`
+      };
+    }
+    if (probe === 'no-rejection') {
+      // UDP gives no delivery confirmation; say so rather than imply proof.
+      return { name: 'OSC target', status: 'pass', detail: `${where} — port not rejecting (UDP: no delivery proof)` };
+    }
+    return { name: 'OSC target', status: 'pass', detail: `${where} (not probed)` };
   }
   if (config.osc.routingConfig) {
-    return { name: 'OSC target', status: 'pass', detail: `routing file ${config.osc.routingConfig}` };
+    return { name: 'OSC target', status: 'pass', detail: `routing file ${config.osc.routingConfig} (not probed)` };
   }
   return {
     name: 'OSC target',

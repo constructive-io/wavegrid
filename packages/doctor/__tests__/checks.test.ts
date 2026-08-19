@@ -9,6 +9,7 @@ import {
   checkOsc,
   checkShard,
   isSecureMode,
+  oscEndpoint,
   overallStatus
 } from '../src/checks';
 import { dirWritable } from '../src/collect';
@@ -26,6 +27,8 @@ function config(osc: WavegridConfig['osc']): WavegridConfig {
     debug: { osc: false }
   };
 }
+
+const beyondless = config({});
 
 describe('checkEnvHijack', () => {
   it('passes when no generic port/host vars are set', () => {
@@ -71,12 +74,46 @@ describe('isSecureMode', () => {
 });
 
 describe('checkOsc', () => {
+  const beyond = config({ beyond: { host: '10.0.0.5', port: 8000, gridOrder: 'row' } });
+
   it('warns when no target is configured', () => {
-    expect(checkOsc(config({})).status).toBe('warn');
+    expect(checkOsc(beyondless).status).toBe('warn');
   });
 
-  it('passes with a BEYOND target', () => {
-    expect(checkOsc(config({ beyond: { host: '10.0.0.5', port: 7001, gridOrder: 'row' } })).status).toBe('pass');
+  it('fails when the port rejected the probe — the silent-drop case', () => {
+    const check = checkOsc(beyond, 'refused');
+    expect(check.status).toBe('fail');
+    expect(check.detail).toContain('nothing listening');
+    expect(check.remedy).toContain('--port');
+  });
+
+  it('warns when the host is unreachable rather than failing the show', () => {
+    expect(checkOsc(beyond, 'unreachable').status).toBe('warn');
+  });
+
+  it('passes when nothing rejected the probe, without claiming delivery', () => {
+    const check = checkOsc(beyond, 'no-rejection');
+    expect(check.status).toBe('pass');
+    expect(check.detail).toContain('no delivery proof');
+  });
+
+  it('says so when the target was not probed', () => {
+    expect(checkOsc(beyond).detail).toContain('not probed');
+  });
+
+  it('reads the FB4 target when there is no BEYOND one', () => {
+    const check = checkOsc(config({ fb4: { host: '10.0.0.9', port: 8000 } }), 'refused');
+    expect(check.status).toBe('fail');
+    expect(check.detail).toContain('FB4 → 10.0.0.9:8000');
+  });
+});
+
+describe('oscEndpoint', () => {
+  it('prefers BEYOND, then FB4, and gives up on a routing file', () => {
+    expect(oscEndpoint(config({ beyond: { host: 'b', port: 8000, gridOrder: 'row' }, fb4: { host: 'f', port: 8000 } })))
+      .toMatchObject({ kind: 'BEYOND', host: 'b' });
+    expect(oscEndpoint(config({ fb4: { host: 'f', port: 8000 } }))).toMatchObject({ kind: 'FB4' });
+    expect(oscEndpoint(config({ routingConfig: '/tmp/routing.json' }))).toBeNull();
   });
 });
 

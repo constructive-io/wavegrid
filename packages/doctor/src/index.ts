@@ -1,4 +1,13 @@
 export {
+  beyondIniCandidates,
+  type BeyondSettings,
+  checkBeyond,
+  findBeyondIni,
+  type Ini,
+  parseIni,
+  readBeyondSettings
+} from './beyond';
+export {
   type Check,
   checkEnvHijack,
   checkOsc,
@@ -6,6 +15,8 @@ export {
   type CheckStatus,
   IGNORED_ENV_VARS,
   isSecureMode,
+  type OscEndpoint,
+  oscEndpoint,
   overallStatus
 } from './checks';
 export {
@@ -34,5 +45,7 @@ export {
   type ProbeError,
   querySystemStatus,
   type StatusProbe,
-  tcpProbe
+  tcpProbe,
+  udpProbe,
+  type UdpState
 } from './probe';
