@@ -23,6 +23,7 @@ from pangolin import (
     Header,
     Packet,
     entropy,
+    format_rate,
     parse_announce,
     parse_rgba_panel,
     parse_settings,
@@ -248,6 +249,24 @@ class ReportTest(unittest.TestCase):
         stream = message(STREAM_TYPE_FRAME, bytes(16), 1) + b'\x40\xfb\x00\x00'
         text = self.render(report_stream, [tcp(stream)], 0)
         self.assertIn('4B unframed', text)
+
+    def test_a_lone_message_gets_no_rate(self):
+        text = self.render(report_stream,
+                           [tcp(message(STREAM_TYPE_FRAME, bytes(16), 1), time=0.0),
+                            tcp(b'', time=0.001)], 0)
+        self.assertIn('1 msgs', text)
+        self.assertNotIn('/s', text)
+
+
+class FormatRateTest(unittest.TestCase):
+    def test_rate_over_a_span(self):
+        self.assertEqual(format_rate(62, 1.0), '62.0/s')
+
+    def test_one_message_has_no_meaningful_rate(self):
+        self.assertEqual(format_rate(1, 0.0000038), '—')
+
+    def test_no_span_has_no_meaningful_rate(self):
+        self.assertEqual(format_rate(10, 0.0), '—')
 
 
 if __name__ == '__main__':

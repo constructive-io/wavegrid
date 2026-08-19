@@ -99,9 +99,11 @@ This is the only confirmation OSC can give you: BEYOND broadcasts what its live
 control holds (while its RGBA panel is open), so send a message and watch the
 value move. Silence means nothing is arriving. Receive-only, like everything here.
 
-[PROTOCOL.md](PROTOCOL.md) is what the captures so far actually say — the
-readable UDP protocols, the frame framing, and the evidence that the frame
-bodies are encrypted.
+[PROTOCOL.md](PROTOCOL.md) is the full report on what the captures so far
+actually say: every port and message type, the header layout byte by byte, the
+device inventory, what is confirmed against what is inferred, a diagnostic
+playbook for a silent show, and the exact captures that would close each
+remaining gap. Read it before a show day.
 
 ## Controlled experiments
 
