@@ -10,9 +10,8 @@ reads the neighbour table, captures and analyses files on disk. The exception is
 when given `--transmit` and a `--host`; without them it prints the bytes it would
 send and exits. Nothing here ever fabricates frame-stream traffic.
 
-Nothing in the Wavegrid app depends on these tools being installed — the app
-only looks for them when you open the Traffic tab (Advanced → Traffic), which
-is also where you choose the directory captures are written to.
+Nothing in the Wavegrid app depends on these tools being installed — this is
+terminal tooling, and each command looks for what it needs when it runs.
 
 ## Requirements
 
@@ -58,7 +57,7 @@ capture filter (`host <ip>`), so nothing else reaches the disk; that matters whe
 a laser is streaming frames.
 
 The directory is, in order of precedence: `--dir`, `$TRAFFIC_CAPTURE_DIR`,
-`captureDir` in `~/.wavegrid/traffic.json` (what the Traffic tab writes), or
+`captureDir` in `~/.wavegrid/traffic.json`, or
 `./captures` here.
 
 ## Analysing
@@ -179,7 +178,7 @@ in a synthetic test isolates a single byte:
 ```
 
 Add `--json` to `doctor`, `interfaces`, `discover`, `capture`, `extract` and
-`compare` for machine-readable output (this is what the Traffic tab consumes).
+`compare` for machine-readable output.
 
 ## Layout
 

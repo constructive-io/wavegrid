@@ -19,8 +19,8 @@ describe('sidebar navigation', () => {
     expect(grouped.length).toBe(new Set(grouped).size);
   });
 
-  it('keeps running a show to the show, its looks, and its health, ahead of everything else', () => {
-    expect(NAV_GROUPS[0]).toEqual({ id: 'run', label: 'Run', routes: ['show', 'nova', 'status'] });
+  it('keeps running a show to the show and its health, ahead of everything else', () => {
+    expect(NAV_GROUPS[0]).toEqual({ id: 'run', label: 'Run', routes: ['show', 'status'] });
   });
 
   it('hides the admin vocabulary under Advanced', () => {
@@ -28,8 +28,18 @@ describe('sidebar navigation', () => {
     expect(advanced).toContain('access');
     expect(advanced).toContain('settings');
     expect(advanced).toContain('devices');
-    // Packet capture is protocol archaeology, not something an operator needs.
-    expect(advanced).toContain('traffic');
+  });
+
+  // Looks belong to the artist UI the show serves, and OSC debugging belongs to
+  // the target it debugs — neither is a destination in the shell.
+  it('leaves looks and OSC debugging out of the sidebar entirely', () => {
+    const everything = [...NAV_GROUPS.flatMap((g) => g.routes), ...UNLISTED_ROUTES];
+    expect(everything).not.toContain('nova');
+    expect(everything).not.toContain('osc');
+    expect(everything).not.toContain('traffic');
+    expect(isRoute('nova')).toBe(false);
+    expect(isRoute('osc')).toBe(false);
+    expect(isRoute('traffic')).toBe(false);
   });
 
   it('labels every route', () => {

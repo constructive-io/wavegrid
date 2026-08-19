@@ -1,5 +1,5 @@
 /**
- * The OSC debugger's back end (Advanced → OSC).
+ * The OSC debugger's back end (Output → Advanced).
  *
  * Debugging "the lasers aren't responding" needs three things a show cannot
  * give you: is anything listening where we send, what exactly goes on the wire,

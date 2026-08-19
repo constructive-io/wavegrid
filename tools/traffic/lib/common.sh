@@ -59,7 +59,7 @@ tool_version() {
 
 # ── Capture directory ──────────────────────────────────────────────────────
 #
-# The UI's Traffic tab lets an operator pick where captures land, and writes it
+# An operator can pick where captures land, and it is written
 # to a small config file. Precedence, most specific first:
 #   --dir flag (callers set TRAFFIC_DIR before sourcing) → env → config → ./captures
 

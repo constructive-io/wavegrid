@@ -64,7 +64,7 @@ pnpm build
 
 | Tool | Description |
 |------|-------------|
-| `tools/traffic` | Passive capture and byte-level analysis of Pangolin BEYOND ⇄ FB4 traffic, on Wireshark's CLI. Driven from Advanced → Traffic in the desktop app, or straight from a terminal — see [tools/traffic/README.md](tools/traffic/README.md). Observation, plus one hand-run experiment (`bin/replay`) that sends BEYOND's own plaintext live-control lines. |
+| `tools/traffic` | Passive capture and byte-level analysis of Pangolin BEYOND ⇄ FB4 traffic, on Wireshark's CLI. Run from a terminal — see [tools/traffic/README.md](tools/traffic/README.md). Observation, plus one hand-run experiment (`bin/replay`) that sends BEYOND's own plaintext live-control lines. |
 
 ## Architecture
 

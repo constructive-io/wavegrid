@@ -114,7 +114,7 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
           <span>
             <span className='font-medium'>Console only — no OSC output.</span> Painting reaches the
             brain, but this project has no OSC target, so nothing is sent to BEYOND. Set one in
-            Advanced → OSC (or <code>wavegrid projects osc</code>), then restart the show.
+            Output → Advanced (or <code>wavegrid projects osc</code>), then restart the show.
           </span>
         </div>
       )}

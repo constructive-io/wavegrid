@@ -1,14 +1,18 @@
 /**
  * The sidebar's shape, grouped by *when* you reach for something rather than by
- * what it is: running a show is the show itself, the Nova look panel, and its
- * health; everything a project needs is under
- * "Set up", and the vocabulary that scares a non-technical operator lives under
- * "Advanced". Projects is not a destination — the switcher in the sidebar
- * header owns choosing one and links to the manage screen.
+ * what it is: running a show is the show itself and its health; everything a
+ * project needs is under "Set up", and the vocabulary that scares a
+ * non-technical operator lives under "Advanced". Projects is not a destination
+ * — the switcher in the sidebar header owns choosing one and links to the
+ * manage screen.
+ *
+ * Two things deliberately absent: Nova, which belongs to the artist UI the show
+ * serves rather than to the shell around it, and OSC debugging, which is a tab
+ * of Output — you go there because of where you send, so that is where the tool
+ * for proving it lives.
  */
 export type Route =
   | 'show'
-  | 'nova'
   | 'status'
   | 'projects'
   | 'config'
@@ -16,13 +20,10 @@ export type Route =
   | 'lights'
   | 'output'
   | 'devices'
-  | 'osc'
-  | 'traffic'
   | 'settings';
 
 export const ROUTE_LABEL: Record<Route, string> = {
   show: 'Show',
-  nova: 'Nova',
   status: 'Status',
   projects: 'Projects',
   config: 'Layout',
@@ -30,8 +31,6 @@ export const ROUTE_LABEL: Record<Route, string> = {
   lights: 'Lights',
   output: 'Output',
   devices: 'Devices',
-  osc: 'OSC',
-  traffic: 'Traffic',
   settings: 'Settings'
 };
 
@@ -44,9 +43,9 @@ export interface NavGroup {
 }
 
 export const NAV_GROUPS: NavGroup[] = [
-  { id: 'run', label: 'Run', routes: ['show', 'nova', 'status'] },
+  { id: 'run', label: 'Run', routes: ['show', 'status'] },
   { id: 'setup', label: 'Set up', routes: ['config', 'lights', 'output'] },
-  { id: 'advanced', label: 'Advanced', routes: ['devices', 'access', 'osc', 'traffic', 'settings'] }
+  { id: 'advanced', label: 'Advanced', routes: ['devices', 'access', 'settings'] }
 ];
 
 /** Routes reachable other than from a sidebar group. */
