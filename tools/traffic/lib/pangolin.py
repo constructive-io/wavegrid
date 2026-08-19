@@ -221,6 +221,15 @@ def read_packets(tshark: str, path: str) -> list[Packet]:
     return packets
 
 
+def streaming_ips(packets: list[Packet]) -> set[str]:
+    """IPs BEYOND has a frame stream with, either direction."""
+    return {
+        ip
+        for p in packets if p.proto == 'tcp' and FB4_STREAM_PORT in (p.sport, p.dport)
+        for ip in (p.src, p.dst)
+    }
+
+
 def report_devices(packets: list[Packet]) -> None:
     devices: dict[str, Device] = {}
     host_names: set[str] = set()
@@ -245,10 +254,16 @@ def report_devices(packets: list[Packet]) -> None:
     print('== devices (UDP 9022) ==')
     if host_names:
         print(f'  BEYOND host: {", ".join(sorted(host_names))}')
+    streaming = streaming_ips(packets)
     for ip, d in sorted(devices.items()):
         label = f'{d.tag} ' if d.tag else ''
         print(f'  {ip:<16} {d.mac:<18} {label}id={d.device_id or "?"} '
               f'settings={len(d.settings)}')
+        if streaming and ip not in streaming:
+            # It is on the network and announcing, but BEYOND never opened a
+            # frame stream to it: a projector that will stay dark.
+            print('                   no frame stream — BEYOND is not sending to '
+                  'this device')
     print()
 
 

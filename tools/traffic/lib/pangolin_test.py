@@ -30,6 +30,7 @@ from pangolin import (
     report_rgba,
     report_stream,
     split_messages,
+    streaming_ips,
 )
 
 
@@ -155,6 +156,16 @@ class EntropyTest(unittest.TestCase):
         self.assertEqual(entropy(b''), 0.0)
 
 
+class StreamingIpsTest(unittest.TestCase):
+    def test_both_ends_of_a_frame_stream_count(self):
+        self.assertEqual(streaming_ips([tcp(b'x')]),
+                         {'169.254.42.165', '169.254.45.4'})
+
+    def test_discovery_traffic_is_not_a_frame_stream(self):
+        packet = udp(b'x', sport=FB4_DISCOVERY_PORT, dport=FB4_DISCOVERY_PORT)
+        self.assertEqual(streaming_ips([packet]), set())
+
+
 class ReportTest(unittest.TestCase):
     """The reports must say 'nothing here' rather than crash on a quiet capture."""
 
@@ -176,6 +187,25 @@ class ReportTest(unittest.TestCase):
         self.assertIn('169.254.45.4', text)
         self.assertIn('00:16:42:fb:04:2c', text)
         self.assertIn('id=566604', text)
+
+    def test_a_device_getting_no_frames_is_called_out(self):
+        # Seen on the show machine: 169.254.45.4 announced itself but BEYOND
+        # never streamed to it, so that projector stayed dark.
+        announce = bytes(0x20) + b'FB4E' + (566604).to_bytes(4, 'little')
+        packets = [
+            udp(announce, sport=FB4_DISCOVERY_PORT, dport=FB4_DISCOVERY_PORT,
+                src='169.254.53.5'),
+            tcp(message(STREAM_TYPE_FRAME, bytes(16), 1)),
+        ]
+        self.assertIn('no frame stream', self.render(report_devices, packets))
+
+    def test_a_device_that_is_streaming_is_not_called_out(self):
+        announce = bytes(0x20) + b'FB4E' + (566604).to_bytes(4, 'little')
+        packets = [
+            udp(announce, sport=FB4_DISCOVERY_PORT, dport=FB4_DISCOVERY_PORT),
+            tcp(message(STREAM_TYPE_FRAME, bytes(16), 1)),
+        ]
+        self.assertNotIn('no frame stream', self.render(report_devices, packets))
 
     def test_zone_state_is_the_last_value_seen(self):
         packets = [
