@@ -29,17 +29,29 @@ html, body {
   -webkit-user-select: none;
 }
 
+/* The element itself is only the hit area — its height is a touch target that
+   components are free to override. The visible gutter lives on the track
+   pseudo-element, so it can't be squeezed out of existence by that height. */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
+  height: 28px;
+  background: transparent;
+  outline: none;
+}
+
+/* Dark blue rather than black: the panel stays seamless, but the channel the
+   thumb travels in is visible. */
+input[type="range"]::-webkit-slider-runnable-track {
   height: 10px;
   border-radius: 5px;
-  /* Only the gutter lifts off the black page — a very dark blue, enough to see
-     how far the thumb can travel without putting a grey bar in the panel. */
-  background: linear-gradient(to right, #16203a, var(--color-accent));
-  outline: none;
-  padding: 8px 0;
-  background-clip: content-box;
+  background: linear-gradient(to right, #1c2b4d, var(--color-accent));
+}
+
+input[type="range"]::-moz-range-track {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(to right, #1c2b4d, var(--color-accent));
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -50,6 +62,8 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--color-accent);
   box-shadow: 0 0 12px var(--color-accent-glow);
   cursor: pointer;
+  /* Centre the thumb on the thinner track. */
+  margin-top: -11px;
 }
 
 input[type="range"]::-moz-range-thumb {
@@ -65,15 +79,23 @@ input[type="range"]::-moz-range-thumb {
 /* Larger hit area for sliders on touch devices */
 @media (pointer: coarse) {
   input[type="range"] {
+    height: 44px;
+  }
+
+  input[type="range"]::-webkit-slider-runnable-track {
     height: 12px;
     border-radius: 6px;
-    padding: 14px 0;
-    min-height: 44px;
+  }
+
+  input[type="range"]::-moz-range-track {
+    height: 12px;
+    border-radius: 6px;
   }
 
   input[type="range"]::-webkit-slider-thumb {
     width: 36px;
     height: 36px;
+    margin-top: -12px;
   }
 
   input[type="range"]::-moz-range-thumb {

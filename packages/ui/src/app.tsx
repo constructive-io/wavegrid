@@ -21,7 +21,6 @@ import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
 import { PrideTab } from '@/components/pride-tab';
 import { SequencesTab } from '@/components/sequences-tab';
-import { SettingsTab } from '@/components/settings-tab';
 import { ShiftDial } from '@/components/shift-dial';
 import { StatusDot } from '@/components/status-dot';
 import { UsaTab } from '@/components/usa-tab';
@@ -59,8 +58,7 @@ const tabs: { key: GridMode; label: string }[] = [
   { key: 'flags', label: 'Flags' },
   { key: 'drops', label: 'Drops' },
   { key: 'audio', label: 'Audio' },
-  { key: 'video', label: 'Video' },
-  { key: 'debug', label: 'Debug' }
+  { key: 'video', label: 'Video' }
 ];
 
 /* ---------- Tool content (no tabs, just the active tool) ---------- */
@@ -293,13 +291,6 @@ function ToolContent({
         <VideoTab send={send} numCannons={numCannons} gridColumns={gridColumns} />
       )}
 
-      {tab === 'debug' && (
-        <SettingsTab
-          numCannons={numCannons}
-          gridColumns={gridColumns}
-          send={send}
-        />
-      )}
     </>
   );
 }
@@ -322,7 +313,7 @@ function TabStrip({
     <div
       className={isRight ? 'flex flex-wrap gap-1 shrink-0' : 'flex gap-1 overflow-x-auto shrink-0'}
       style={{
-        padding: isRight ? '10px 10px 6px' : '8px 12px 6px',
+        padding: isRight ? '8px 10px 5px' : '6px 12px 5px',
         ...(isRight ? {} : { WebkitOverflowScrolling: 'touch' as const })
       }}
     >
@@ -332,8 +323,8 @@ function TabStrip({
           onClick={() => setTab(t.key)}
           className="whitespace-nowrap transition-all"
           style={{
-            padding: isPhone ? '10px 16px' : isRight ? '8px 12px' : '10px 18px',
-            borderRadius: 22,
+            padding: isPhone ? '9px 14px' : isRight ? '7px 11px' : '8px 15px',
+            borderRadius: 20,
             fontSize: isPhone ? 14 : isRight ? 12 : 14,
             fontWeight: 600,
             letterSpacing: '0.02em',
@@ -593,7 +584,6 @@ export default function Home() {
   }, [settings]);
 
   useEffect(() => {
-    if (tab === 'debug') return;
     send({ type: 'physical_preview_clear' });
     send({ type: 'calibration_mode', enabled: false });
   }, [send, tab]);
@@ -826,10 +816,6 @@ export default function Home() {
   );
 
   const handleTabChange = useCallback((t: GridMode) => {
-    if (t !== 'debug' && tab === 'debug') {
-      send({ type: 'physical_preview_clear' });
-      send({ type: 'calibration_mode', enabled: false });
-    }
     setTab(t);
     localStorage.setItem('wavegrid-tab', t);
     if (isPhone && sheetSnap === 'peek') {
