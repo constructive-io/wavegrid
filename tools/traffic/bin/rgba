@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# rgba — live view of what BEYOND's live control is holding, per zone.
+#
+# Usage: ./bin/rgba [--zone N] [--port 16062] [--raw]
+#
+# BEYOND broadcasts every live-control change while its RGBA panel is open, so
+# this is the confirmation OSC itself can't give you: send a message, watch the
+# value change here. Silence means nothing is reaching BEYOND. Receive-only.
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+
+command -v python3 >/dev/null || { echo 'error: python3 is required for rgba' >&2; exit 127; }
+
+exec python3 "$TRAFFIC_ROOT/lib/rgba_listen.py" "$@"
