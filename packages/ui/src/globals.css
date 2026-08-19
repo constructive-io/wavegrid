@@ -34,9 +34,9 @@ input[type="range"] {
   appearance: none;
   height: 10px;
   border-radius: 5px;
-  /* The track has to read as a range even at the dark end, so it starts well
-     above the page background rather than blending into it. */
-  background: linear-gradient(to right, #4a4a63, var(--color-accent));
+  /* Only the gutter lifts off the black page — a very dark blue, enough to see
+     how far the thumb can travel without putting a grey bar in the panel. */
+  background: linear-gradient(to right, #16203a, var(--color-accent));
   outline: none;
   padding: 8px 0;
   background-clip: content-box;
