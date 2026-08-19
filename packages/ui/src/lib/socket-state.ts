@@ -60,11 +60,17 @@ export function beginConnection(snapshot: SocketSnapshot, now = Date.now()): Soc
   };
 }
 
+/** True for messages that mean the replicated config document moved on. */
+export function isSyncConfigMessage(msg: unknown): boolean {
+  if (!msg || typeof msg !== 'object') return false;
+  const type = (msg as Record<string, unknown>).type;
+  return type === 'sync_update' || type === 'sync_state';
+}
+
 /** Apply one server message without mutating the previous connection snapshot. */
 export function applySocketMessage(
   snapshot: SocketSnapshot,
   msg: unknown,
-  onSyncConfig?: () => void,
   now = Date.now()
 ): SocketSnapshot {
   if (!msg || typeof msg !== 'object') return snapshot;
@@ -106,7 +112,6 @@ export function applySocketMessage(
     };
   case 'sync_update':
   case 'sync_state':
-    onSyncConfig?.();
     return { ...snapshot, lastMessageAt: now };
   default:
     return snapshot;

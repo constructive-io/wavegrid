@@ -10,6 +10,7 @@ import {
   applySocketMessage,
   beginConnection,
   createSocketSnapshot,
+  isSyncConfigMessage,
   SOCKET_FEED_STALE_MS,
   type SocketSnapshot
 } from '@/lib/socket-state';
@@ -81,7 +82,8 @@ export function useSocket(
           const msg = JSON.parse(e.data);
           const now = Date.now();
           lastMessageAtRef.current = now;
-          setSnapshot((prev) => applySocketMessage(prev, msg, onSyncConfigRef.current, now));
+          setSnapshot((prev) => applySocketMessage(prev, msg, now));
+          if (isSyncConfigMessage(msg)) onSyncConfigRef.current?.();
         } catch {
           // ignore
         }

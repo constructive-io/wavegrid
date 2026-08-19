@@ -2,7 +2,8 @@ import {
   applySocketMessage,
   beginConnection,
   createSocketSnapshot,
-  isFeedStale
+  isFeedStale,
+  isSyncConfigMessage
 } from '../src/lib/socket-state';
 
 describe('socket state snapshots', () => {
@@ -10,17 +11,14 @@ describe('socket state snapshots', () => {
     const old = applySocketMessage(
       applySocketMessage(
         applySocketMessage(
-          applySocketMessage(createSocketSnapshot(100), { type: 'state', grid: [{ h: 10, s: 20, b: 30 }] }, undefined, 110),
+          applySocketMessage(createSocketSnapshot(100), { type: 'state', grid: [{ h: 10, s: 20, b: 30 }] }, 110),
           { type: 'settings', alpha: 0.2, attack: 0.4, speed: 2, animation: 'pulse' },
-          undefined,
           120
         ),
         { type: 'orientation', rotation: 90, flipH: true, flipV: false },
-        undefined,
         130
       ),
       { type: 'playlist_state', active: true, currentStep: 1, playlist: null },
-      undefined,
       140
     );
     const fresh = beginConnection(old, 200);
@@ -32,17 +30,14 @@ describe('socket state snapshots', () => {
     const synced = applySocketMessage(
       applySocketMessage(
         applySocketMessage(
-          applySocketMessage(fresh, { type: 'state', grid: [{ h: 1, s: 2, b: 3 }] }, undefined, 210),
+          applySocketMessage(fresh, { type: 'state', grid: [{ h: 1, s: 2, b: 3 }] }, 210),
           { type: 'orientation', rotation: 180, flipH: false, flipV: true },
-          undefined,
           211
         ),
         { type: 'settings', alpha: 0.06, attack: 1, speed: 1, animation: null },
-        undefined,
         212
       ),
       { type: 'playlist_state', active: false, currentStep: 0, playlist: null },
-      undefined,
       213
     );
     expect(synced.grid).toEqual([{ h: 1, s: 2, b: 3 }]);
@@ -52,12 +47,17 @@ describe('socket state snapshots', () => {
   });
 
   it('signals sync messages and detects a silent feed', () => {
-    const onSync = jest.fn();
     const snapshot = beginConnection(createSocketSnapshot(0), 1);
-    const updated = applySocketMessage(snapshot, { type: 'sync_state', revision: 1, entries: {} }, onSync, 10);
+    expect(isSyncConfigMessage({ type: 'sync_update' })).toBe(true);
+    expect(isSyncConfigMessage({ type: 'sync_state' })).toBe(true);
+    expect(isSyncConfigMessage({ type: 'state' })).toBe(false);
+    expect(isSyncConfigMessage(null)).toBe(false);
+    expect(isSyncConfigMessage('sync_state')).toBe(false);
 
-    expect(onSync).toHaveBeenCalledTimes(1);
+    const updated = applySocketMessage(snapshot, { type: 'sync_state', revision: 1, entries: {} }, 10);
+
     expect(updated.lastMessageAt).toBe(10);
+    expect(applySocketMessage(updated, { type: 'sync_update' }, 20).lastMessageAt).toBe(20);
     expect(isFeedStale(updated, 8_011)).toBe(true);
     expect(isFeedStale(updated, 8_009)).toBe(false);
   });
