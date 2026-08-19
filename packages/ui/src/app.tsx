@@ -379,35 +379,68 @@ function ToolPanel({
 
 /* ---------- Master sliders (top bar on desktop, expandable on phone) ---------- */
 
+/** Speed is logarithmic — 0.01x to 5x — so the slider carries a percentage of
+ *  that curve rather than the multiplier itself. */
+const SPEED_MIN = 0.01;
+const SPEED_MAX = 5.0;
+const speedToPct = (v: number) =>
+  Math.round((Math.log(v / SPEED_MIN) / Math.log(SPEED_MAX / SPEED_MIN)) * 100);
+const pctToSpeed = (pct: number) => SPEED_MIN * Math.pow(SPEED_MAX / SPEED_MIN, pct / 100);
+const formatSpeed = (v: number) => `${v < 0.1 ? v.toFixed(3) : v < 1 ? v.toFixed(2) : v.toFixed(1)}x`;
+
+interface MasterSlider {
+  label: string;
+  value: number;
+  display: string;
+  handler: (pct: number) => void;
+  flex: number;
+}
+
 function MasterSliders({
   masterBright,
   smoothness,
   attack,
+  animSpeed,
   onMasterBright,
   onSmooth,
   onAttack,
+  onAnimSpeed,
   throttledSlider,
   vertical
 }: {
   masterBright: number;
   smoothness: number;
   attack: number;
+  animSpeed: number;
   onMasterBright: (v: number) => void;
   onSmooth: (v: number) => void;
   onAttack: (v: number) => void;
+  onAnimSpeed: (v: number) => void;
   throttledSlider: (handler: (v: number) => void) => (e: React.ChangeEvent<HTMLInputElement>) => void;
   vertical?: boolean;
 }) {
-  const sliders = [
-    { label: 'Bright', value: masterBright, handler: onMasterBright, flex: 1 },
-    { label: 'Fade', value: smoothness, handler: onSmooth, flex: 3 },
-    { label: 'Attack', value: attack, handler: onAttack, flex: 1 }
+  // The two an operator reaches for mid-show hold the fixed slots; brightness
+  // and attack get set once, so they live behind the disclosure.
+  const fixed: MasterSlider[] = [
+    {
+      label: 'Speed',
+      value: speedToPct(animSpeed),
+      display: formatSpeed(animSpeed),
+      handler: (pct) => onAnimSpeed(pctToSpeed(pct)),
+      flex: 2
+    },
+    { label: 'Fade', value: smoothness, display: String(smoothness), handler: onSmooth, flex: 3 }
   ];
+  const extra: MasterSlider[] = [
+    { label: 'Bright', value: masterBright, display: String(masterBright), handler: onMasterBright, flex: 1 },
+    { label: 'Attack', value: attack, display: String(attack), handler: onAttack, flex: 1 }
+  ];
+  const [showExtra, setShowExtra] = useState(false);
 
   if (vertical) {
     return (
       <div className="space-y-3 p-4">
-        {sliders.map((s) => (
+        {[...fixed, ...extra].map((s) => (
           <div key={s.label} className="flex items-center gap-3">
             <span className="text-sm font-medium" style={{ color: '#888898', minWidth: 56 }}>
               {s.label}
@@ -421,7 +454,7 @@ function MasterSliders({
               onChange={throttledSlider(s.handler)}
             />
             <span className="text-sm font-mono" style={{ color: '#888898', minWidth: 32, textAlign: 'right' }}>
-              {s.value}
+              {s.display}
             </span>
           </div>
         ))}
@@ -431,7 +464,7 @@ function MasterSliders({
 
   return (
     <>
-      {sliders.map((s) => (
+      {[...fixed, ...(showExtra ? extra : [])].map((s) => (
         <div key={s.label} className="flex items-center gap-2" style={{ minWidth: 0, flex: s.flex }}>
           <span className="text-xs font-medium shrink-0" style={{ color: '#888898', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
             {s.label}
@@ -446,10 +479,24 @@ function MasterSliders({
             onChange={throttledSlider(s.handler)}
           />
           <span className="text-xs font-mono shrink-0" style={{ color: '#888898', minWidth: 28, textAlign: 'right' }}>
-            {s.value}
+            {s.display}
           </span>
         </div>
       ))}
+      <button
+        onClick={() => setShowExtra((v) => !v)}
+        title={showExtra ? 'Hide brightness and attack' : 'Brightness and attack'}
+        className="shrink-0 text-xs"
+        style={{
+          padding: '2px 8px',
+          borderRadius: 6,
+          background: showExtra ? 'rgba(74,124,255,0.15)' : 'transparent',
+          border: `1px solid ${showExtra ? '#4a7cff' : '#1a1a25'}`,
+          color: showExtra ? '#4a7cff' : '#888898'
+        }}
+      >
+        ⋯
+      </button>
     </>
   );
 }
@@ -896,9 +943,11 @@ export default function Home() {
               masterBright={masterBright}
               smoothness={smoothness}
               attack={attack}
+              animSpeed={animSpeed}
               onMasterBright={handleMasterBright}
               onSmooth={handleSmooth}
               onAttack={handleAttack}
+              onAnimSpeed={handleAnimSpeed}
               throttledSlider={throttledSlider}
               vertical
             />
@@ -1156,9 +1205,11 @@ export default function Home() {
             masterBright={masterBright}
             smoothness={smoothness}
             attack={attack}
+            animSpeed={animSpeed}
             onMasterBright={handleMasterBright}
             onSmooth={handleSmooth}
             onAttack={handleAttack}
+            onAnimSpeed={handleAnimSpeed}
             throttledSlider={throttledSlider}
           />
         </div>

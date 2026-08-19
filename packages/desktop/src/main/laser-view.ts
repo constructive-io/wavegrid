@@ -131,6 +131,13 @@ function ensureView(): WebContentsView | null {
     void shell.openExternal(url);
     return { action: 'deny' };
   });
+  // While the embedded UI is full screen it is the only focused thing on the
+  // window, so its own web contents sees Escape and the renderer never would —
+  // without this there is no keyboard way back out.
+  created.webContents.on('before-input-event', (_e, input) => {
+    if (input.type !== 'keyDown' || input.key !== 'Escape') return;
+    if (!win.isDestroyed()) win.webContents.send('laser:escape');
+  });
   created.webContents.on('did-fail-load', (_e, _code, _desc, _url, isMainFrame) => {
     if (isMainFrame && desiredUrl && loadedUrl === desiredUrl) retryLater(desiredUrl);
   });

@@ -23,8 +23,15 @@ jest.mock('electron', () => ({
 let brainProject: string | null = 'grace';
 jest.mock('@/main/brain', () => ({ status: () => ({ project: brainProject }) }));
 jest.mock('@/main/operator-session', () => ({ embeddedUrl: (url: string) => `${url}#wg_token=t` }));
+const windowSend = jest.fn();
 jest.mock('@/main/runtime', () => ({
-  runtime: { mainWindow: { isDestroyed: () => false, contentView: { addChildView: jest.fn() } } }
+  runtime: {
+    mainWindow: {
+      isDestroyed: () => false,
+      contentView: { addChildView: jest.fn() },
+      webContents: { send: windowSend }
+    }
+  }
 }));
 
 import { invalidateLaserView, resetLaserView, syncLaser } from '@/main/laser-view';
@@ -43,6 +50,8 @@ beforeEach(() => {
   brainProject = 'grace';
   webContents.loadURL.mockReset().mockResolvedValue(undefined);
   viewInstance.setVisible.mockClear();
+  webContents.on.mockClear();
+  windowSend.mockClear();
 });
 
 afterEach(() => jest.useRealTimers());
@@ -152,6 +161,24 @@ it('does not put the stopped show back on screen when the next one starts', asyn
   resolveLoad();
   await flush();
   expect(visibility().at(-1)).toBe(true);
+});
+
+it('tells the renderer about Escape pressed inside the embedded UI', () => {
+  show();
+  const onInput = webContents.on.mock.calls.find(([e]) => e === 'before-input-event')?.[1] as (
+    e: unknown,
+    input: { type: string; key: string }
+  ) => void;
+
+  // Full screen leaves the embedded UI focused, so the renderer's own keydown
+  // listener never fires and this is the only way back out.
+  onInput({}, { type: 'keyDown', key: 'Escape' });
+  expect(windowSend).toHaveBeenCalledWith('laser:escape');
+
+  windowSend.mockClear();
+  onInput({}, { type: 'keyUp', key: 'Escape' });
+  onInput({}, { type: 'keyDown', key: 'a' });
+  expect(windowSend).not.toHaveBeenCalled();
 });
 
 it('does not reload an unchanged url on every sync', async () => {

@@ -128,6 +128,11 @@ contextBridge.exposeInMainWorld('wavegrid', api);
 
 // Fire-and-forget channel the renderer uses to position the native laser view.
 const laser: WavegridLaser = {
-  sync: (state: LaserSyncState) => ipcRenderer.send('laser:sync', state)
+  sync: (state: LaserSyncState) => ipcRenderer.send('laser:sync', state),
+  onEscape: (handler: () => void) => {
+    const listener = () => handler();
+    ipcRenderer.on('laser:escape', listener);
+    return () => ipcRenderer.off('laser:escape', listener);
+  }
 };
 contextBridge.exposeInMainWorld('wavegridLaser', laser);

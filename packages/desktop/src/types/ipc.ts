@@ -562,6 +562,9 @@ export interface OscDebugState {
 
 export interface WavegridLaser {
   sync(state: LaserSyncState): void;
+  /** Escape pressed inside the embedded UI, which owns its own key events and is
+   *  the only thing focused while it is full screen. Returns an unsubscribe. */
+  onEscape(handler: () => void): () => void;
 }
 
 declare global {
