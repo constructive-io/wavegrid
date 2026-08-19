@@ -56,7 +56,7 @@ export function LoginScreen({ onLogin, notice, defaultUsername = '' }: LoginScre
             className="text-3xl font-bold tracking-widest"
             style={{ color: '#01A1FF' }}
           >
-            ILLUMINATE
+            WAVEGRID
           </h1>
           <p className="text-sm mt-1" style={{ color: '#666' }}>
             Painting the sky with light
