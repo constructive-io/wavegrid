@@ -22,6 +22,7 @@ the part you use while something is broken.
 - [What is still missing, and how to capture it](#what-is-still-missing-and-how-to-capture-it)
 - [Diagnostic playbook](#diagnostic-playbook)
 - [Ways in that are not this protocol](#ways-in-that-are-not-this-protocol)
+- [Guided experiments, and the one tool that transmits](#guided-experiments-and-the-one-tool-that-transmits)
 
 ## The installation, as the network sees it
 
@@ -248,6 +249,35 @@ readable either. The 32-byte `0x00028010` body is all zeroes — the one body in
 the protocol that is plainly not encrypted, which is itself a small hint that the
 opacity is applied per message type rather than to the whole connection.
 
+### No frame body is ever sent twice
+
+The question that decides whether a captured frame could simply be replayed:
+does BEYOND ever emit the same body twice? Over 1,161 frames of *static* content
+across two captures — an idle slice and the amber capture, i.e. the best case for
+repetition, since the picture is not changing at all:
+
+| | result |
+| --- | --- |
+| distinct bodies | 1,161 of 1,161 — zero repeats |
+| body bytes constant across every frame | 0 of 2,360 |
+| bytes two consecutive bodies share | 1–21 of 2,360 (chance alone ≈ 9) |
+| bodies shared between two devices getting the same scene | 0 |
+
+Reproduce with `./bin/decode <capture> --repeats`.
+
+A static scene re-encrypted into a completely different 2,360 bytes every 16 ms
+means each frame carries a nonce, a counter, or a stream-cipher position. Two
+consequences worth stating plainly, because they close off the two obvious
+shortcuts:
+
+- **Replaying a captured frame is not a route in.** A copy is either rejected as
+  stale or, at best, decrypts to a single stale picture — and there is no
+  repetition anywhere to build a mapping from.
+- **A known-plaintext attack has nothing to bite on.** Byte-identical input
+  (blackout, held amber) produces unrelated ciphertext, so we cannot line up
+  "this look" against "these bytes", which is the technique that would otherwise
+  work on a home-grown scheme.
+
 So: **the frame path cannot be decoded from captures alone**, and this is where
 passive analysis ends. Getting further would need something a capture cannot
 provide — key material, instrumented software, or vendor documentation. Per the
@@ -358,6 +388,22 @@ tag, and the tooling is already built for it:
 Worth doing for the handful that matter (colour balance, scan rate, blanking
 delay) rather than all 223.
 
+**5. Nobody has tried sending the 16062 lines.** Those lines are plaintext, and
+the format is fully understood — so the cheapest remaining question is whether
+anything on the network *acts* on them, or whether the broadcast is only BEYOND
+narrating itself. This is a test in the room, not a capture:
+
+```
+close BEYOND completely (tray included)
+./bin/session replay --host <FB4_IP>[,<FB4_IP>…]
+```
+
+Evidence for the pessimistic answer: 16062 has only ever been seen host →
+network, never toward BEYOND, and the FB4s take their orders on 3348. So the
+expectation is that nothing moves. It is still worth ten minutes, because the
+result is unambiguous either way and it is the only cheap experiment left that
+could end in direct control.
+
 Also worth having, cheaply, while someone is at the machine: BEYOND's projector
 list screenshot (to explain `45.4`), the FB4 firmware versions, and a listing of
 what content is on each SD card — the last one decides whether the ArtNet route
@@ -400,6 +446,34 @@ also stops being available to BEYOND. Untested here, and it would be the first
 thing in this project that transmits toward hardware; noted so the option isn't
 rediscovered from scratch.
 
+## Guided experiments, and the one tool that transmits
+
+`./bin/session --list` runs the experiments above end to end: it starts the
+capture, walks the operator through what to do at the machine, stops the capture,
+decodes it, and says what the result means. Three of them:
+
+| experiment | answers | transmits |
+| --- | --- | --- |
+| `./bin/session handshake` | is there a key exchange on connect? (gap 1) | no |
+| `./bin/session osc-rgba` | do our OSC values land, and on which zone? (gaps 2, 3) | no |
+| `./bin/session replay --host <ip>` | does anything act on the 16062 lines? (gap 5) | yes |
+
+`./bin/replay` is the only tool here that puts packets on the wire, and only when
+given `--transmit` **and** `--host`. Without them it prints the exact datagrams
+it would send and exits, which is also the fastest way to check the format
+against this document:
+
+```
+./bin/replay --zone all --colour amber --sweep
+```
+
+It sends nothing but BEYOND's own plaintext live-control lines — the same bytes
+BEYOND broadcasts, at the same rate a human moving a slider would — never
+fabricated frame-stream traffic, which is not constructible anyway. Rules for
+running it: BEYOND closed (otherwise a change in the room proves nothing about
+what caused it), somebody watching the heads, E-stop in reach, and never as an
+unattended loop.
+
 ## What this toolkit is good for
 
 - Confirming an OSC message reached BEYOND, and what value it set, per zone
@@ -411,5 +485,7 @@ rediscovered from scratch.
   told to draw nothing".
 - Naming settings tags by controlled experiment, when someone has the machine.
 
-Everything in `tools/traffic` reads files and sockets. It never transmits toward
-the hardware.
+Everything in `tools/traffic` reads files and sockets, with one deliberate
+exception: `./bin/replay --transmit`, which exists to answer the one question
+capture analysis cannot, and which sends only the plaintext live-control lines
+BEYOND itself broadcasts.

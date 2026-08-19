@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# replay — send BEYOND's plaintext live-control lines yourself, to find out
+# whether anything on the network acts on them.
+#
+# Usage:
+#   ./bin/replay                                   # dry run: print the bytes
+#   ./bin/replay --zone all --colour amber
+#   ./bin/replay --sweep --zone 1 --transmit --host 169.254.53.5
+#
+# This is the only tool here that transmits, and only with --transmit. Every
+# other tool in tools/traffic stays receive-only.
+#
+# Run it with BEYOND closed — otherwise a change in the room proves nothing
+# about who caused it. Have someone watching the heads and the E-stop in reach.
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+
+command -v python3 >/dev/null || { echo 'error: python3 is required for replay' >&2; exit 127; }
+
+exec python3 "$TRAFFIC_ROOT/lib/replay.py" "$@"

@@ -121,8 +121,8 @@ osc` defaults to 8000, BEYOND's factory port) and the zone has to be under live
 control.
 
 This is aimed output on a configured target, unrelated to
-[`tools/traffic`](../../tools/traffic), which stays passive — it observes
-BEYOND ⇄ FB4 traffic and never transmits.
+[`tools/traffic`](../../tools/traffic), which observes BEYOND ⇄ FB4 traffic and
+transmits nothing except its `bin/replay` experiment, run by hand.
 
 ### `wavegrid config` (or `wavegrid --print-config`)
 

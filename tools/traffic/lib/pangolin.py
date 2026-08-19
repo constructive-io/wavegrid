@@ -23,6 +23,7 @@ Read-only: this parses files, it never transmits.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import math
 import subprocess
 import sys
@@ -355,6 +356,103 @@ def report_stream(packets: list[Packet], hex_bytes: int) -> None:
     print()
 
 
+def stream_messages(packets: list[Packet]) -> dict[str, list[bytes]]:
+    """Messages per direction of each TCP 3348 connection, in capture order."""
+    streams: dict[str, list[Packet]] = defaultdict(list)
+    for p in packets:
+        if p.proto == 'tcp' and FB4_STREAM_PORT in (p.sport, p.dport):
+            streams[f'{p.src}:{p.sport}->{p.dst}:{p.dport}'].append(p)
+    return {
+        key: split_messages(b''.join(p.payload for p in ps))
+        for key, ps in sorted(streams.items())
+    }
+
+
+@dataclass
+class Repeats:
+    """Whether a stream's frame bodies ever say the same thing twice.
+
+    The question this answers is whether the encryption is per-frame. Replaying a
+    captured frame can only work if an identical body is ever legitimately sent
+    twice — otherwise each one carries a nonce or a counter, and a copy is either
+    rejected or (worse, silently) meaningless.
+    """
+
+    frames: int
+    distinct: int
+    body_len: int
+    constant_offsets: int
+    shared_min: int
+    shared_max: int
+
+    @property
+    def repeated(self) -> int:
+        return self.frames - self.distinct
+
+    @property
+    def chance(self) -> float:
+        """Bytes two unrelated 256-value sequences would match on by luck."""
+        return self.body_len / 256
+
+
+def body_repeats(bodies: list[bytes]) -> Repeats | None:
+    if len(bodies) < 2:
+        return None
+    width = min(len(b) for b in bodies)
+    shared = [sum(1 for x, y in zip(a, b) if x == y) for a, b in zip(bodies, bodies[1:])]
+    return Repeats(
+        frames=len(bodies),
+        distinct=len({hashlib.sha256(b).digest() for b in bodies}),
+        body_len=width,
+        constant_offsets=sum(
+            1 for i in range(width) if all(b[i] == bodies[0][i] for b in bodies)
+        ),
+        shared_min=min(shared),
+        shared_max=max(shared),
+    )
+
+
+def report_repeats(packets: list[Packet]) -> None:
+    streams = stream_messages(packets)
+    bodies_by_stream = {
+        key: [m[HEADER_LEN:] for m in messages if u32(m, 4) == STREAM_TYPE_FRAME]
+        for key, messages in streams.items()
+    }
+    bodies_by_stream = {k: v for k, v in bodies_by_stream.items() if v}
+
+    print('== do frame bodies ever repeat? (TCP 3348) ==')
+    if not bodies_by_stream:
+        print('  no frames in this capture\n')
+        return
+
+    for key, bodies in bodies_by_stream.items():
+        r = body_repeats(bodies)
+        if r is None:
+            print(f'  {key}: {len(bodies)} frame — need two to compare')
+            continue
+        print(f'  {key}')
+        print(f'    {r.frames} frames, {r.distinct} distinct bodies, '
+              f'{r.repeated} repeated')
+        print(f'    bytes identical across every frame: {r.constant_offsets}/{r.body_len}')
+        print(f'    consecutive bodies share {r.shared_min}–{r.shared_max} bytes '
+              f'(chance alone ≈ {r.chance:.0f})')
+
+    # The same scene goes to several projectors at once. If two devices ever got
+    # byte-identical bodies, the encryption would be per-scene, not per-frame and
+    # per-connection — so this is worth asking even when repeats within one
+    # stream come up empty.
+    keys = list(bodies_by_stream)
+    for i, left in enumerate(keys):
+        for right in keys[i + 1:]:
+            a = {hashlib.sha256(b).digest() for b in bodies_by_stream[left]}
+            same = sum(1 for b in bodies_by_stream[right] if hashlib.sha256(b).digest() in a)
+            print(f'  {left.split("->")[-1]} vs {right.split("->")[-1]}: '
+                  f'{same} bodies in common')
+    print('  identical bodies are what a replayable stream looks like; none means\n'
+          '  every frame is encrypted afresh and a captured frame cannot be reused')
+    print()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('capture')
@@ -363,6 +461,8 @@ def main() -> None:
                         help='also print this many body bytes of the first stream message')
     parser.add_argument('--timeline', action='store_true',
                         help='print every live-control change, to line up with what you did')
+    parser.add_argument('--repeats', action='store_true',
+                        help='ask whether any frame body is ever sent twice (replayability)')
     args = parser.parse_args()
 
     packets = read_packets(args.tshark, args.capture)
@@ -370,6 +470,8 @@ def main() -> None:
     report_devices(packets)
     report_rgba(packets, args.timeline)
     report_stream(packets, args.hex)
+    if args.repeats:
+        report_repeats(packets)
 
 
 if __name__ == '__main__':
