@@ -5,11 +5,11 @@
  * time formatting happens here so the renderer stays free of node deps.
  */
 import { collectDiagnostics } from '@wavegrid/doctor';
-import { loadWavegridConfig } from '@wavegrid/layout';
 import { formatRanges } from '@wavegrid/server';
 import { openStore } from '@wavegrid/settings';
 
 import { receiverRunning } from '@/main/brain';
+import { resolveProjectConfig } from '@/main/receiver-env';
 import type { DoctorReceiver, DoctorReport } from '@/types/ipc';
 
 export async function buildDoctorReport(project: string): Promise<DoctorReport | null> {
@@ -17,7 +17,9 @@ export async function buildDoctorReport(project: string): Promise<DoctorReport |
   if (!project || !store.hasProject(project)) return null;
   if (store.getActiveProject() !== project) store.setActiveProject(project);
 
-  const resolved = loadWavegridConfig();
+  // Via the brain, so a diagnosis reads the selected project's own config and
+  // not whatever a previous show left in this long-lived process's env.
+  const resolved = resolveProjectConfig();
   const diag = await collectDiagnostics({ store, project, resolved });
   const nameFor = (id: string): string =>
     diag.devices.find((d) => d.id === id)?.name ?? `${id.slice(0, 8)}…`;

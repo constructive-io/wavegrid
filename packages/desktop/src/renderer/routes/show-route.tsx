@@ -12,6 +12,7 @@ import {
   EmptyTitle
 } from '@/components/ui/empty';
 import { watchOverlays } from '@/renderer/lib/overlay-present';
+import { hasOscOutput } from '@/renderer/lib/show-output';
 import { ShareShow } from '@/renderer/routes/share-show';
 import type { BrainStatus } from '@/types/ipc';
 
@@ -102,6 +103,18 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
           <span>
             <span className='font-medium'>No laser output.</span> The brain and UI are running, but
             this machine’s receiver failed to start: {status.receiverError}
+          </span>
+        </div>
+      )}
+      {/* The receiver can start perfectly and still drive nothing, which looks
+          identical to a healthy show until someone notices the lasers are dark. */}
+      {running && !status.receiverError && status.receiverRunning && !hasOscOutput(status) && (
+        <div className='flex items-start gap-2 rounded-lg border px-3 py-2 text-sm text-amber-600 dark:text-amber-400'>
+          <AlertTriangle className='mt-0.5 size-4 shrink-0' />
+          <span>
+            <span className='font-medium'>Console only — no OSC output.</span> Painting reaches the
+            brain, but this project has no OSC target, so nothing is sent to BEYOND. Set one in
+            Advanced → OSC (or <code>wavegrid projects osc</code>), then restart the show.
           </span>
         </div>
       )}

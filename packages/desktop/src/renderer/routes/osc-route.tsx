@@ -26,10 +26,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import type { OscDebugPreset, OscDebugState, OscProbeState } from '@/types/ipc';
+import { oscOutputs } from '@/renderer/lib/show-output';
+import type { BrainStatus, OscDebugPreset, OscDebugState, OscProbeState } from '@/types/ipc';
 
 interface OscRouteProps {
   activeProject: string | null;
+  status: BrainStatus;
 }
 
 /** What each probe verdict actually means, in the operator's terms. UDP has no
@@ -65,7 +67,7 @@ function clock(at: number): string {
   return new Date(at).toLocaleTimeString();
 }
 
-export function OscRoute({ activeProject }: OscRouteProps) {
+export function OscRoute({ activeProject, status: brain }: OscRouteProps) {
   const api = window.wavegrid.oscDebug;
   const [state, setState] = React.useState<OscDebugState | null>(null);
   const [zone, setZone] = React.useState('');
@@ -188,6 +190,42 @@ export function OscRoute({ activeProject }: OscRouteProps) {
               {PROBE_TEXT[state.probe].label}
             </span>
             <p className='text-muted-foreground text-xs'>{PROBE_TEXT[state.probe].detail}</p>
+          </div>
+        )}
+      </section>
+
+      {/* The question this panel exists to answer: the buttons below send from
+          here, but the show sends from the receiver — and until now nothing said
+          whether the receiver had a target at all. */}
+      <section className='flex flex-col gap-2 rounded-lg border px-4 py-3'>
+        <span className='text-sm font-medium'>What the running show is driving</span>
+        <Separator />
+        {!brain.running ? (
+          <p className='text-muted-foreground text-sm'>
+            No show running. The buttons below still send — they do not need one.
+          </p>
+        ) : brain.project !== activeProject ? (
+          <p className='text-sm text-amber-600 dark:text-amber-400'>
+            The running show is <strong>{brain.project}</strong>, but you are editing and debugging{' '}
+            <strong>{activeProject}</strong> — they can have different targets. Start the show on
+            this project before trusting what you see here.
+          </p>
+        ) : brain.receiverError ? (
+          <p className='text-destructive text-sm'>
+            The receiver isn&rsquo;t running: {brain.receiverError}
+          </p>
+        ) : oscOutputs(brain).length === 0 ? (
+          <p className='text-sm text-amber-600 dark:text-amber-400'>
+            Console only — the receiver is running with no OSC output, so painting reaches the brain
+            and nothing reaches BEYOND. Set a target under Set up → Output, then restart the show.
+          </p>
+        ) : (
+          <div className='flex flex-col gap-1'>
+            {oscOutputs(brain).map((label) => (
+              <code key={label} className='bg-muted rounded px-2 py-1 text-xs'>
+                {label}
+              </code>
+            ))}
           </div>
         )}
       </section>

@@ -32,6 +32,7 @@ const EMPTY_STATUS: BrainStatus = {
   receiverRunning: false,
   lanUrls: [],
   receiverError: null,
+  receiverOutputs: [],
   lastError: null
 };
 

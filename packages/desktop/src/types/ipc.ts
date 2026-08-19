@@ -17,6 +17,10 @@ export interface BrainStatus {
   /** Why the output stage isn't running while the brain is up (OSC target,
    *  network) — the show plays on screen but nothing reaches the lasers. */
   receiverError: string | null;
+  /** What the running receiver is driving, e.g. `['Console', 'BEYOND OSC →
+   *  10.0.0.5:8000 (row-major, rgb)']`. `['Console']` alone means the show is
+   *  running with no OSC output — the lasers stay dark. */
+  receiverOutputs: string[];
   /** Why the last start attempt failed, while the brain is down. Cleared by a
    *  successful start. */
   lastError: string | null;
