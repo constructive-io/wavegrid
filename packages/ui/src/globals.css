@@ -34,7 +34,9 @@ input[type="range"] {
   appearance: none;
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(to right, #1a1a2a, var(--color-accent));
+  /* The track has to read as a range even at the dark end, so it starts well
+     above the page background rather than blending into it. */
+  background: linear-gradient(to right, #4a4a63, var(--color-accent));
   outline: none;
   padding: 8px 0;
   background-clip: content-box;

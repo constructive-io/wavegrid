@@ -1,7 +1,7 @@
 import type { Fixture, Layout } from '@wavegrid/layout';
 
 import { amberAnimations } from './amber';
-import { isArtGrid, prideColorAt, ROYGBIV, roygbivAt, setTarget, smooth } from './helpers';
+import { isArtGrid, prideColorAt, ROYGBIV, roygbivAt, setTarget, smooth, transColorAt } from './helpers';
 import { AnimationFn, GridCell } from './types';
 
 /**
@@ -175,6 +175,35 @@ animations['pride-ring'] = (grid, tick, attack, layout) => {
   const speed = tick * 0.012;
   layout.fixtures.forEach((f, i) => {
     const color = roygbivAt(i / n + speed);
+    setTarget(grid, i, color.h, color.s, 90, attack);
+  });
+};
+
+// ── Trans flag animations ────
+//
+// The same three shapes as the pride looks, on the trans palette — the
+// sequences have always asked for these by name.
+
+animations['trans-flow'] = (grid, tick, attack, layout) => {
+  const speed = tick * 0.012;
+  layout.fixtures.forEach((f, i) => {
+    const color = transColorAt(f.v + speed);
+    setTarget(grid, i, color.h, color.s, 90, attack);
+  });
+};
+
+animations['trans-breathe'] = (grid, tick, attack) => {
+  const color = transColorAt(tick * 0.008);
+  const brightness = 70 + Math.sin(tick * 0.04) * 20;
+  for (let i = 0; i < grid.length; i++) {
+    setTarget(grid, i, color.h, color.s, brightness, attack);
+  }
+};
+
+animations['trans-ring'] = (grid, tick, attack, layout) => {
+  const speed = tick * 0.012;
+  layout.fixtures.forEach((f, i) => {
+    const color = transColorAt(i / layout.count + speed);
     setTarget(grid, i, color.h, color.s, 90, attack);
   });
 };

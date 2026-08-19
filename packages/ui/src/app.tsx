@@ -1,3 +1,4 @@
+import { type Layout, presets } from '@wavegrid/layout/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AudioTab } from '@/components/audio-tab';
@@ -30,6 +31,9 @@ import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
 import { useIsPhone } from '@/lib/use-media-query';
 import { type PlaylistState, useSocket } from '@/lib/use-socket';
+
+// Stands in only until /api/config answers, and matches useConfig's own fallback.
+const FALLBACK_LAYOUT = presets['grid-7x7']();
 
 type PanelLayout = 'bottom' | 'right';
 type TrailFadeEntry = {
@@ -73,7 +77,7 @@ function ToolContent({
   flags, brightness, audio,
   isPhone,
   onShift,
-  numCannons, gridColumns, fixtures,
+  numCannons, gridColumns, fixtures, layout,
   activePattern, onPatternSelect,
   playlistState
 }: {
@@ -99,6 +103,7 @@ function ToolContent({
   numCannons: number;
   gridColumns: number;
   fixtures?: PreviewFixture[];
+  layout: Layout;
   activePattern: string | null;
   onPatternSelect: (id: string) => void;
   playlistState: PlaylistState | null;
@@ -258,11 +263,15 @@ function ToolContent({
       )}
 
       {tab === 'sequences' && (
-        <SequencesTab send={send} playlistState={playlistState} />
+        <SequencesTab send={send} playlistState={playlistState} layout={layout} />
       )}
 
       {tab === 'playlist' && (
-        <PlaylistTab send={send} playlistState={playlistState as Parameters<typeof PlaylistTab>[0]['playlistState']} />
+        <PlaylistTab
+          send={send}
+          playlistState={playlistState as Parameters<typeof PlaylistTab>[0]['playlistState']}
+          layout={layout}
+        />
       )}
 
       {tab === 'flags' && (
@@ -517,6 +526,7 @@ export default function Home() {
   const NUM_CANNONS = config?.numCannons ?? 49;
   const GRID_COLUMNS = config?.gridColumns ?? 7;
   const FIXTURES = config?.layout?.fixtures;
+  const LAYOUT = config?.layout ?? FALLBACK_LAYOUT;
 
   const [tab, setTab] = useState<GridMode>(() => {
     if (typeof window === 'undefined') return 'paint';
@@ -841,6 +851,7 @@ export default function Home() {
     numCannons: NUM_CANNONS,
     gridColumns: GRID_COLUMNS,
     fixtures: FIXTURES,
+    layout: LAYOUT,
     activePattern,
     onPatternSelect: handlePatternSelect,
     playlistState

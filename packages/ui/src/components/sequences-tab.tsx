@@ -1,148 +1,12 @@
-import { useCallback } from 'react';
+import { layoutFilters, showDuration, type ShowPreset, showPresetsForLayout } from '@wavegrid/animations';
+import type { Layout } from '@wavegrid/layout/client';
+import { useCallback, useMemo } from 'react';
 
 import type { PlaylistState } from '@/lib/use-socket';
 
+import { LayoutFilterChips, useLayoutFilter } from './layout-filter';
 
-
-interface PlaylistStep {
-  type: 'animation' | 'scene' | 'evalPattern';
-  name?: string;
-  code?: string;
-  duration: number;
-}
-
-interface SequenceDef {
-  name: string;
-  description: string;
-  gradient: string;
-  steps: PlaylistStep[];
-  transition: 'cut' | 'fade';
-  transitionDuration: number;
-}
-
-// ── Preset Sequences ──────────────────────────────────────────────────
-
-const SEQUENCES: SequenceDef[] = [
-  {
-    name: 'Solid Vibes',
-    description: 'Pure colors, gradients, and static scenes — no movement, just beautiful light',
-    gradient: 'linear-gradient(135deg, #e40303, #ff8c00, #ffed00, #008026, #004dff, #c8a000)',
-    transition: 'fade',
-    transitionDuration: 3,
-    steps: [
-      { type: 'scene', name: 'pride', duration: 150 },
-      { type: 'scene', name: 'gold', duration: 120 },
-      { type: 'scene', name: 'trans', duration: 150 },
-      { type: 'scene', name: 'sunset', duration: 120 },
-      { type: 'scene', name: 'ocean', duration: 120 },
-      { type: 'scene', name: 'forest', duration: 120 },
-      { type: 'scene', name: 'solstice', duration: 120 },
-      { type: 'scene', name: 'fire', duration: 120 },
-      { type: 'scene', name: 'night', duration: 120 }
-    ]
-  },
-  {
-    name: 'Pride Show',
-    description: 'Static flags + flowing animations — alternating calm and motion',
-    gradient: 'linear-gradient(135deg, #e40303, #ff8c00, #ffed00, #008026, #004dff, #750787)',
-    transition: 'fade',
-    transitionDuration: 2,
-    steps: [
-      { type: 'scene', name: 'pride', duration: 120 },
-      { type: 'animation', name: 'pride-flow', duration: 180 },
-      { type: 'animation', name: 'rainbow', duration: 120 },
-      { type: 'animation', name: 'pride-ring', duration: 120 },
-      { type: 'scene', name: 'pride', duration: 90 },
-      { type: 'animation', name: 'pride-breathe', duration: 120 },
-      { type: 'animation', name: 'pride-rotate', duration: 120 },
-      { type: 'scene', name: 'pride', duration: 90 },
-      { type: 'animation', name: 'rainbow', duration: 180 }
-    ]
-  },
-  {
-    name: 'Pride & Trans',
-    description: 'Mixed pride and trans — static flags, flowing animations, breathing colors',
-    gradient: 'linear-gradient(135deg, #e40303, #ff8c00, #5BCEFA, #F5A9B8, #750787)',
-    transition: 'fade',
-    transitionDuration: 2,
-    steps: [
-      { type: 'scene', name: 'pride', duration: 120 },
-      { type: 'animation', name: 'pride-flow', duration: 150 },
-      { type: 'scene', name: 'trans', duration: 120 },
-      { type: 'animation', name: 'trans-flow', duration: 150 },
-      { type: 'animation', name: 'pride-ring', duration: 120 },
-      { type: 'scene', name: 'trans', duration: 90 },
-      { type: 'animation', name: 'trans-breathe', duration: 120 },
-      { type: 'scene', name: 'pride', duration: 90 },
-      { type: 'animation', name: 'pride-breathe', duration: 120 },
-      { type: 'animation', name: 'trans-ring', duration: 120 },
-      { type: 'scene', name: 'trans', duration: 90 },
-      { type: 'animation', name: 'pride-rotate', duration: 120 },
-      { type: 'animation', name: 'rainbow', duration: 120 },
-      { type: 'animation', name: 'trans-flow', duration: 150 }
-    ]
-  },
-  {
-    name: 'Heart Night',
-    description: 'Romantic vibes — hearts, breathing, and city love',
-    gradient: 'linear-gradient(135deg, #ff0040, #cc0030, #ff6080)',
-    transition: 'fade',
-    transitionDuration: 3,
-    steps: [
-      { type: 'scene', name: 'heart', duration: 180 },
-      { type: 'animation', name: 'heart-breathe', duration: 300 },
-      { type: 'animation', name: 'i-heart-sf', duration: 180 },
-      { type: 'animation', name: 'heart-breathe', duration: 300 },
-      { type: 'scene', name: 'heart', duration: 120 }
-    ]
-  },
-  {
-    name: 'SF Showcase',
-    description: 'City pride — SF scenes, hearts, and rainbows',
-    gradient: 'linear-gradient(135deg, #c8a000, #ff6060, #4060ff)',
-    transition: 'fade',
-    transitionDuration: 3,
-    steps: [
-      { type: 'scene', name: 'sf', duration: 180 },
-      { type: 'animation', name: 'i-heart-sf', duration: 240 },
-      { type: 'animation', name: 'rainbow', duration: 120 },
-      { type: 'scene', name: 'gold', duration: 120 },
-      { type: 'animation', name: 'wave', duration: 180 },
-      { type: 'scene', name: 'sf', duration: 120 }
-    ]
-  },
-  {
-    name: 'Ambient',
-    description: 'Chill background — slow waves, breathing, rain',
-    gradient: 'linear-gradient(135deg, #1a3a5c, #2a5a3c, #3a2a5c)',
-    transition: 'fade',
-    transitionDuration: 4,
-    steps: [
-      { type: 'animation', name: 'wave', duration: 300 },
-      { type: 'animation', name: 'breathe', duration: 240 },
-      { type: 'animation', name: 'rain', duration: 300 },
-      { type: 'animation', name: 'spiral', duration: 240 },
-      { type: 'animation', name: 'wave', duration: 300 }
-    ]
-  },
-  {
-    name: 'High Energy',
-    description: 'Fast cuts — short bursts of variety',
-    gradient: 'linear-gradient(135deg, #ff4400, #ffcc00, #00ff88, #0088ff)',
-    transition: 'cut',
-    transitionDuration: 0,
-    steps: [
-      { type: 'animation', name: 'pride-ring', duration: 60 },
-      { type: 'animation', name: 'rainbow', duration: 45 },
-      { type: 'animation', name: 'heart-breathe', duration: 60 },
-      { type: 'animation', name: 'pride-rotate', duration: 60 },
-      { type: 'animation', name: 'spiral', duration: 60 },
-      { type: 'animation', name: 'wave', duration: 45 },
-      { type: 'animation', name: 'pride-flow', duration: 60 },
-      { type: 'animation', name: 'pacman', duration: 45 }
-    ]
-  }
-];
+type Sequence = ShowPreset & { reason: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -152,11 +16,7 @@ function formatDuration(seconds: number): string {
   return m > 0 ? `${m}m${s > 0 ? ' ' + s + 's' : ''}` : `${s}s`;
 }
 
-function totalDuration(steps: PlaylistStep[]): number {
-  return steps.reduce((a, s) => a + s.duration, 0);
-}
-
-function stepLabel(step: PlaylistStep): string {
+function stepLabel(step: { type: string; name?: string }): string {
   if (step.type === 'evalPattern') return 'Custom Pattern';
   return step.name ?? 'Unknown';
 }
@@ -165,20 +25,37 @@ function stepLabel(step: PlaylistStep): string {
 
 export function SequencesTab({
   send,
-  playlistState
+  playlistState,
+  layout
 }: {
   send: (msg: Record<string, unknown>) => void;
   playlistState: PlaylistState | null;
+  layout: Layout;
 }) {
+  const [filter, setFilter] = useLayoutFilter('wavegrid-sequence-filter');
+
+  // The rig a sequence is judged against: this installation for "All", or the
+  // chosen reference rig — so an operator can see what a Nova show needs even
+  // when they are sitting in front of a 7×7.
+  const judgedAgainst = useMemo(() => {
+    const chosen = layoutFilters().find(f => f.id === filter);
+    return chosen?.layout ?? layout;
+  }, [filter, layout]);
+
+  const sequences = useMemo(
+    () => showPresetsForLayout(judgedAgainst, 'sequence'),
+    [judgedAgainst]
+  );
+
   const activeSequenceName = playlistState?.active && playlistState.playlist
-    ? findActiveSequenceName(playlistState.playlist.steps)
+    ? findActiveSequenceName(sequences, playlistState.playlist.steps)
     : null;
 
-  const handlePlay = useCallback((seq: SequenceDef) => {
+  const handlePlay = useCallback((seq: Sequence) => {
     send({
       type: 'playlist',
       steps: seq.steps,
-      loop: true,
+      loop: seq.loop,
       transition: seq.transition,
       transitionDuration: seq.transitionDuration
     });
@@ -252,7 +129,7 @@ export function SequencesTab({
                 <div style={{ fontSize: 10, color: '#888' }}>
                   Step {(playlistState.currentStep ?? 0) + 1}/{playlistState.playlist?.steps.length ?? '?'}
                   {playlistState.playlist?.steps[playlistState.currentStep] && (
-                    <> &middot; {stepLabel(playlistState.playlist.steps[playlistState.currentStep] as PlaylistStep)}</>
+                    <> &middot; {stepLabel(playlistState.playlist.steps[playlistState.currentStep])}</>
                   )}
                 </div>
               </>
@@ -278,7 +155,7 @@ export function SequencesTab({
                 }}
               >
                 <span style={{ minWidth: 14 }}>{idx + 1}.</span>
-                <span style={{ flex: 1 }}>{stepLabel(step as PlaylistStep)}</span>
+                <span style={{ flex: 1 }}>{stepLabel(step)}</span>
                 <span style={{ color: '#444' }}>{formatDuration(step.duration)}</span>
               </div>
             ))}
@@ -288,21 +165,24 @@ export function SequencesTab({
 
       {/* Sequence presets — fills remaining height, scrolls */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <p
-          className="text-xs font-medium"
-          style={{ color: '#888898', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, flexShrink: 0 }}
-        >
-          Sequences
-        </p>
+        <div className="flex items-center justify-between gap-2" style={{ flexShrink: 0, marginBottom: 8 }}>
+          <p
+            className="text-xs font-medium"
+            style={{ color: '#888898', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+          >
+            Sequences
+          </p>
+          <LayoutFilterChips value={filter} onChange={setFilter} layout={layout} />
+        </div>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: 6
           }}>
-            {SEQUENCES.map((seq) => (
+            {sequences.map((seq) => (
               <SequenceCard
-                key={seq.name}
+                key={seq.id}
                 sequence={seq}
                 active={activeSequenceName === seq.name}
                 onPlay={() => handlePlay(seq)}
@@ -320,12 +200,13 @@ function SequenceCard({
   active,
   onPlay
 }: {
-  sequence: SequenceDef;
+  sequence: Sequence;
   active: boolean;
   onPlay: () => void;
 }) {
-  const total = totalDuration(sequence.steps);
+  const total = showDuration(sequence.steps);
   const mins = Math.round(total / 60);
+  const unsuited = sequence.reason !== '';
 
   return (
     <button
@@ -339,7 +220,10 @@ function SequenceCard({
           : '#0a0a10',
         border: active ? '2px solid #4488cc' : '1.5px solid #1a1a25',
         cursor: 'pointer',
-        width: '100%'
+        width: '100%',
+        // Still playable: a rig can be re-pointed, and the operator knows more
+        // about the room than the layout does.
+        opacity: unsuited ? 0.55 : 1
       }}
     >
       <div className="flex items-center gap-2">
@@ -360,6 +244,11 @@ function SequenceCard({
           <div style={{ fontSize: 10, color: '#777', marginTop: 1 }}>
             {sequence.description}
           </div>
+          {unsuited && (
+            <div style={{ fontSize: 9, color: '#c08040', marginTop: 2 }}>
+              {sequence.reason}
+            </div>
+          )}
         </div>
         {active && (
           <div style={{ fontSize: 9, color: '#4488cc', fontWeight: 600 }}>
@@ -372,8 +261,11 @@ function SequenceCard({
 }
 
 /** Try to match active playlist steps to a known sequence name. */
-function findActiveSequenceName(steps: Array<{ type: string; name?: string; duration: number }>): string | null {
-  for (const seq of SEQUENCES) {
+function findActiveSequenceName(
+  sequences: Sequence[],
+  steps: Array<{ type: string; name?: string; duration: number }>
+): string | null {
+  for (const seq of sequences) {
     if (seq.steps.length !== steps.length) continue;
     const match = seq.steps.every((s, i) =>
       s.type === steps[i].type && s.name === steps[i].name && s.duration === steps[i].duration

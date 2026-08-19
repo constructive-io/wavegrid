@@ -92,6 +92,31 @@ export function roygbivAt(position: number): { h: number; s: number } {
   };
 }
 
+/** The trans flag as a cyclic palette: blue, pink, white, pink, blue. */
+export const TRANS_COLORS: Array<{ h: number; s: number }> = [
+  { h: 197, s: 100 },
+  { h: 340, s: 60 },
+  { h: 0, s: 0 },
+  { h: 340, s: 60 },
+  { h: 197, s: 100 }
+];
+
+/** Sample the trans palette at `position` (0–1, wrapping), blending stops. */
+export function transColorAt(position: number): { h: number; s: number } {
+  const scaled = wrapUnit(position) * TRANS_COLORS.length;
+  const idx = Math.floor(scaled);
+  const mix = scaled - idx;
+  const a = TRANS_COLORS[idx % TRANS_COLORS.length];
+  const b = TRANS_COLORS[(idx + 1) % TRANS_COLORS.length];
+  let dh = b.h - a.h;
+  if (dh > 180) dh -= 360;
+  if (dh < -180) dh += 360;
+  return {
+    h: (a.h + dh * mix + 360) % 360,
+    s: a.s + (b.s - a.s) * mix
+  };
+}
+
 export function angleDelta(from: number, to: number): number {
   return ((to - from + 540) % 360) - 180;
 }
