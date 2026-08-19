@@ -301,6 +301,17 @@ def report_rgba(packets: list[Packet], timeline: bool) -> None:
     print()
 
 
+def format_rate(count: int, span: float) -> str:
+    """A rate needs two messages to mean anything.
+
+    A single message spans whatever gap the neighbouring packets happen to
+    have, which turns into an absurd figure — say it's unknown instead.
+    """
+    if count < 2 or span <= 0:
+        return '—'
+    return f'{count / span:.1f}/s'
+
+
 def report_stream(packets: list[Packet], hex_bytes: int) -> None:
     streams: dict[str, list[Packet]] = defaultdict(list)
     for p in packets:
@@ -326,7 +337,7 @@ def report_stream(packets: list[Packet], hex_bytes: int) -> None:
             name = {STREAM_TYPE_FRAME: 'frame', STREAM_TYPE_CONTROL: 'control',
                     STREAM_TYPE_TELEMETRY: 'telemetry'}.get(kind, 'unknown')
             body = b''.join(m[HEADER_LEN:] for m in messages if u32(m, 4) == kind)
-            rate = f'{count / span:.1f}/s' if span > 0 else '—'
+            rate = format_rate(count, span)
             print(f'    type 0x{kind:08x} {name:<9} {count:>5} msgs  {len(sample)}B  '
                   f'{rate:<8} body entropy {entropy(body):.2f} bits/byte')
         seqs = [Header.parse(m).sequence for m in messages if u32(m, 4) == STREAM_TYPE_FRAME]
