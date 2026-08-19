@@ -17,7 +17,7 @@ is also where you choose the directory captures are written to.
 - `tshark`, `dumpcap`, `capinfos`, `editcap`, `mergecap` — all ship with
   Wireshark. On macOS they live inside `Wireshark.app`, and the scripts look
   there, so a plain drag-to-Applications install works without touching `PATH`.
-- `python3` (macOS and Linux both have it) for `compare`.
+- `python3` (macOS and Linux both have it) for `compare`, `decode` and `rgba`.
 - Permission to capture. `./bin/doctor` says whether you have it and prints the
   exact privileged command if you do not — it never runs it for you.
 
@@ -74,6 +74,35 @@ request/reply), and hex dumps of the first payloads.
 ./bin/extract captures/big.pcapng --port 7765
 ```
 
+## Decoding
+
+`analyze` treats a capture as bytes; `decode` treats it as Pangolin:
+
+```
+./bin/decode captures/20250101-120000-output-on.pcapng
+./bin/decode captures/… --timeline --hex 16
+```
+
+It lists the FB4s that announced themselves (id, MAC, model tag), what BEYOND's
+live control held per zone, and the framing/type mix/rate of the frame stream to
+each FB4. `--timeline` prints every live-control change with its timestamp, which
+is how you line a capture up against what you were doing at the time.
+
+For watching that live instead of after the fact:
+
+```
+./bin/rgba              # every live-control change BEYOND broadcasts, as it happens
+./bin/rgba --zone 3
+```
+
+This is the only confirmation OSC can give you: BEYOND broadcasts what its live
+control holds (while its RGBA panel is open), so send a message and watch the
+value move. Silence means nothing is arriving. Receive-only, like everything here.
+
+[PROTOCOL.md](PROTOCOL.md) is what the captures so far actually say — the
+readable UDP protocols, the frame framing, and the evidence that the frame
+bodies are encrypted.
+
 ## Controlled experiments
 
 ```
@@ -127,8 +156,18 @@ bin/analyze      summarise a capture
 bin/extract      cut a capture down to a host/port/filter
 bin/experiment   guided one-state-per-file capture run
 bin/compare      byte-level diff of two captures
+bin/decode       read a capture as Pangolin protocols
+bin/rgba         live view of BEYOND's live-control values
 lib/common.sh    tool discovery, capture directory, JSON helpers
 lib/compare.py   the diff itself
+lib/pangolin.py  the protocol decoder
+lib/rgba_listen.py  the live listener
+```
+
+The decoder has tests, run from the repo root:
+
+```
+python3 -m unittest discover -s tools/traffic/lib -p '*_test.py'
 ```
 
 Captures are git-ignored: they contain your network's traffic, and they are big.

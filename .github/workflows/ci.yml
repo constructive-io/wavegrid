@@ -39,6 +39,9 @@ jobs:
       - name: Test
         run: pnpm -r --if-present run test
 
+      - name: Test traffic toolkit
+        run: python3 -m unittest discover -s tools/traffic/lib -p '*_test.py'
+
   build-windows:
     runs-on: windows-latest
 

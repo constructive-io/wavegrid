@@ -23,3 +23,6 @@ deploy/light-map.json
 # Traefik runtime files (generated / contains secrets)
 deploy/traefik/dynamic.toml
 deploy/traefik/acme.json
+
+# python bytecode from the traffic toolkit
+**/__pycache__/

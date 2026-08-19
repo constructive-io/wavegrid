@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#
+# decode — read a capture as Pangolin protocols instead of as bytes.
+#
+# Usage: ./bin/decode <capture.pcapng> [--hex N]
+#
+# Prints the FB4s that announced themselves (UDP 9022), what BEYOND says its
+# live control holds per zone (UDP 16062), and the framing/rate of the frame
+# stream to each FB4 (TCP 3348). Passive: it only reads the file.
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+
+TSHARK="$(need_tool tshark)"
+command -v python3 >/dev/null || { echo 'error: python3 is required for decode' >&2; exit 127; }
+
+exec python3 "$TRAFFIC_ROOT/lib/pangolin.py" --tshark "$TSHARK" "$@"
