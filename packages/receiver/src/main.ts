@@ -28,6 +28,13 @@ import { Receiver, ShardConfig } from './receiver';
 export interface ReceiverHandle {
   receiver: Receiver;
   stop: () => void;
+  /**
+   * What this receiver is actually driving, e.g. `['Console', 'BEYOND OSC →
+   * 127.0.0.1:8000 (row-major, rgb)']`. Surfaced so an embedding app can tell
+   * an operator that the show is console-only instead of leaving them to guess
+   * from dark lasers.
+   */
+  outputs: string[];
 }
 
 const RECEIVER_VERSION = '0.4.1';
@@ -228,7 +235,7 @@ export function startReceiver(resolved: ResolvedConfig = loadWavegridConfig()): 
   console.log(`  → Log file: ${LOG_FILE}`);
 
   const stop = () => receiver.stop();
-  return { receiver, stop };
+  return { receiver, stop, outputs: outputLabels };
 
   function loadPhysicalLightMap(numCannons: number): number[] | null {
     if (!fs.existsSync(LIGHT_MAP_FILE)) return null;

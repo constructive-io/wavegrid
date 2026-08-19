@@ -526,7 +526,7 @@ export function App() {
           nothing may be looked for until you open it. */}
       {route === 'traffic' && <TrafficRoute />}
       {/* OSC debugger: probes and single sends only, and only while open. */}
-      {route === 'osc' && <OscRoute activeProject={editingProject} />}
+      {route === 'osc' && <OscRoute activeProject={editingProject} status={status} />}
       {route === 'settings' && (
         <SettingsRoute
           info={storeInfo}

@@ -9,11 +9,12 @@ import { createRequire } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 
-import { loadWavegridConfig, type ResolvedConfig } from '@wavegrid/layout';
+import type { ResolvedConfig } from '@wavegrid/layout';
 import type { ReceiverHandle } from '@wavegrid/receiver';
 import type { ServerHandle } from '@wavegrid/server';
 import { openStore, type SettingsStore } from '@wavegrid/settings';
 
+import { applyReceiverEnv, resolveProjectConfig } from '@/main/receiver-env';
 import { runtime, sendToRenderer } from '@/main/runtime';
 import type { BrainStatus } from '@/types/ipc';
 
@@ -70,15 +71,6 @@ function applyServerEnv(store: SettingsStore, project: string): void {
   if (uiDir) process.env.WG_UI_DIR = uiDir;
 }
 
-function applyReceiverEnv(store: SettingsStore, project: string): void {
-  if (!process.env.WG_RECEIVER_KEY) process.env.WG_RECEIVER_KEY = store.requireSecret(project, 'receiverKey');
-  process.env.WG_STATE_DIR = store.stateDir(project);
-  process.env.RECEIVER_LOG = join(store.logsDir(project), 'receiver.log');
-  const device = store.getDevice();
-  process.env.WG_DEVICE_ID = device.id;
-  process.env.WG_DEVICE_NAME = device.name;
-}
-
 export function status(): BrainStatus {
   const s: BrainStatus = current
     ? {
@@ -89,6 +81,7 @@ export function status(): BrainStatus {
       receiverRunning: current.receiver != null,
       lanUrls: lanAddresses().map((ip) => `http://${ip}:${new URL(current!.url).port}`),
       receiverError: current.receiverError,
+      receiverOutputs: current.receiver?.outputs ?? [],
       lastError: null
     }
     : {
@@ -99,6 +92,7 @@ export function status(): BrainStatus {
       receiverRunning: false,
       lanUrls: [],
       receiverError: null,
+      receiverOutputs: [],
       lastError
     };
   runtime.lastStatus = s;
@@ -128,9 +122,8 @@ async function start(project: string): Promise<BrainStatus> {
   if (!store.hasProject(project)) throw new Error(`Unknown project: ${project}`);
   if (store.getActiveProject() !== project) store.setActiveProject(project);
 
-  const resolved: ResolvedConfig = loadWavegridConfig();
+  const resolved: ResolvedConfig = resolveProjectConfig();
   applyServerEnv(store, project);
-  applyReceiverEnv(store, project);
 
   const { startServer } = await import('@wavegrid/server');
   const server = startServer(resolved);
@@ -146,6 +139,7 @@ async function start(project: string): Promise<BrainStatus> {
   let receiver: ReceiverHandle | null = null;
   let receiverError: string | null = null;
   try {
+    applyReceiverEnv(store, project, resolved);
     const { startReceiver } = await import('@wavegrid/receiver');
     receiver = startReceiver(resolved);
   } catch (err) {
@@ -174,7 +168,7 @@ async function start(project: string): Promise<BrainStatus> {
 export function runningBind(): { host: string; port: number } | null {
   if (!current) return null;
   return {
-    host: loadWavegridConfig().config.server.host,
+    host: resolveProjectConfig().config.server.host,
     port: Number(new URL(current.url).port)
   };
 }
@@ -195,10 +189,11 @@ export async function startLocalReceiver(): Promise<BrainStatus> {
   if (current.receiver) return status();
 
   const store = openStore();
-  applyReceiverEnv(store, current.project);
   const { startReceiver } = await import('@wavegrid/receiver');
   try {
-    current.receiver = startReceiver(loadWavegridConfig());
+    const resolved = resolveProjectConfig();
+    applyReceiverEnv(store, current.project, resolved);
+    current.receiver = startReceiver(resolved);
     current.receiverError = null;
   } catch (err) {
     current.receiverError = err instanceof Error ? err.message : String(err);

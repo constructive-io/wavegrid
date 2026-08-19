@@ -18,6 +18,7 @@ export const runtime: Runtime = {
     receiverRunning: false,
     lanUrls: [],
     receiverError: null,
+    receiverOutputs: [],
     lastError: null
   }
 };

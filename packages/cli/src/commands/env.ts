@@ -1,60 +1,13 @@
-import { loadWavegridConfig, type WavegridConfig } from '@wavegrid/layout';
+import { configEnvMap, loadWavegridConfig } from '@wavegrid/layout';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import c from 'yanse';
 
 import { type Flags, getStore, resolveProjectName } from '../project';
 
-/**
- * Project the non-secret resolved config into the env-var names the server and
- * receiver read directly. This is how config authored in the store or a local
- * wavegrid.json (not env) reaches the runtime.
- */
-export function configEnvMap(config: WavegridConfig): Record<string, string> {
-  const env: Record<string, string> = {};
-  const set = (k: string, v: string | number | undefined) => {
-    if (v !== undefined && v !== '') env[k] = String(v);
-  };
-
-  if (config.layout.preset) set('WAVEGRID_LAYOUT', config.layout.preset);
-  set('WAVEGRID_MODE', config.mode);
-  set('WAVEGRID_HOST', config.server.host);
-  set('WAVEGRID_PORT', config.server.port);
-  set('WAVEGRID_UI_PORT', config.ui.port);
-  set('SIMULATOR_URL', `ws://localhost:${config.server.port}`);
-
-  set('RECEIVER_ALPHA', config.receiver.alpha);
-  set('FALLBACK_DELAY', config.receiver.fallbackDelay);
-  if (config.receiver.shard) {
-    set('SHARD_START', config.receiver.shard.start);
-    set('SHARD_END', config.receiver.shard.end);
-  }
-  set('LIGHT_MAP_CONFIG', config.receiver.lightMap);
-
-  if (config.osc.beyond) {
-    set('BEYOND_HOST', config.osc.beyond.host);
-    set('BEYOND_PORT', config.osc.beyond.port);
-    set('BEYOND_GRID_ORDER', config.osc.beyond.gridOrder);
-  }
-  if (config.osc.fb4) {
-    set('FB4_HOST', config.osc.fb4.host);
-    set('FB4_PORT', config.osc.fb4.port);
-  }
-  set('ROUTING_CONFIG', config.osc.routingConfig);
-
-  if (config.debug.osc) set('DEBUG_OSC', '1');
-  set('DEBUG_UI_PORT', config.debug.uiPort);
-
-  return env;
-}
-
-/** Set config-derived env vars that aren't already present (operator env wins). */
-export function applyConfigToEnv(config: WavegridConfig): void {
-  const map = configEnvMap(config);
-  for (const [k, v] of Object.entries(map)) {
-    if (!process.env[k]) process.env[k] = v;
-  }
-}
+// The config→env projection lives in @wavegrid/layout beside the loader that
+// parses it back, so the desktop app applies exactly what the CLI does.
+export { applyConfigToEnv, configEnvMap } from '@wavegrid/layout';
 
 /**
  * Build the `.env` lines for a project from its resolved config + secrets.
