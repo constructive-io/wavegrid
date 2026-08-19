@@ -460,7 +460,7 @@ export default function Home() {
   const [configRev, setConfigRev] = useState(0);
   const config = useConfig(configRev);
   const { user, token, checked, endedSession, lastUser, login, sessionEnded } = useAuth();
-  const { connection, grid, orientation, playlistState, settings, send } = useSocket(
+  const { connection, grid, orientation, playlistState, settings, epoch, send } = useSocket(
     config?.simulatorUrl ?? null,
     token,
     useCallback(() => setConfigRev((n) => n + 1), [])
@@ -515,6 +515,9 @@ export default function Home() {
 
   // Sync slider state from server on initial connect
   const settingsSyncedRef = useRef(false);
+  useEffect(() => {
+    settingsSyncedRef.current = false;
+  }, [epoch]);
   useEffect(() => {
     if (!settings || settingsSyncedRef.current) return;
     settingsSyncedRef.current = true;
