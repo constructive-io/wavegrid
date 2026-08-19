@@ -1,7 +1,7 @@
 import { browse } from '@wavegrid/discovery';
 import { autoMap, resolveLayout } from '@wavegrid/layout';
 import { openStore } from '@wavegrid/settings';
-import { dialog, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 
 import {
   sendToBrain,
@@ -15,7 +15,6 @@ import { buildDoctorReport } from '@/main/doctor';
 import { invalidateLaserView, type LaserSyncState, syncLaser } from '@/main/laser-view';
 import { buildLightMapView } from '@/main/light-map';
 import { buildNetworkReport } from '@/main/network';
-import { applyNovaLook, novaBlackout, setNovaSpeed } from '@/main/nova';
 import {
   clearOscLog,
   oscDebugState,
@@ -32,19 +31,6 @@ import {
   knownPresets,
   toEditable
 } from '@/main/project-config';
-import {
-  analyzeCapture,
-  captureState,
-  compareCaptures,
-  listCaptures,
-  readSettings,
-  startCapture,
-  stopCapture,
-  trafficDiscover,
-  trafficDoctor,
-  trafficInterfaces,
-  writeSettings
-} from '@/main/traffic';
 import { exportProjectToFile, importProjectFromFile } from '@/main/transfer';
 import type {
   DeviceInfo,
@@ -60,7 +46,6 @@ import type {
   ShardRange,
   StoreClearResult,
   StoreInfo,
-  TrafficCaptureRequest,
   UserRole
 } from '@/types/ipc';
 
@@ -327,12 +312,6 @@ export function registerAllIpc(): void {
     sendToBrain(project, { type: 'calibration_mode', enabled: false });
   });
 
-  // Nova panel: run an amber look on the live rig. The look id is validated
-  // against the shared catalog in `nova.ts`; nothing else can be injected.
-  ipcMain.handle('nova:apply', (_e, project: string, look: string) => applyNovaLook(project, look));
-  ipcMain.handle('nova:speed', (_e, project: string, value: number) => setNovaSpeed(project, value));
-  ipcMain.handle('nova:blackout', (_e, project: string) => novaBlackout(project));
-
   ipcMain.handle('projects:exportToFile', (_e, project: string, includeSecrets: boolean) =>
     exportProjectToFile(project, includeSecrets)
   );
@@ -376,34 +355,7 @@ export function registerAllIpc(): void {
     return { ...summary, info: storeInfo() };
   });
 
-  // Traffic panel (Advanced → Traffic): passive observation only. Wireshark is
-  // looked for when the panel asks, never at startup, so a machine without it
-  // runs the rest of the app untouched.
-  ipcMain.handle('traffic:doctor', () => trafficDoctor());
-  ipcMain.handle('traffic:interfaces', (_e, host?: string) => trafficInterfaces(host));
-  ipcMain.handle('traffic:discover', (_e, iface?: string, seconds?: number) =>
-    trafficDiscover(iface, seconds)
-  );
-  ipcMain.handle('traffic:start', (_e, req: TrafficCaptureRequest) => startCapture(req));
-  ipcMain.handle('traffic:stop', () => stopCapture());
-  ipcMain.handle('traffic:status', () => captureState());
-  ipcMain.handle('traffic:captures', () => listCaptures());
-  ipcMain.handle('traffic:analyze', (_e, path: string, host?: string) => analyzeCapture(path, host));
-  ipcMain.handle('traffic:compare', (_e, a: string, b: string, host?: string) =>
-    compareCaptures(a, b, host)
-  );
-  ipcMain.handle('traffic:settings', () => readSettings());
-  ipcMain.handle('traffic:setCaptureDir', (_e, dir: string) => writeSettings(dir));
-  ipcMain.handle('traffic:chooseCaptureDir', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
-      title: 'Where should captures be saved?',
-      properties: ['openDirectory', 'createDirectory']
-    });
-    if (canceled || !filePaths[0]) return null;
-    return writeSettings(filePaths[0]);
-  });
-
-  // OSC debugger (Advanced → OSC). Local UDP only, single messages, at the
+  // OSC debugger (Output → Advanced). Local UDP only, single messages, at the
   // project's own configured target — never a running show.
   ipcMain.handle('oscDebug:state', (_e, project: string) => oscDebugState(project));
   ipcMain.handle('oscDebug:probe', (_e, project: string) => probeOscTarget(project));

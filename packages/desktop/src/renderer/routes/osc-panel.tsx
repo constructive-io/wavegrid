@@ -1,5 +1,6 @@
 /**
- * Advanced → OSC. The screen to open when the lasers do not respond.
+ * Output → Advanced. The panel to open when the lasers do not respond, one tab
+ * away from the target it is debugging.
  *
  * OSC rides UDP, so a show aimed at the wrong port looks exactly like a working
  * one: nothing errors, nothing arrives. This panel replaces that silence with
@@ -29,7 +30,7 @@ import { Separator } from '@/components/ui/separator';
 import { oscOutputs } from '@/renderer/lib/show-output';
 import type { BrainStatus, OscDebugPreset, OscDebugState, OscProbeState } from '@/types/ipc';
 
-interface OscRouteProps {
+interface OscPanelProps {
   activeProject: string | null;
   status: BrainStatus;
 }
@@ -67,7 +68,7 @@ function clock(at: number): string {
   return new Date(at).toLocaleTimeString();
 }
 
-export function OscRoute({ activeProject, status: brain }: OscRouteProps) {
+export function OscPanel({ activeProject, status: brain }: OscPanelProps) {
   const api = window.wavegrid.oscDebug;
   const [state, setState] = React.useState<OscDebugState | null>(null);
   const [zone, setZone] = React.useState('');

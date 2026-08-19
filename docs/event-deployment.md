@@ -134,7 +134,7 @@ graph TD
 
 ## Troubleshooting
 
-Advanced → OSC in the desktop app is the fastest first look: it shows the
+Output → Advanced in the desktop app is the fastest first look: it shows the
 resolved target and port, probes it, reads BEYOND.ini where BEYOND is installed
 locally, sends blackout / full white / full amber (one zone or all) and tails
 every message in and out.

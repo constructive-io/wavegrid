@@ -477,7 +477,12 @@ export default function Home() {
     if (saved && tabs.some((t) => t.key === saved)) return saved as GridMode;
     return 'paint';
   });
-  const [layout, setLayout] = useState<PanelLayout>('bottom');
+  // Beside the grid, not under it: the parameters are read while looking at the
+  // rig, and a bottom panel pushes the grid off a short window.
+  const [layout, setLayout] = useState<PanelLayout>(() => {
+    if (typeof window === 'undefined') return 'right';
+    return localStorage.getItem('wavegrid-panel-layout') === 'bottom' ? 'bottom' : 'right';
+  });
   const [hue, setHue] = useState(220);
   const [sat, setSat] = useState(90);
   const [bright, setBright] = useState(100);
@@ -1109,7 +1114,13 @@ export default function Home() {
             </div>
             {/* Layout toggle */}
             <button
-              onClick={() => setLayout((l) => l === 'bottom' ? 'right' : 'bottom')}
+              onClick={() =>
+                setLayout((l) => {
+                  const next = l === 'bottom' ? 'right' : 'bottom';
+                  localStorage.setItem('wavegrid-panel-layout', next);
+                  return next;
+                })
+              }
               className="flex items-center justify-center transition-all"
               title={layout === 'bottom' ? 'Panel: right side' : 'Panel: bottom'}
               style={headerBtnStyle}

@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Cog, Cpu, Flame, FolderKanban, Lightbulb, MonitorPlay, Radio, ShieldCheck, SlidersHorizontal, Waves, X } from 'lucide-react';
+import { Activity, AlertTriangle, Cog, Cpu, FolderKanban, Lightbulb, MonitorPlay, Radio, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import * as React from 'react';
 
 import { type AppLinkRenderer } from '@/components/ui/app-bar';
@@ -28,8 +28,6 @@ import { AccessRoute } from '@/renderer/routes/access-route';
 import { ConfigRoute } from '@/renderer/routes/config-route';
 import { DevicesRoute } from '@/renderer/routes/devices-route';
 import { LightsRoute } from '@/renderer/routes/lights-route';
-import { NovaRoute } from '@/renderer/routes/nova-route';
-import { OscRoute } from '@/renderer/routes/osc-route';
 import { OutputRoute } from '@/renderer/routes/output-route';
 import { ProjectSwitcher } from '@/renderer/routes/project-switcher';
 import { ProjectsRoute } from '@/renderer/routes/projects-route';
@@ -37,13 +35,11 @@ import { SettingsRoute } from '@/renderer/routes/settings-route';
 import { ShowRoute } from '@/renderer/routes/show-route';
 import { StatusRoute } from '@/renderer/routes/status-route';
 import { SwitchProjectDialog } from '@/renderer/routes/switch-project-dialog';
-import { TrafficRoute } from '@/renderer/routes/traffic-route';
 
 type AppIcon = React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
 
 const ROUTE_ICON: Record<Route, AppIcon> = {
   show: MonitorPlay,
-  nova: Flame,
   status: Activity,
   projects: FolderKanban,
   config: SlidersHorizontal,
@@ -51,8 +47,6 @@ const ROUTE_ICON: Record<Route, AppIcon> = {
   lights: Lightbulb,
   output: Radio,
   devices: Cpu,
-  osc: Radio,
-  traffic: Waves,
   settings: Cog
 };
 
@@ -343,8 +337,6 @@ export function App() {
       void refreshSecrets();
     }
     if (route === 'lights') void refreshLightMap();
-    // Nova previews the project's own ring, so it needs the resolved layout.
-    if (route === 'nova') void refreshConfig();
     if (route === 'output') void refreshOsc();
     if (route === 'settings') void refreshStore();
     if (route === 'status') void refreshDoctor();
@@ -397,23 +389,6 @@ export function App() {
           onStart={onStart}
           onStop={onStop}
           busy={busy}
-        />
-      )}
-      {route === 'nova' && (
-        <NovaRoute
-          project={editingProject}
-          layoutLabel={config?.layoutLabel ?? null}
-          count={config?.cannonCount ?? 6}
-          brainLive={status.running && status.project === editingProject}
-          onApply={(look) => {
-            if (editingProject) void window.wavegrid.nova.apply(editingProject, look);
-          }}
-          onSpeed={(value) => {
-            if (editingProject) void window.wavegrid.nova.speed(editingProject, value);
-          }}
-          onBlackout={() => {
-            if (editingProject) void window.wavegrid.nova.blackout(editingProject);
-          }}
         />
       )}
       {route === 'status' && (
@@ -520,13 +495,9 @@ export function App() {
           target={oscTarget}
           onSave={(target) => withBusy(() => saveOsc(target))}
           busy={busy}
+          status={status}
         />
       )}
-      {/* Traffic loads itself: it is the only screen that touches Wireshark, and
-          nothing may be looked for until you open it. */}
-      {route === 'traffic' && <TrafficRoute />}
-      {/* OSC debugger: probes and single sends only, and only while open. */}
-      {route === 'osc' && <OscRoute activeProject={editingProject} status={status} />}
       {route === 'settings' && (
         <SettingsRoute
           info={storeInfo}
