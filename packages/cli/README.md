@@ -97,6 +97,32 @@ than emitted. See [`docs/light-indexing.md`](../../docs/light-indexing.md).
 A one-laptop show skips all of it — `wavegrid projects osc` points straight at
 BEYOND or FB4.
 
+### `wavegrid signals` — debugging what reaches Pangolin
+
+The show sends a whole grid 30 times a second, which is the wrong instrument for
+"did BEYOND get anything at all?" and "which zone is fixture 7?". These send by
+hand, over the project's configured OSC target (or `--host` / `--port`):
+
+```sh
+wavegrid signals send /beyond/zone/0/livecontrol/red 255   # one message
+wavegrid signals probe --zones 0-11 --hold 500             # light one zone at a time
+wavegrid signals listen --port 7001                        # print what arrives
+```
+
+`send` arguments are floats unless tagged (`i:3` integer, `s:text` string), since
+an int where the receiver expects a float tends to be dropped silently. `probe`
+uses the same encoders as the show and blacks out when it finishes; `listen`
+binds a port, so pointing the show at `--host 127.0.0.1 --port <n>` shows the
+exact stream the hardware would receive.
+
+For BEYOND to act on any of it, its OSC server must be enabled (BEYOND's
+settings — check the port there rather than assuming; `projects osc` defaults to
+7001 for BEYOND, 8000 for FB4) and the zone has to be under live control.
+
+This is aimed output on a configured target, unrelated to
+[`tools/traffic`](../../tools/traffic), which stays passive — it observes
+BEYOND ⇄ FB4 traffic and never transmits.
+
 ### `wavegrid config` (or `wavegrid --print-config`)
 
 Resolves the configuration and prints it with per-key provenance so it is obvious

@@ -1,3 +1,7 @@
+// Hand-driven OSC for debugging what reaches the hardware
+export type { OscArg, OscListener, ReceivedOsc } from './debug';
+export { listenForOsc, parseIndexRange, parseOscArg, probeGrid, sendOscMessage } from './debug';
+
 // Color conversion
 export type { RGB } from './color';
 export { hsbToRgb, hsbToRgb100, hsbToRgb255 } from './color';

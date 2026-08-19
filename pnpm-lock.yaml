@@ -82,6 +82,9 @@ importers:
       '@wavegrid/layout':
         specifier: workspace:*
         version: link:../layout/dist
+      '@wavegrid/osc':
+        specifier: workspace:*
+        version: link:../osc/dist
       '@wavegrid/receiver':
         specifier: workspace:*
         version: link:../receiver/dist
