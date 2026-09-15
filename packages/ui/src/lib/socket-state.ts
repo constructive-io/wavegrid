@@ -1,3 +1,11 @@
+import type { PoolSnapshot } from '@wavegrid/pool';
+
+/** The server-run pool, as broadcast for viewers to draw. */
+export interface PoolState extends PoolSnapshot {
+  active: boolean;
+  touches: number;
+}
+
 export interface CannonColor {
   h: number;
   s: number;
@@ -33,6 +41,7 @@ export interface SocketSnapshot {
   orientation: Orientation;
   playlistState: PlaylistState | null;
   settings: Settings | null;
+  pool: PoolState | null;
   epoch: number;
   lastMessageAt: number;
 }
@@ -47,6 +56,7 @@ export function createSocketSnapshot(now = 0): SocketSnapshot {
     orientation: { rotation: 0, flipH: false, flipV: false },
     playlistState: null,
     settings: null,
+    pool: null,
     epoch: 0,
     lastMessageAt: now
   };
@@ -107,6 +117,19 @@ export function applySocketMessage(
         attack: typeof message.attack === 'number' ? message.attack : 1.0,
         speed: typeof message.speed === 'number' ? message.speed : 1.0,
         animation: typeof message.animation === 'string' ? message.animation : null
+      },
+      lastMessageAt: now
+    };
+  case 'pool':
+    if (!Array.isArray(message.sources) || !message.settings) return snapshot;
+    return {
+      ...snapshot,
+      pool: {
+        active: !!message.active,
+        touches: typeof message.touches === 'number' ? message.touches : 0,
+        settings: message.settings as PoolState['settings'],
+        sources: message.sources as PoolState['sources'],
+        spiral: (message.spiral as PoolState['spiral']) ?? { cx: 0.5, cy: 0.5, omega: 0 }
       },
       lastMessageAt: now
     };

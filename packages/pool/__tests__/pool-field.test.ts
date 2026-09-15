@@ -8,7 +8,7 @@ import {
   PoolField,
   quantize,
   spiralOmega
-} from '../src/lib/pool-field';
+} from '../src/pool-field';
 
 const COLOR = { hue: 200, sat: 85, bright: 100 };
 const DT = 1 / 60;
@@ -27,7 +27,7 @@ function run(field: PoolField, seconds: number, each?: (out: Hsb[], t: number) =
   return out;
 }
 
-const maxB = (out: Hsb[]) => Math.max(...out.map((c) => c.b));
+const maxB = (out: readonly Hsb[]) => Math.max(...out.map((c) => c.b));
 const total = (out: Hsb[]) => out.reduce((a, c) => a + c.b, 0);
 
 describe('cannonPoints', () => {

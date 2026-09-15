@@ -1,5 +1,14 @@
 import { advertise, type AdvertiseHandle } from '@wavegrid/discovery';
 import { type Layout, loadWavegridConfig, type ResolvedConfig } from '@wavegrid/layout';
+import {
+  cannonPoints,
+  DEFAULT_POOL_SETTINGS,
+  OutputSmoother,
+  PoolField,
+  type PoolSettings,
+  quantize,
+  sameHsb
+} from '@wavegrid/pool';
 import { isValidScope, openStore } from '@wavegrid/settings';
 import * as fs from 'fs';
 import http from 'http';
@@ -101,6 +110,7 @@ interface PersistedState {
   shiftVy: number;
   grid: Array<{ h: number; s: number; b: number }>;
   playlist: PlaylistDef | null;
+  poolSettings?: PoolSettings;
 }
 
 function loadPersistedState(): PersistedState | null {
@@ -127,7 +137,8 @@ function scheduleSave() {
       shiftVx,
       shiftVy,
       grid: grid.map(c => ({ h: c.targetH, s: c.targetS, b: c.targetB })),
-      playlist: activePlaylist
+      playlist: activePlaylist,
+      poolSettings: pool.settings
     };
     try {
       fs.mkdirSync(STATE_DIR, { recursive: true });
@@ -157,6 +168,88 @@ let shiftVy = 0;
 let shiftAccX = 0;
 let shiftAccY = 0;
 let activePlaylist: PlaylistDef | null = null;
+
+// ── The Pool ──────────────────────────────────────────────────────
+// The server owns the field: UIs only send fingers. It keeps drifting and
+// dissolving when every iPad is gone, and several iPads stir the same water.
+const pool = new PoolField();
+const poolSmoother = new OutputSmoother(NUM_CANNONS);
+/** UI-order sample points, in the same 0..1 square the fingers arrive in. */
+const poolPoints = cannonPoints(NUM_CANNONS, GRID_COLUMNS, layout.fixtures);
+/** Last quantized value sent per grid index, so receivers only hear changes. */
+let poolSent = grid.map(() => ({ h: 0, s: 0, b: 0 }));
+/** True while the pool is the base producer writing grid targets each tick. */
+let poolActive = false;
+let poolFrame = 0;
+/** Which finger ids each socket owns, so a dropped iPad lifts its fingers. */
+const poolTouchOwners = new Map<WebSocket, Set<string>>();
+let poolClientSeq = 0;
+const poolClientIds = new WeakMap<WebSocket, number>();
+
+function poolTouchId(ws: WebSocket, id: unknown): string {
+  let cid = poolClientIds.get(ws);
+  if (cid === undefined) {
+    cid = ++poolClientSeq;
+    poolClientIds.set(ws, cid);
+  }
+  return `${cid}:${String(id)}`;
+}
+
+/** Another producer took the grid — the pool lets go without touching targets. */
+function deactivatePool() {
+  if (!poolActive && pool.sourceCount === 0 && pool.touchCount === 0) return;
+  poolActive = false;
+  pool.reset();
+  poolSmoother.reset();
+  poolTouchOwners.clear();
+  broadcastPool();
+}
+
+/** The pool takes the grid, the way a paint stroke or an animation would. */
+function activatePool() {
+  if (poolActive) return;
+  currentAnimation = null;
+  cancelPlaylistIfActive();
+  patternEngine.stop();
+  poolSmoother.reset();
+  poolSent = grid.map(c => quantize({ h: c.targetH, s: c.targetS, b: c.targetB }));
+  poolActive = true;
+  scheduleSave();
+}
+
+function poolPayload(): string {
+  return JSON.stringify({ type: 'pool', active: poolActive, touches: pool.touchCount, ...pool.snapshot() });
+}
+
+function broadcastPool() {
+  fanoutLossy(wss.clients, poolPayload(), dropClient);
+}
+
+/** One 60 fps step: run the field, sample the fixtures, write grid targets. */
+function tickPool(dt: number) {
+  pool.step(dt);
+  const out = poolSmoother.step(pool.sampleAll(poolPoints), dt);
+  // Receivers hear the pool the way they hear paint: changed cells, ~15 Hz.
+  const emit = ++poolFrame % 4 === 0;
+  const cells: Array<{ idx: number; h: number; s: number; b: number }> = [];
+  for (let ui = 0; ui < out.length; ui++) {
+    const gi = mapUiToGrid(ui, GRID_COLUMNS, GRID_ROWS, orientation);
+    if (gi < 0 || gi >= grid.length) continue;
+    setCannonTarget(grid, gi, out[ui].h, out[ui].s, out[ui].b, currentAttack);
+    if (!emit) continue;
+    const q = quantize(out[ui]);
+    if (!sameHsb(q, poolSent[gi])) {
+      poolSent[gi] = q;
+      cells.push({ idx: gi, ...q });
+    }
+  }
+  if (!emit) return;
+  if (cells.length > 0) {
+    broadcastCommand({ action: 'paint', cells });
+    framesSinceLastCommand = 0;
+  }
+  broadcastPool();
+}
 let playlistCurrentStep = 0;
 const patternEngine = new ServerPatternEngine(layout);
 
@@ -170,6 +263,7 @@ if (restored) {
   if (restored.orientation) orientation = { ...defaultOrientation(), ...restored.orientation };
   shiftVx = restored.shiftVx ?? 0;
   shiftVy = restored.shiftVy ?? 0;
+  if (restored.poolSettings) pool.settings = { ...DEFAULT_POOL_SETTINGS, ...restored.poolSettings };
   if (Array.isArray(restored.grid)) {
     for (let i = 0; i < Math.min(restored.grid.length, grid.length); i++) {
       const c = restored.grid[i];
@@ -591,6 +685,12 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   ws.on('close', () => {
     clients.delete(ws);
     liveness.delete(ws);
+    // A dropped iPad lifts its fingers; the water keeps moving on its own.
+    const owned = poolTouchOwners.get(ws);
+    if (owned) {
+      for (const id of owned) pool.pointerUp(id);
+      poolTouchOwners.delete(ws);
+    }
   });
   ws.on('error', (error) => dropClient(ws, error));
   ws.on('pong', () => {
@@ -631,6 +731,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   if (shiftVx !== 0 || shiftVy !== 0) {
     sendToClient(ws, JSON.stringify({ type: 'command', action: 'setShift', vx: shiftVx, vy: shiftVy }));
   }
+  sendToClient(ws, poolPayload());
 
   ws.on('message', (raw) => {
     try {
@@ -682,17 +783,62 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         handleSyncMerge(msg as SyncMergeMessage);
         return;
       }
-      handleMessage(msg);
+      handleMessage(msg, ws);
     } catch {
       // ignore malformed messages
     }
   });
 });
 
-function handleMessage(msg: any) {
+function handleMessage(msg: any, ws?: WebSocket) {
   switch (msg.type) {
+  case 'pool_touch': {
+    if (typeof msg.x !== 'number' || typeof msg.y !== 'number') break;
+    // In-process `send()` has no socket; its fingers belong to the brain itself.
+    const id = ws ? poolTouchId(ws, msg.id) : `0:${String(msg.id)}`;
+    if (msg.phase === 'down') {
+      activatePool();
+      const c = msg.color ?? {};
+      pool.pointerDown(id, msg.x, msg.y, {
+        hue: typeof c.hue === 'number' ? c.hue : 0,
+        sat: typeof c.sat === 'number' ? c.sat : 100,
+        bright: typeof c.bright === 'number' ? c.bright : 100
+      });
+      if (ws) {
+        let owned = poolTouchOwners.get(ws);
+        if (!owned) poolTouchOwners.set(ws, (owned = new Set()));
+        owned.add(id);
+      }
+    } else if (msg.phase === 'move') {
+      pool.pointerMove(id, msg.x, msg.y);
+    } else if (msg.phase === 'up') {
+      pool.pointerUp(id);
+      if (ws) poolTouchOwners.get(ws)?.delete(id);
+    }
+    break;
+  }
+  case 'pool_settings': {
+    const s = pool.settings;
+    const mode = msg.mode === 'flow' || msg.mode === 'spiral' || msg.mode === 'droplets' ? msg.mode : s.mode;
+    const num = (v: unknown, prev: number) =>
+      typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : prev;
+    pool.settings = {
+      mode,
+      motion: num(msg.motion, s.motion),
+      spread: num(msg.spread, s.spread),
+      persistence: num(msg.persistence, s.persistence)
+    };
+    broadcastPool();
+    scheduleSave();
+    break;
+  }
+  case 'pool_release':
+    // Dissolve: what glows fades out over about a second; fingers stay live.
+    pool.release();
+    break;
   case 'cannon': {
     currentAnimation = null;
+    deactivatePool();
     const gi = mapUiToGrid(msg.index, GRID_COLUMNS, GRID_ROWS, orientation);
     setCannonTarget(
       grid,
@@ -716,6 +862,7 @@ function handleMessage(msg: any) {
       currentAnimation = null;
       cancelPlaylistIfActive();
       patternEngine.stop();
+      deactivatePool();
       applyScene(grid, msg.name, layout);
       broadcastCommand({ action: 'setScene', name: msg.name });
       scheduleSave();
@@ -727,12 +874,14 @@ function handleMessage(msg: any) {
       animationTick = 0;
       cancelPlaylistIfActive();
       patternEngine.stop();
+      deactivatePool();
       broadcastCommand({ action: 'setAnimation', name: msg.name, speed: animSpeed });
       scheduleSave();
     } else if (msg.name === 'stop') {
       currentAnimation = null;
       cancelPlaylistIfActive();
       patternEngine.stop();
+      deactivatePool();
       broadcastCommand({ action: 'stop' });
       scheduleSave();
     }
@@ -758,6 +907,7 @@ function handleMessage(msg: any) {
       currentAnimation = null;
       cancelPlaylistIfActive();
       patternEngine.stop();
+      deactivatePool();
       const cells: Array<{ idx: number; h: number; s: number; b: number }> = [];
       for (const uiIdx of msg.indices) {
         const gi = mapUiToGrid(uiIdx, GRID_COLUMNS, GRID_ROWS, orientation);
@@ -830,6 +980,7 @@ function handleMessage(msg: any) {
     currentAnimation = null;
     cancelPlaylistIfActive();
     patternEngine.stop();
+    deactivatePool();
     resetGrid(grid);
     broadcastCommand({ action: 'clear' });
     broadcastState();
@@ -880,6 +1031,7 @@ function handleMessage(msg: any) {
     if (typeof msg.code === 'string') {
       currentAnimation = null;
       cancelPlaylistIfActive();
+      deactivatePool();
       patternEngine.load(msg.code);
       broadcastCommand({
         action: 'evalPattern',
@@ -912,6 +1064,7 @@ function handleMessage(msg: any) {
       activePlaylist = playlistDef;
       playlistCurrentStep = typeof msg.startAt === 'number' ? msg.startAt : 0;
       currentAnimation = null;
+      deactivatePool();
       const compiled = compilePlaylist(playlistDef, playlistCurrentStep);
       patternEngine.load(compiled);
       broadcastCommand({ action: 'evalPattern', code: compiled, params: {} });
@@ -954,6 +1107,8 @@ const tickTimer = setInterval(() => {
   if (!calibrationMode && currentAnimation && animations[currentAnimation]) {
     animations[currentAnimation](grid, animationTick, currentAttack, layout);
     animationTick += animSpeed;
+  } else if (!calibrationMode && poolActive) {
+    tickPool(TICK_MS / 1000);
   } else if (!calibrationMode && patternEngine.active) {
     // Render evalPattern locally for UI preview — write to targets so tickGrid lerps smoothly
     const previewGrid = grid.map(c => ({ h: c.targetH, s: c.targetS, b: c.targetB }));

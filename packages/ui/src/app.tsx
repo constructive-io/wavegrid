@@ -1,4 +1,5 @@
 import { type Layout, presets } from '@wavegrid/layout/client';
+import { DEFAULT_POOL_SETTINGS, type PoolColor, type PoolSettings } from '@wavegrid/pool';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AudioTab } from '@/components/audio-tab';
@@ -19,7 +20,7 @@ import { NovaTab } from '@/components/nova-tab';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
 import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
-import { PoolCanvas } from '@/components/pool-canvas';
+import { PoolCanvas, type PoolTouchPhase } from '@/components/pool-canvas';
 import { PoolTab } from '@/components/pool-tab';
 import { PrideTab } from '@/components/pride-tab';
 import { SequencesTab } from '@/components/sequences-tab';
@@ -27,7 +28,6 @@ import { ShiftDial } from '@/components/shift-dial';
 import { StatusDot } from '@/components/status-dot';
 import { UsaTab } from '@/components/usa-tab';
 import { VideoTab } from '@/components/video-tab';
-import { DEFAULT_POOL_SETTINGS, type PoolField, type PoolSettings } from '@/lib/pool-field';
 import { useAudio } from '@/lib/use-audio';
 import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
@@ -528,7 +528,7 @@ export default function Home() {
   const [configRev, setConfigRev] = useState(0);
   const config = useConfig(configRev);
   const { user, token, checked, endedSession, lastUser, login, logout, sessionEnded } = useAuth();
-  const { connection, grid, orientation, playlistState, settings, epoch, send } = useSocket(
+  const { connection, grid, orientation, playlistState, settings, pool, epoch, send } = useSocket(
     config?.simulatorUrl ?? null,
     token,
     useCallback(() => setConfigRev((n) => n + 1), [])
@@ -561,16 +561,9 @@ export default function Home() {
   const [smoothness, setSmoothness] = useState(50);
   const [attack, setAttack] = useState(80);
   const [masterBright, setMasterBright] = useState(100);
-  const [poolSettings, setPoolSettings] = useState<PoolSettings>(() => {
-    if (typeof window === 'undefined') return DEFAULT_POOL_SETTINGS;
-    try {
-      const saved = localStorage.getItem('wavegrid-pool');
-      return saved ? { ...DEFAULT_POOL_SETTINGS, ...(JSON.parse(saved) as Partial<PoolSettings>) } : DEFAULT_POOL_SETTINGS;
-    } catch {
-      return DEFAULT_POOL_SETTINGS;
-    }
-  });
-  const poolFieldRef = useRef<PoolField | null>(null);
+  // The pool's settings live in the brain (they outlive this iPad); this is
+  // the slider's local echo so it doesn't lag behind a finger.
+  const [poolSettings, setPoolSettings] = useState<PoolSettings>(DEFAULT_POOL_SETTINGS);
   const [sheetSnap, setSheetSnap] = useState<SnapPoint>('peek');
   const [showMasterSliders, setShowMasterSliders] = useState(false);
   const [viewFlip, setViewFlip] = useState(() => {
@@ -787,29 +780,44 @@ export default function Home() {
 
   const handleClear = useCallback(() => {
     clearTrailFadeTimers();
-    poolFieldRef.current?.reset();
     send({ type: 'clear' });
   }, [clearTrailFadeTimers, send]);
 
-  /** The pool's own cannon path: never a paint trail-fade on top of it. */
-  const handlePoolCannon = useCallback(
-    (index: number, h: number, s: number, b: number) => {
-      send({ type: 'cannon', index, h, s, b });
+  // Whatever the brain says the pool is set to wins — another iPad, or a
+  // restart, may have moved the sliders.
+  // A slider still being dragged keeps its own value until the echoes settle.
+  const poolServerSettings = pool?.settings;
+  const poolEditedAt = useRef(0);
+  useEffect(() => {
+    if (!poolServerSettings || Date.now() - poolEditedAt.current < 600) return;
+    setPoolSettings((prev) =>
+      prev.mode === poolServerSettings.mode &&
+      prev.motion === poolServerSettings.motion &&
+      prev.spread === poolServerSettings.spread &&
+      prev.persistence === poolServerSettings.persistence
+        ? prev
+        : poolServerSettings
+    );
+  }, [poolServerSettings]);
+
+  const handlePoolTouch = useCallback(
+    (id: number, phase: PoolTouchPhase, x: number, y: number, color: PoolColor) => {
+      send({ type: 'pool_touch', id, phase, x, y, color });
     },
     [send]
   );
 
   const handlePoolSettings = useCallback((s: PoolSettings) => {
+    poolEditedAt.current = Date.now();
     setPoolSettings(s);
-    localStorage.setItem('wavegrid-pool', JSON.stringify(s));
-  }, []);
+    send({ type: 'pool_settings', ...s });
+  }, [send]);
 
   const handlePoolRelease = useCallback(() => {
-    poolFieldRef.current?.release();
-  }, []);
+    send({ type: 'pool_release' });
+  }, [send]);
 
   const handlePoolStop = useCallback(() => {
-    poolFieldRef.current?.reset();
     handleGlobalStop();
     handleClear();
   }, [handleClear, handleGlobalStop]);
@@ -1129,11 +1137,11 @@ export default function Home() {
               count={NUM_CANNONS}
               columns={GRID_COLUMNS}
               fixtures={FIXTURES}
-              settings={poolSettings}
+              grid={gridData}
+              pool={pool}
               color={{ hue, sat, bright }}
               viewFlip={viewFlip && hasOrientation ? orientation : null}
-              onCannon={handlePoolCannon}
-              fieldRef={poolFieldRef}
+              onTouch={handlePoolTouch}
             />
           ) : (
             <GridDisplay
@@ -1291,11 +1299,11 @@ export default function Home() {
               count={NUM_CANNONS}
               columns={GRID_COLUMNS}
               fixtures={FIXTURES}
-              settings={poolSettings}
+              grid={gridData}
+              pool={pool}
               color={{ hue, sat, bright }}
               viewFlip={viewFlip && hasOrientation ? orientation : null}
-              onCannon={handlePoolCannon}
-              fieldRef={poolFieldRef}
+              onTouch={handlePoolTouch}
             />
           ) : (
             <GridDisplay
