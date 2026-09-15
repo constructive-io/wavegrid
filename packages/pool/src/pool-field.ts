@@ -71,6 +71,27 @@ interface Source {
   releasing: boolean;
 }
 
+/** Pointer ids are numbers in a browser; the server prefixes them per client. */
+export type TouchId = number | string;
+
+/** Just enough of a source for a client to draw the field the server is running. */
+export interface SourceSnapshot {
+  x: number;
+  y: number;
+  hue: number;
+  sat: number;
+  energy: number;
+  sigma: number;
+  ring: number;
+  kind: 'blob' | 'ring';
+}
+
+export interface PoolSnapshot {
+  settings: PoolSettings;
+  sources: SourceSnapshot[];
+  spiral: { cx: number; cy: number; omega: number };
+}
+
 interface Touch {
   /** Where the finger actually is. */
   tx: number;
@@ -99,6 +120,7 @@ const RELEASE_TAU = 0.9;
 const BLOOM_TAU = 0.4;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const round3 = (v: number) => Math.round(v * 1000) / 1000;
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 /** Fraction of the way to a target that a first-order lag covers in `dt`. */
 export const lagStep = (dt: number, tau: number) => 1 - Math.exp(-dt / Math.max(1e-6, tau));
@@ -126,7 +148,7 @@ export function dropletSpeed(m: number): number {
 export class PoolField {
   settings: PoolSettings;
   private sources: Source[] = [];
-  private touches = new Map<number, Touch>();
+  private touches = new Map<TouchId, Touch>();
   private seq = 0;
   /** Spiral state. The target is where the fingers are; the live value chases it. */
   private spiral = { cx: 0.5, cy: 0.5, omega: 0, targetCx: 0.5, targetCy: 0.5, targetOmega: 0 };
@@ -152,7 +174,7 @@ export class PoolField {
     return { cx: this.spiral.cx, cy: this.spiral.cy, omega: this.spiral.omega };
   }
 
-  pointerDown(id: number, x: number, y: number, color: PoolColor): void {
+  pointerDown(id: TouchId, x: number, y: number, color: PoolColor): void {
     const px = clamp(x, 0, 1);
     const py = clamp(y, 0, 1);
     this.touches.set(id, {
@@ -165,15 +187,20 @@ export class PoolField {
     if (this.settings.mode === 'droplets') this.deposit(px, py, 0, 0, color, 'ring');
   }
 
-  pointerMove(id: number, x: number, y: number): void {
+  pointerMove(id: TouchId, x: number, y: number): void {
     const t = this.touches.get(id);
     if (!t) return;
     t.tx = clamp(x, 0, 1);
     t.ty = clamp(y, 0, 1);
   }
 
-  pointerUp(id: number): void {
+  pointerUp(id: TouchId): void {
     this.touches.delete(id);
+  }
+
+  /** Ids of the fingers currently down. */
+  touchIds(): TouchId[] {
+    return [...this.touches.keys()];
   }
 
   /** Lift every finger — pointer capture lost, tab hidden, etc. */
@@ -379,6 +406,21 @@ export class PoolField {
   /** The sources, read-only, for drawing the field itself. */
   forEachSource(fn: (s: Readonly<Source>) => void): void {
     for (const s of this.sources) fn(s);
+  }
+
+  /** Compact state for broadcasting to viewers; faint sources are dropped. */
+  snapshot(): PoolSnapshot {
+    const sources: SourceSnapshot[] = [];
+    for (const s of this.sources) {
+      if (s.energy < 0.004) continue;
+      sources.push({
+        x: round3(s.x), y: round3(s.y),
+        hue: Math.round(s.hue), sat: Math.round(s.sat),
+        energy: round3(s.energy), sigma: round3(s.sigma), ring: round3(s.ring),
+        kind: s.kind
+      });
+    }
+    return { settings: { ...this.settings }, sources, spiral: this.spiralState };
   }
 
   private deposit(x: number, y: number, vx: number, vy: number, color: PoolColor, kind: Source['kind']): void {

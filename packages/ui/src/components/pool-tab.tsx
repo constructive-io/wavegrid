@@ -1,4 +1,4 @@
-import type { PoolMode, PoolSettings } from '@/lib/pool-field';
+import type { PoolMode, PoolSettings } from '@wavegrid/pool';
 
 import { ControlGrid, ControlGroup } from './control-grid';
 

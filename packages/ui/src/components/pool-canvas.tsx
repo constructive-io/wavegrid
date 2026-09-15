@@ -1,33 +1,27 @@
+import { cannonPoints, type PoolColor } from '@wavegrid/pool';
 import { useCallback, useEffect, useRef } from 'react';
 
-import {
-  cannonPoints,
-  type Hsb,
-  OutputSmoother,
-  type PoolColor,
-  PoolField,
-  type PoolSettings,
-  quantize,
-  sameHsb
-} from '@/lib/pool-field';
-import type { Orientation } from '@/lib/socket-state';
+import type { CannonColor, Orientation, PoolState } from '@/lib/socket-state';
 
-/** How often sampled cannon values go to the server. */
-const SEND_HZ = 15;
+/** Finger positions go to the server at most this often per finger. */
+const MOVE_HZ = 30;
 const REFERENCE_COLS = 7;
 /** Same inset GridDisplay draws inside, so the markers land on Paint's orbs. */
 const INSET = 10;
+
+export type PoolTouchPhase = 'down' | 'move' | 'up';
 
 interface PoolCanvasProps {
   count: number;
   columns: number;
   fixtures?: readonly { u: number; v: number }[];
-  settings: PoolSettings;
+  /** Per-cannon values in UI order — what the lasers are actually doing. */
+  grid: readonly CannonColor[];
+  /** The field as the server is running it. */
+  pool: PoolState | null;
   color: PoolColor;
   viewFlip: Orientation | null;
-  onCannon: (index: number, h: number, s: number, b: number) => void;
-  /** Hands the live field to the parent so Clear / Stop can reach it. */
-  fieldRef: React.MutableRefObject<PoolField | null>;
+  onTouch: (id: number, phase: PoolTouchPhase, x: number, y: number, color: PoolColor) => void;
 }
 
 function orientationToCss(o: Orientation): string {
@@ -43,46 +37,44 @@ function hsl(h: number, s: number, l: number, a = 1): string {
 }
 
 /**
- * The pool itself: a square canvas that draws the continuous field, the
- * fixture markers on top of it, and runs the simulation + output loop.
+ * The pool as seen from an iPad: a square canvas drawing the field the server
+ * is running, with the fixture markers on top filled from the live grid.
  *
- * Every pointer is fed to the field as a touch; the field is what decides
- * what the cannons do. Output is sampled at the configured fixture positions,
- * smoothed, and sent as ordinary `cannon` messages, so mapping, orientation,
- * master brightness and the receiver's low-pass all apply exactly as they do
- * for the paint tab.
+ * The simulation itself lives in the server, so several iPads stir one field
+ * and it keeps drifting when they all go away. This component only forwards
+ * fingers (in the field's 0..1 space, orientation undone) and draws what
+ * comes back.
  */
 export function PoolCanvas({
   count,
   columns,
   fixtures,
-  settings,
+  grid,
+  pool,
   color,
   viewFlip,
-  onCannon,
-  fieldRef
+  onTouch
 }: PoolCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const localField = useRef<PoolField | null>(null);
-  if (!localField.current) localField.current = new PoolField(settings);
-  const field = localField.current;
-  fieldRef.current = field;
-  field.settings = settings;
 
   const colorRef = useRef(color);
   colorRef.current = color;
-  const onCannonRef = useRef(onCannon);
-  onCannonRef.current = onCannon;
+  const onTouchRef = useRef(onTouch);
+  onTouchRef.current = onTouch;
 
   const pointsRef = useRef(cannonPoints(count, columns, fixtures));
   useEffect(() => {
     pointsRef.current = cannonPoints(count, columns, fixtures);
   }, [count, columns, fixtures]);
 
-  const smootherRef = useRef(new OutputSmoother(count));
-  const lastSentRef = useRef<Hsb[]>([]);
+  const gridRef = useRef(grid);
+  gridRef.current = grid;
+  const poolRef = useRef(pool);
+  poolRef.current = pool;
   const sizeRef = useRef(600);
+  /** Fingers down on this canvas, with when each last reported a move. */
+  const activeRef = useRef(new Map<number, number>());
 
   const resize = useCallback(() => {
     const wrap = wrapRef.current;
@@ -107,7 +99,7 @@ export function PoolCanvas({
     return () => ro.disconnect();
   }, [resize]);
 
-  const draw = useCallback((outputs: readonly Hsb[]) => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -124,13 +116,16 @@ export function PoolCanvas({
     const X = (n: number) => INSET + n * area;
     const S = (n: number) => n * area;
 
+    const field = poolRef.current;
+    const sources = field?.active ? field.sources : [];
+
     // The field: every source as a soft radial gradient, additively blended,
     // so overlapping strokes brighten and mix where they meet.
     ctx.globalCompositeOperation = 'lighter';
-    field.forEachSource((s) => {
+    for (const s of sources) {
       const alpha = Math.min(0.55, s.energy * 0.6);
-      if (alpha < 0.01) return;
-      const light = 30 + Math.min(30, s.bright * 0.25);
+      if (alpha < 0.01) continue;
+      const light = 45;
       if (s.kind === 'ring') {
         const r = S(s.ring);
         const w = S(s.sigma) * 2.2;
@@ -140,14 +135,14 @@ export function PoolCanvas({
           g.addColorStop(1, hsl(s.hue, s.sat, light, 0));
           ctx.fillStyle = g;
           ctx.fillRect(0, 0, size, size);
-          return;
+          continue;
         }
         ctx.strokeStyle = hsl(s.hue, s.sat, light, alpha * 0.9);
         ctx.lineWidth = w;
         ctx.beginPath();
         ctx.arc(X(s.x), X(s.y), r, 0, Math.PI * 2);
         ctx.stroke();
-        return;
+        continue;
       }
       const rad = S(s.sigma) * 3;
       const g = ctx.createRadialGradient(X(s.x), X(s.y), 0, X(s.x), X(s.y), rad);
@@ -156,12 +151,12 @@ export function PoolCanvas({
       g.addColorStop(1, hsl(s.hue, s.sat, light, 0));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, size, size);
-    });
+    }
     ctx.globalCompositeOperation = 'source-over';
 
     // Spiral centre, faintly, so you can see what the field is turning about.
-    if (settings.mode === 'spiral') {
-      const sp = field.spiralState;
+    if (field?.active && field.settings.mode === 'spiral') {
+      const sp = field.spiral;
       const strength = Math.min(1, Math.abs(sp.omega) / 0.3);
       if (strength > 0.02) {
         ctx.strokeStyle = `rgba(255,255,255,${0.05 + strength * 0.08})`;
@@ -173,12 +168,13 @@ export function PoolCanvas({
     }
 
     // Cannons: a ring marker at every configured position, filled with the
-    // value about to be sent — this is exactly what the lasers will do.
+    // value the server holds for it — this is exactly what the lasers do.
     const points = pointsRef.current;
+    const values = gridRef.current;
     const orbR = (area / REFERENCE_COLS) * 0.22;
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      const out = outputs[i] ?? { h: 0, s: 0, b: 0 };
+      const out = values[i] ?? { h: 0, s: 0, b: 0 };
       const px = X(p.x);
       const py = X(p.y);
       const b = out.b / 100;
@@ -199,68 +195,31 @@ export function PoolCanvas({
       ctx.strokeStyle = `rgba(255,255,255,${0.18 + 0.5 * b})`;
       ctx.stroke();
     }
-  }, [field, settings.mode]);
+  }, []);
 
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-    let sinceSend = 0;
-    const smoother = smootherRef.current;
-
-    let generation = field.generation;
-    const frame = (now: number) => {
-      const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
-      last = now;
-      if (field.generation !== generation) {
-        // The field was reset (blackout / clear): nothing may glide back up
-        // out of the smoother, and the server already holds zeros.
-        generation = field.generation;
-        smoother.reset();
-        lastSentRef.current = pointsRef.current.map(() => ({ h: 0, s: 0, b: 0 }));
-      }
-      field.step(dt);
-      smoother.resize(pointsRef.current.length);
-      const targets = field.sampleAll(pointsRef.current);
-      const smoothed = smoother.step(targets, dt);
-      draw(smoothed);
-
-      sinceSend += dt;
-      if (sinceSend >= 1 / SEND_HZ) {
-        sinceSend = 0;
-        const sent = lastSentRef.current;
-        for (let i = 0; i < smoothed.length; i++) {
-          const q = quantize(smoothed[i]);
-          const prev = sent[i];
-          if (prev && sameHsb(prev, q)) continue;
-          if (!prev && q.b === 0) {
-            sent[i] = q;
-            continue;
-          }
-          sent[i] = q;
-          onCannonRef.current(i, q.h, q.s, q.b);
-        }
-      }
+    const frame = () => {
+      draw();
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
 
+    const liftAll = () => {
+      for (const id of activeRef.current.keys()) onTouchRef.current(id, 'up', 0, 0, colorRef.current);
+      activeRef.current.clear();
+    };
     const onHide = () => {
-      if (document.hidden) field.releaseAll();
+      if (document.hidden) liftAll();
     };
     document.addEventListener('visibilitychange', onHide);
     return () => {
       cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onHide);
-      // Leaving the tab: the lasers must not freeze at whatever was glowing.
-      field.reset();
-      smoother.reset();
-      const sent = lastSentRef.current;
-      for (let i = 0; i < sent.length; i++) {
-        if (sent[i].b !== 0) onCannonRef.current(i, 0, 0, 0);
-      }
-      lastSentRef.current = [];
+      // Leaving the tab lifts our fingers; the server keeps the water moving.
+      liftAll();
     };
-  }, [draw, field]);
+  }, [draw]);
 
   const toField = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     // The rect is of the *transformed* element; the canvas is square so its
@@ -297,18 +256,24 @@ export function PoolCanvas({
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = toField(e);
-    field.pointerDown(e.pointerId, p.x, p.y, colorRef.current);
-  }, [field, toField]);
+    activeRef.current.set(e.pointerId, performance.now());
+    onTouchRef.current(e.pointerId, 'down', p.x, p.y, colorRef.current);
+  }, [toField]);
 
   const handleMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (field.touchCount === 0) return;
+    const last = activeRef.current.get(e.pointerId);
+    if (last === undefined) return;
+    const now = performance.now();
+    if (now - last < 1000 / MOVE_HZ) return;
+    activeRef.current.set(e.pointerId, now);
     const p = toField(e);
-    field.pointerMove(e.pointerId, p.x, p.y);
-  }, [field, toField]);
+    onTouchRef.current(e.pointerId, 'move', p.x, p.y, colorRef.current);
+  }, [toField]);
 
   const handleUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    field.pointerUp(e.pointerId);
-  }, [field]);
+    if (!activeRef.current.delete(e.pointerId)) return;
+    onTouchRef.current(e.pointerId, 'up', 0, 0, colorRef.current);
+  }, []);
 
   const flipCss = viewFlip ? orientationToCss(viewFlip) : 'none';
 

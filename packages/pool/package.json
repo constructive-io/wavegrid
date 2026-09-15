@@ -1,8 +1,8 @@
 {
-  "name": "@wavegrid/server",
-  "version": "1.2.0",
+  "name": "@wavegrid/pool",
+  "version": "1.0.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
-  "description": "7×7 RGB grid simulator with smooth transitions",
+  "description": "The Pool: a continuous field of light stirred by touch — shared by server and UI",
   "main": "index.js",
   "module": "esm/index.js",
   "types": "index.d.ts",
@@ -26,28 +26,11 @@
     "build:dev": "makage build --dev",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --fix",
     "test": "jest --passWithNoTests",
-    "test:watch": "jest --watch",
-    "dev": "ts-node src/server.ts"
+    "test:watch": "jest --watch"
   },
-  "keywords": [
-    "laser",
-    "osc",
-    "lighting",
-    "simulator",
-    "7x7"
-  ],
-  "dependencies": {
-    "@wavegrid/animations": "workspace:*",
-    "@wavegrid/discovery": "workspace:*",
-    "@wavegrid/layout": "workspace:*",
-    "@wavegrid/pool": "workspace:*",
-    "@wavegrid/settings": "workspace:*",
-    "@wavegrid/ui": "workspace:*",
-    "ws": "^8.18.0"
-  },
+  "keywords": ["wavegrid", "laser", "pool", "touch", "field"],
   "devDependencies": {
-    "@types/ws": "^8.5.13",
+    "@wavegrid/layout": "workspace:*",
     "makage": "^0.3.0"
-  },
-  "gitHead": "5d71ea2c19cc1f48676f65a40aac29ecdd44bc20"
+  }
 }
