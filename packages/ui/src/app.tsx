@@ -19,12 +19,15 @@ import { NovaTab } from '@/components/nova-tab';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
 import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
+import { PoolCanvas } from '@/components/pool-canvas';
+import { PoolTab } from '@/components/pool-tab';
 import { PrideTab } from '@/components/pride-tab';
 import { SequencesTab } from '@/components/sequences-tab';
 import { ShiftDial } from '@/components/shift-dial';
 import { StatusDot } from '@/components/status-dot';
 import { UsaTab } from '@/components/usa-tab';
 import { VideoTab } from '@/components/video-tab';
+import { DEFAULT_POOL_SETTINGS, type PoolField, type PoolSettings } from '@/lib/pool-field';
 import { useAudio } from '@/lib/use-audio';
 import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
@@ -45,6 +48,7 @@ type TrailFadeEntry = {
 
 const tabs: { key: GridMode; label: string }[] = [
   { key: 'paint', label: 'Paint' },
+  { key: 'pool', label: 'Pool' },
   { key: 'gradient', label: 'Gradient' },
   { key: 'scenes', label: 'Scenes' },
   { key: 'animations', label: 'Anim' },
@@ -68,6 +72,7 @@ function ToolContent({
   hue, sat, bright, brushSize, softEdge, trailFade,
   setHue, setSat, setBright, setBrushSize, setSoftEdge, setTrailFade,
   gradient, dropsConfig, setDropsConfig,
+  poolSettings, setPoolSettings, onPoolRelease, onPoolStop,
   activeScene, handleScene,
   activeAnim, handleAnim,
   animSpeed, onAnimSpeed,
@@ -86,6 +91,10 @@ function ToolContent({
   gradient: ReturnType<typeof useGradient>;
   dropsConfig: { spectrumStart: number; spectrumEnd: number; speed: number; decay: number; width: number };
   setDropsConfig: (c: typeof dropsConfig) => void;
+  poolSettings: PoolSettings;
+  setPoolSettings: (s: PoolSettings) => void;
+  onPoolRelease: () => void;
+  onPoolStop: () => void;
   activeScene: string | null;
   handleScene: (name: string) => void;
   activeAnim: string | null;
@@ -123,6 +132,18 @@ function ToolContent({
           onSoftEdgeChange={setSoftEdge}
           onTrailFadeChange={setTrailFade}
           compact={isPhone}
+        />
+      )}
+
+      {tab === 'pool' && (
+        <PoolTab
+          settings={poolSettings}
+          onSettings={setPoolSettings}
+          hue={hue}
+          sat={sat}
+          onColor={(h, s) => { setHue(h); setSat(s); }}
+          onRelease={onPoolRelease}
+          onStop={onPoolStop}
         />
       )}
 
@@ -540,6 +561,16 @@ export default function Home() {
   const [smoothness, setSmoothness] = useState(50);
   const [attack, setAttack] = useState(80);
   const [masterBright, setMasterBright] = useState(100);
+  const [poolSettings, setPoolSettings] = useState<PoolSettings>(() => {
+    if (typeof window === 'undefined') return DEFAULT_POOL_SETTINGS;
+    try {
+      const saved = localStorage.getItem('wavegrid-pool');
+      return saved ? { ...DEFAULT_POOL_SETTINGS, ...(JSON.parse(saved) as Partial<PoolSettings>) } : DEFAULT_POOL_SETTINGS;
+    } catch {
+      return DEFAULT_POOL_SETTINGS;
+    }
+  });
+  const poolFieldRef = useRef<PoolField | null>(null);
   const [sheetSnap, setSheetSnap] = useState<SnapPoint>('peek');
   const [showMasterSliders, setShowMasterSliders] = useState(false);
   const [viewFlip, setViewFlip] = useState(() => {
@@ -756,8 +787,32 @@ export default function Home() {
 
   const handleClear = useCallback(() => {
     clearTrailFadeTimers();
+    poolFieldRef.current?.reset();
     send({ type: 'clear' });
   }, [clearTrailFadeTimers, send]);
+
+  /** The pool's own cannon path: never a paint trail-fade on top of it. */
+  const handlePoolCannon = useCallback(
+    (index: number, h: number, s: number, b: number) => {
+      send({ type: 'cannon', index, h, s, b });
+    },
+    [send]
+  );
+
+  const handlePoolSettings = useCallback((s: PoolSettings) => {
+    setPoolSettings(s);
+    localStorage.setItem('wavegrid-pool', JSON.stringify(s));
+  }, []);
+
+  const handlePoolRelease = useCallback(() => {
+    poolFieldRef.current?.release();
+  }, []);
+
+  const handlePoolStop = useCallback(() => {
+    poolFieldRef.current?.reset();
+    handleGlobalStop();
+    handleClear();
+  }, [handleClear, handleGlobalStop]);
 
   const handleRotate = useCallback((direction: 'cw' | 'ccw') => {
     send({ type: 'rotate', direction });
@@ -827,6 +882,8 @@ export default function Home() {
     hue, sat, bright, brushSize, softEdge, trailFade,
     setHue, setSat, setBright, setBrushSize, setSoftEdge, setTrailFade,
     gradient, dropsConfig, setDropsConfig,
+    poolSettings, setPoolSettings: handlePoolSettings,
+    onPoolRelease: handlePoolRelease, onPoolStop: handlePoolStop,
     activeScene, handleScene,
     activeAnim, handleAnim,
     animSpeed, onAnimSpeed: handleAnimSpeed,
@@ -1067,23 +1124,36 @@ export default function Home() {
           className="flex-1 flex items-center justify-center overflow-hidden"
           style={{ padding: 8, paddingBottom: 80, minHeight: 0 }}
         >
-          <GridDisplay
-            grid={gridData}
-            columns={GRID_COLUMNS}
-            fixtures={FIXTURES}
-            currentHue={hue}
-            currentSat={sat}
-            currentBright={bright}
-            mode={tab}
-            brushSize={brushSize}
-            softEdge={softEdge}
-            motionPath={motion.state.path}
-            viewFlip={viewFlip && hasOrientation ? orientation : null}
-            onCannon={handleCannon}
-            onDrop={addDrop}
-            onMotionPoint={motion.recordPoint}
-            onGradientDrag={handleGradientDrag}
-          />
+          {tab === 'pool' ? (
+            <PoolCanvas
+              count={NUM_CANNONS}
+              columns={GRID_COLUMNS}
+              fixtures={FIXTURES}
+              settings={poolSettings}
+              color={{ hue, sat, bright }}
+              viewFlip={viewFlip && hasOrientation ? orientation : null}
+              onCannon={handlePoolCannon}
+              fieldRef={poolFieldRef}
+            />
+          ) : (
+            <GridDisplay
+              grid={gridData}
+              columns={GRID_COLUMNS}
+              fixtures={FIXTURES}
+              currentHue={hue}
+              currentSat={sat}
+              currentBright={bright}
+              mode={tab}
+              brushSize={brushSize}
+              softEdge={softEdge}
+              motionPath={motion.state.path}
+              viewFlip={viewFlip && hasOrientation ? orientation : null}
+              onCannon={handleCannon}
+              onDrop={addDrop}
+              onMotionPoint={motion.recordPoint}
+              onGradientDrag={handleGradientDrag}
+            />
+          )}
         </div>
 
         {/* Bottom sheet */}
@@ -1216,23 +1286,36 @@ export default function Home() {
       <div className={`flex-1 flex ${layout === 'right' ? 'flex-row' : 'flex-col'} overflow-hidden`} style={{ minHeight: 0 }}>
         {/* Grid Canvas */}
         <div className="flex-1 flex items-center justify-center overflow-hidden" style={{ padding: 16, minHeight: 0, minWidth: 0 }}>
-          <GridDisplay
-            grid={gridData}
-            columns={GRID_COLUMNS}
-            fixtures={FIXTURES}
-            currentHue={hue}
-            currentSat={sat}
-            currentBright={bright}
-            mode={tab}
-            brushSize={brushSize}
-            softEdge={softEdge}
-            motionPath={motion.state.path}
-            viewFlip={viewFlip && hasOrientation ? orientation : null}
-            onCannon={handleCannon}
-            onDrop={addDrop}
-            onMotionPoint={motion.recordPoint}
-            onGradientDrag={handleGradientDrag}
-          />
+          {tab === 'pool' ? (
+            <PoolCanvas
+              count={NUM_CANNONS}
+              columns={GRID_COLUMNS}
+              fixtures={FIXTURES}
+              settings={poolSettings}
+              color={{ hue, sat, bright }}
+              viewFlip={viewFlip && hasOrientation ? orientation : null}
+              onCannon={handlePoolCannon}
+              fieldRef={poolFieldRef}
+            />
+          ) : (
+            <GridDisplay
+              grid={gridData}
+              columns={GRID_COLUMNS}
+              fixtures={FIXTURES}
+              currentHue={hue}
+              currentSat={sat}
+              currentBright={bright}
+              mode={tab}
+              brushSize={brushSize}
+              softEdge={softEdge}
+              motionPath={motion.state.path}
+              viewFlip={viewFlip && hasOrientation ? orientation : null}
+              onCannon={handleCannon}
+              onDrop={addDrop}
+              onMotionPoint={motion.recordPoint}
+              onGradientDrag={handleGradientDrag}
+            />
+          )}
         </div>
 
         {/* Tool Panel — capped at half the height under the canvas, so a tall
