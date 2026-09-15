@@ -27,13 +27,20 @@ export interface PoolSettings {
   spread: number;
   /** 0..1 — how long a gesture lingers after release. */
   persistence: number;
+  /**
+   * Hold: what you paint stays until Dissolve or Blackout, still drifting and
+   * turning. Painting over a spot recolours it rather than piling on. Off, the
+   * field fades on `persistence`.
+   */
+  hold?: boolean;
 }
 
 export const DEFAULT_POOL_SETTINGS: PoolSettings = {
   mode: 'flow',
   motion: 0.35,
   spread: 0.5,
-  persistence: 0.55
+  persistence: 0.55,
+  hold: false
 };
 
 export interface PoolColor {
@@ -118,6 +125,8 @@ const SPIRAL_SPIN_TAU = 2.2;
 const RELEASE_TAU = 0.9;
 /** A new source swells in on this clock, so a tap blooms rather than pops. */
 const BLOOM_TAU = 0.4;
+/** A held blob never spreads wider than this, so a held field keeps its shape. */
+const HOLD_MAX_SIGMA = 0.3;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -313,8 +322,9 @@ export class PoolField {
     }
 
     // 3. Sources: drift, spread, turn, dissolve.
+    const hold = this.settings.hold === true;
     const tau = persistenceSeconds(this.settings.persistence);
-    const decay = Math.exp(-dt / tau);
+    const decay = hold ? 1 : Math.exp(-dt / tau);
     const releaseDecay = Math.exp(-dt / RELEASE_TAU);
     const diffusion = lerp(0.004, 0.02, this.settings.motion);
     const dragK = lagStep(dt, 1.5);
@@ -336,7 +346,7 @@ export class PoolField {
       } else {
         s.energy *= s.releasing ? releaseDecay : decay;
       }
-      s.hue = (s.hue + s.hueDrift * dt + 360) % 360;
+      if (!hold) s.hue = (s.hue + s.hueDrift * dt + 360) % 360;
       if (s.kind === 'ring') {
         s.ring += ringGrow;
         // A ring thins as it widens so the total light stays about the same.
@@ -348,6 +358,7 @@ export class PoolField {
       s.vx -= s.vx * dragK;
       s.vy -= s.vy * dragK;
       s.sigma += diffusion * dt;
+      if (hold && s.sigma > HOLD_MAX_SIGMA) s.sigma = HOLD_MAX_SIGMA;
       if (Math.abs(turn) > 1e-7) {
         const rx = (s.x - cx) * inward;
         const ry = (s.y - cy) * inward;
@@ -425,6 +436,29 @@ export class PoolField {
 
   private deposit(x: number, y: number, vx: number, vy: number, color: PoolColor, kind: Source['kind']): void {
     const sigma = spreadSigma(this.settings.spread);
+    if (this.settings.hold === true && kind === 'blob') {
+      // Paint over what is there: a held blob under the finger takes the new
+      // colour and is topped up, so the field never fills up with layers.
+      let nearest: Source | null = null;
+      let best = sigma * 0.6;
+      for (const s of this.sources) {
+        if (s.kind !== 'blob' || s.releasing) continue;
+        const d = Math.hypot(s.x - x, s.y - y);
+        if (d < best) {
+          best = d;
+          nearest = s;
+        }
+      }
+      if (nearest) {
+        nearest.hue = color.hue;
+        nearest.sat = color.sat;
+        nearest.bright = color.bright;
+        nearest.target = Math.max(nearest.target, 0.55);
+        nearest.vx = vx;
+        nearest.vy = vy;
+        return;
+      }
+    }
     this.seq++;
     this.sources.push({
       x, y, vx, vy,

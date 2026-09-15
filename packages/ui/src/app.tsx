@@ -809,7 +809,8 @@ export default function Home() {
       prev.mode === poolServerSettings.mode &&
       prev.motion === poolServerSettings.motion &&
       prev.spread === poolServerSettings.spread &&
-      prev.persistence === poolServerSettings.persistence
+      prev.persistence === poolServerSettings.persistence &&
+      (prev.hold === true) === (poolServerSettings.hold === true)
         ? prev
         : poolServerSettings
     );

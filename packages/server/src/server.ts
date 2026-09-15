@@ -826,7 +826,8 @@ function handleMessage(msg: any, ws?: WebSocket) {
       mode,
       motion: num(msg.motion, s.motion),
       spread: num(msg.spread, s.spread),
-      persistence: num(msg.persistence, s.persistence)
+      persistence: num(msg.persistence, s.persistence),
+      hold: typeof msg.hold === 'boolean' ? msg.hold : s.hold === true
     };
     broadcastPool();
     scheduleSave();

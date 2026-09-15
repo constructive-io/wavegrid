@@ -15,7 +15,7 @@ interface PoolMsg {
   active: boolean;
   touches: number;
   sources: Array<{ x: number; y: number; energy: number }>;
-  settings: { mode: string; motion: number; spread: number; persistence: number };
+  settings: { mode: string; motion: number; spread: number; persistence: number; hold?: boolean };
 }
 
 interface Client {
@@ -86,7 +86,7 @@ describe('server-owned pool', () => {
 
   beforeEach(async () => {
     handle.send({ type: 'clear' });
-    handle.send({ type: 'pool_settings', mode: 'flow', motion: 0.35, spread: 0.5, persistence: 0.55 });
+    handle.send({ type: 'pool_settings', mode: 'flow', motion: 0.35, spread: 0.5, persistence: 0.55, hold: false });
     handle.send({ type: 'smoothness', value: 0.3 });
     handle.send({ type: 'attack', value: 1 });
     await wait(50);
@@ -218,6 +218,13 @@ describe('server-owned pool', () => {
     expect(b.pool?.settings.motion).toBe(1);
     expect(b.pool?.settings.spread).toBe(0);
     expect(b.pool?.settings.persistence).toBeCloseTo(0.55);
+    expect(b.pool?.settings.hold).toBe(false);
+    a.send({ type: 'pool_settings', hold: 'yes' });
+    await wait(80);
+    expect(b.pool?.settings.hold).toBe(false);
+    a.send({ type: 'pool_settings', hold: true });
+    await wait(80);
+    expect(b.pool?.settings.hold).toBe(true);
     a.ws.close();
     b.ws.close();
   });
