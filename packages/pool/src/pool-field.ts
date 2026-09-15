@@ -29,8 +29,9 @@ export interface PoolSettings {
   persistence: number;
   /**
    * Hold: what you paint stays until Dissolve or Blackout, still drifting and
-   * turning. Painting over a spot recolours it rather than piling on. Off, the
-   * field fades on `persistence`.
+   * turning. Painting over a spot recolours it rather than piling on; a droplet
+   * still ripples out but leaves its colour behind. Off, the field fades on
+   * `persistence`.
    */
   hold?: boolean;
 }
@@ -193,7 +194,13 @@ export class PoolField {
       sinceDeposit: Infinity,
       age: 0
     });
-    if (this.settings.mode === 'droplets') this.deposit(px, py, 0, 0, color, 'ring');
+    if (this.settings.mode === 'droplets') this.drop(px, py, color);
+  }
+
+  /** A droplet: a ring that ripples out and, when holding, a puddle that stays behind. */
+  private drop(x: number, y: number, color: PoolColor): void {
+    this.deposit(x, y, 0, 0, color, 'ring');
+    if (this.settings.hold === true) this.deposit(x, y, 0, 0, color, 'blob');
   }
 
   pointerMove(id: TouchId, x: number, y: number): void {
@@ -270,7 +277,7 @@ export class PoolField {
         // and only once the finger has moved a real distance.
         const moved = Math.hypot(t.x - t.lastDepositX, t.y - t.lastDepositY);
         if (t.sinceDeposit > 0.35 && moved > sigma * 0.8) {
-          this.deposit(t.x, t.y, 0, 0, t.color, 'ring');
+          this.drop(t.x, t.y, t.color);
           t.lastDepositX = t.x;
           t.lastDepositY = t.y;
           t.sinceDeposit = 0;
