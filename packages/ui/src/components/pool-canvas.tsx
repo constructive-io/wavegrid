@@ -15,6 +15,8 @@ import type { Orientation } from '@/lib/socket-state';
 /** How often sampled cannon values go to the server. */
 const SEND_HZ = 15;
 const REFERENCE_COLS = 7;
+/** Same inset GridDisplay draws inside, so the markers land on Paint's orbs. */
+const INSET = 10;
 
 interface PoolCanvasProps {
   count: number;
@@ -117,6 +119,11 @@ export function PoolCanvas({
     ctx.fillStyle = '#07070c';
     ctx.fillRect(0, 0, size, size);
 
+    // Field coordinates (0..1) → pixels, inside the same inset as GridDisplay.
+    const area = size - 2 * INSET;
+    const X = (n: number) => INSET + n * area;
+    const S = (n: number) => n * area;
+
     // The field: every source as a soft radial gradient, additively blended,
     // so overlapping strokes brighten and mix where they meet.
     ctx.globalCompositeOperation = 'lighter';
@@ -125,10 +132,10 @@ export function PoolCanvas({
       if (alpha < 0.01) return;
       const light = 30 + Math.min(30, s.bright * 0.25);
       if (s.kind === 'ring') {
-        const r = s.ring * size;
-        const w = s.sigma * size * 2.2;
+        const r = S(s.ring);
+        const w = S(s.sigma) * 2.2;
         if (r <= 0) {
-          const g = ctx.createRadialGradient(s.x * size, s.y * size, 0, s.x * size, s.y * size, w);
+          const g = ctx.createRadialGradient(X(s.x), X(s.y), 0, X(s.x), X(s.y), w);
           g.addColorStop(0, hsl(s.hue, s.sat, light, alpha));
           g.addColorStop(1, hsl(s.hue, s.sat, light, 0));
           ctx.fillStyle = g;
@@ -138,12 +145,12 @@ export function PoolCanvas({
         ctx.strokeStyle = hsl(s.hue, s.sat, light, alpha * 0.9);
         ctx.lineWidth = w;
         ctx.beginPath();
-        ctx.arc(s.x * size, s.y * size, r, 0, Math.PI * 2);
+        ctx.arc(X(s.x), X(s.y), r, 0, Math.PI * 2);
         ctx.stroke();
         return;
       }
-      const rad = s.sigma * size * 3;
-      const g = ctx.createRadialGradient(s.x * size, s.y * size, 0, s.x * size, s.y * size, rad);
+      const rad = S(s.sigma) * 3;
+      const g = ctx.createRadialGradient(X(s.x), X(s.y), 0, X(s.x), X(s.y), rad);
       g.addColorStop(0, hsl(s.hue, s.sat, light, alpha));
       g.addColorStop(0.45, hsl(s.hue, s.sat, light, alpha * 0.35));
       g.addColorStop(1, hsl(s.hue, s.sat, light, 0));
@@ -160,7 +167,7 @@ export function PoolCanvas({
         ctx.strokeStyle = `rgba(255,255,255,${0.05 + strength * 0.08})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(sp.cx * size, sp.cy * size, 10, 0, Math.PI * 2);
+        ctx.arc(X(sp.cx), X(sp.cy), 10, 0, Math.PI * 2);
         ctx.stroke();
       }
     }
@@ -168,12 +175,12 @@ export function PoolCanvas({
     // Cannons: a ring marker at every configured position, filled with the
     // value about to be sent — this is exactly what the lasers will do.
     const points = pointsRef.current;
-    const orbR = (size / REFERENCE_COLS) * 0.22;
+    const orbR = (area / REFERENCE_COLS) * 0.22;
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
       const out = outputs[i] ?? { h: 0, s: 0, b: 0 };
-      const px = p.x * size;
-      const py = p.y * size;
+      const px = X(p.x);
+      const py = X(p.y);
       const b = out.b / 100;
       if (b > 0.01) {
         const glow = ctx.createRadialGradient(px, py, orbR * 0.4, px, py, orbR * 2.6);
@@ -200,9 +207,17 @@ export function PoolCanvas({
     let sinceSend = 0;
     const smoother = smootherRef.current;
 
+    let generation = field.generation;
     const frame = (now: number) => {
       const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
       last = now;
+      if (field.generation !== generation) {
+        // The field was reset (blackout / clear): nothing may glide back up
+        // out of the smoother, and the server already holds zeros.
+        generation = field.generation;
+        smoother.reset();
+        lastSentRef.current = pointsRef.current.map(() => ({ h: 0, s: 0, b: 0 }));
+      }
       field.step(dt);
       smoother.resize(pointsRef.current.length);
       const targets = field.sampleAll(pointsRef.current);
@@ -241,9 +256,12 @@ export function PoolCanvas({
 
   const toField = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
+    const scale = rect.width / Math.max(1, sizeRef.current);
+    const inset = INSET * scale;
+    const draw = Math.max(1, rect.width - 2 * inset);
     return {
-      x: (e.clientX - rect.left) / Math.max(1, rect.width),
-      y: (e.clientY - rect.top) / Math.max(1, rect.height)
+      x: (e.clientX - rect.left - inset) / draw,
+      y: (e.clientY - rect.top - inset) / draw
     };
   }, []);
 

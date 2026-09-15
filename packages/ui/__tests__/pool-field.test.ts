@@ -216,12 +216,20 @@ describe('PoolField', () => {
     expect(maxB(run(a, 6))).toBeLessThan(1);
 
     const b = new PoolField();
+    const smoother = new OutputSmoother(gracePoints.length);
     b.pointerDown(1, 0.5, 0.5, COLOR);
-    run(b, 1);
+    run(b, 1, (out) => smoother.step(out, DT));
+    expect(maxB(smoother.values)).toBeGreaterThan(5);
+    const gen = b.generation;
     b.reset();
+    expect(b.generation).toBe(gen + 1);
     expect(b.sourceCount).toBe(0);
     expect(b.touchCount).toBe(0);
     expect(maxB(b.sampleAll(gracePoints))).toBe(0);
+    // A blackout must not glide back up out of the output smoother either.
+    smoother.reset();
+    smoother.step(b.sampleAll(gracePoints), DT);
+    expect(maxB(smoother.values)).toBe(0);
   });
 
   it('is frame-rate independent: 30fps and 120fps land in the same place', () => {

@@ -132,6 +132,8 @@ export class PoolField {
   private spiral = { cx: 0.5, cy: 0.5, omega: 0, targetCx: 0.5, targetCy: 0.5, targetOmega: 0 };
   /** Total smoothed finger speed — the field brightens a touch when it is stirred. */
   private stir = 0;
+  /** Bumped by reset(), so whoever smooths the output knows to drop its state too. */
+  generation = 0;
 
   constructor(settings: PoolSettings = DEFAULT_POOL_SETTINGS) {
     this.settings = { ...settings };
@@ -189,6 +191,7 @@ export class PoolField {
 
   /** Drop everything at once. Only for leaving the tab; the show uses release(). */
   reset(): void {
+    this.generation++;
     this.sources = [];
     this.touches.clear();
     this.spiral.omega = 0;
@@ -453,6 +456,15 @@ export class OutputSmoother {
   resize(count: number): void {
     if (this.state.length === count) return;
     this.state = Array.from({ length: count }, (_, i) => this.state[i] ?? { h: 0, s: 0, b: 0 });
+  }
+
+  /** Snap everything to black — after a blackout nothing may glide back up. */
+  reset(): void {
+    for (const c of this.state) {
+      c.h = 0;
+      c.s = 0;
+      c.b = 0;
+    }
   }
 
   step(targets: readonly Hsb[], dt: number): Hsb[] {
