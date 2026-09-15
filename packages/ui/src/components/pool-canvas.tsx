@@ -21,6 +21,8 @@ interface PoolCanvasProps {
   pool: PoolState | null;
   color: PoolColor;
   viewFlip: Orientation | null;
+  /** Draw only the beam markers — what the lasers actually do — and no field. */
+  beamsOnly?: boolean;
   onTouch: (id: number, phase: PoolTouchPhase, x: number, y: number, color: PoolColor) => void;
 }
 
@@ -53,6 +55,7 @@ export function PoolCanvas({
   pool,
   color,
   viewFlip,
+  beamsOnly = false,
   onTouch
 }: PoolCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -72,6 +75,8 @@ export function PoolCanvas({
   gridRef.current = grid;
   const poolRef = useRef(pool);
   poolRef.current = pool;
+  const beamsOnlyRef = useRef(beamsOnly);
+  beamsOnlyRef.current = beamsOnly;
   const sizeRef = useRef(600);
   /** Fingers down on this canvas, with when each last reported a move. */
   const activeRef = useRef(new Map<number, number>());
@@ -117,7 +122,8 @@ export function PoolCanvas({
     const S = (n: number) => n * area;
 
     const field = poolRef.current;
-    const sources = field?.active ? field.sources : [];
+    const showField = !beamsOnlyRef.current;
+    const sources = showField && field?.active ? field.sources : [];
 
     // The field: every source as a soft radial gradient, additively blended,
     // so overlapping strokes brighten and mix where they meet.
@@ -155,7 +161,7 @@ export function PoolCanvas({
     ctx.globalCompositeOperation = 'source-over';
 
     // Spiral centre, faintly, so you can see what the field is turning about.
-    if (field?.active && field.settings.mode === 'spiral') {
+    if (showField && field?.active && field.settings.mode === 'spiral') {
       const sp = field.spiral;
       const strength = Math.min(1, Math.abs(sp.omega) / 0.3);
       if (strength > 0.02) {

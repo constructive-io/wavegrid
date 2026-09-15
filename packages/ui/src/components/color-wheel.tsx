@@ -32,22 +32,32 @@ function hslRgb(h: number, s: number, l: number): [number, number, number] {
   return [f(0), f(8), f(4)];
 }
 
-export function ColorWheel({
+interface ColorPickerProps {
+  hue: number;
+  saturation: number;
+  brightness: number;
+  onHueChange: (h: number) => void;
+  onSatChange: (s: number) => void;
+  onBrightChange: (b: number) => void;
+  compact?: boolean;
+  /** The second cell: quick colours and whatever else the tab controls. */
+  children?: React.ReactNode;
+}
+
+/**
+ * The wheel, brightness bar and preview swatch, on their own so every tab that
+ * picks a colour presents the same picker.
+ */
+export function ColorPicker({
   hue,
   saturation,
   brightness,
-  brushSize,
-  softEdge,
-  trailFade,
   onHueChange,
   onSatChange,
   onBrightChange,
-  onBrushSizeChange,
-  onSoftEdgeChange,
-  onTrailFadeChange,
-  onClear,
-  compact = false
-}: ColorWheelProps) {
+  compact = false,
+  children
+}: ColorPickerProps) {
   const wheelRef = useRef<HTMLCanvasElement>(null);
   const brightBarRef = useRef<HTMLDivElement>(null);
   const draggingWheel = useRef(false);
@@ -133,22 +143,7 @@ export function ColorWheel({
     };
   }, [pickWheel, pickBright]);
 
-  // Black is the one swatch that is a brightness, not a hue: painting with it
-  // sends brightness 0, which turns lasers off. Picking a colour again brings
-  // back the brightness the operator was painting at.
   const isBlack = brightness === 0;
-  const litBrightness = useRef(brightness > 0 ? brightness : DEFAULT_BRIGHTNESS);
-  if (brightness > 0) litBrightness.current = brightness;
-
-  const pickColor = useCallback((h: number, s: number) => {
-    onHueChange(h);
-    onSatChange(s);
-    if (brightness === 0) onBrightChange(litBrightness.current);
-  }, [brightness, onBrightChange, onHueChange, onSatChange]);
-
-  const pickBlack = useCallback(() => {
-    onBrightChange(0);
-  }, [onBrightChange]);
 
   const radius = wheelSize / 2 - 2;
   const cursorAngle = (hue * Math.PI) / 180;
@@ -238,64 +233,127 @@ export function ColorWheel({
 
   return (
     <ControlGrid minCellWidth={240}>
-      {/* Cell 1: color picker */}
       <div className="flex items-start gap-4">
         {wheelBlock}
         {brightBlock}
         {previewBlock}
       </div>
 
-      {/* Cell 2: quick colors + brush controls */}
-      <ControlGroup label="Brush">
-        {/* ROYGBIV quick-pick swatches, plus black to paint lasers off */}
-        <div className="flex items-center gap-2 pb-1">
-          {[
-            { h: 0, s: 100, label: 'Red' },
-            { h: 30, s: 100, label: 'Orange' },
-            { h: 55, s: 100, label: 'Yellow' },
-            { h: 120, s: 100, label: 'Green' },
-            { h: 180, s: 100, label: 'Cyan' },
-            { h: 225, s: 100, label: 'Blue' },
-            { h: 280, s: 100, label: 'Purple' },
-            { h: 0, s: 0, label: 'White' }
-          ].map((c) => {
-            const [r, g, b] = hslRgb(c.h, c.s, 50);
-            const bg = c.s === 0 ? '#fff' : `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
-            const isActive = !isBlack && Math.abs(hue - c.h) < 5 && Math.abs(saturation - c.s) < 5;
-            return (
-              <button
-                key={c.label}
-                onClick={() => pickColor(c.h, c.s)}
-                title={c.label}
-                className="shrink-0 rounded-full transition-transform"
-                style={{
-                  width: 26,
-                  height: 26,
-                  background: bg,
-                  border: isActive ? '2.5px solid #fff' : '2px solid rgba(255,255,255,0.15)',
-                  boxShadow: isActive ? `0 0 8px ${bg}` : 'none',
-                  transform: isActive ? 'scale(1.15)' : 'scale(1)'
-                }}
-              />
-            );
-          })}
+      {children}
+    </ControlGrid>
+  );
+}
 
-          {/* Black is no brightness at all, so it paints lasers off. The outline
+interface QuickColorsProps {
+  hue: number;
+  saturation: number;
+  brightness: number;
+  onHueChange: (h: number) => void;
+  onSatChange: (s: number) => void;
+  onBrightChange: (b: number) => void;
+}
+
+/** ROYGBIV quick-pick swatches, plus black to paint lasers off. */
+export function QuickColors({ hue, saturation, brightness, onHueChange, onSatChange, onBrightChange }: QuickColorsProps) {
+  // Black is the one swatch that is a brightness, not a hue: painting with it
+  // sends brightness 0, which turns lasers off. Picking a colour again brings
+  // back the brightness the operator was painting at.
+  const isBlack = brightness === 0;
+  const litBrightness = useRef(brightness > 0 ? brightness : DEFAULT_BRIGHTNESS);
+  if (brightness > 0) litBrightness.current = brightness;
+
+  const pickColor = useCallback((h: number, s: number) => {
+    onHueChange(h);
+    onSatChange(s);
+    if (brightness === 0) onBrightChange(litBrightness.current);
+  }, [brightness, onBrightChange, onHueChange, onSatChange]);
+
+  const pickBlack = useCallback(() => {
+    onBrightChange(0);
+  }, [onBrightChange]);
+
+  return (
+    <>
+      <div className="flex items-center gap-2 pb-1">
+        {[
+          { h: 0, s: 100, label: 'Red' },
+          { h: 30, s: 100, label: 'Orange' },
+          { h: 55, s: 100, label: 'Yellow' },
+          { h: 120, s: 100, label: 'Green' },
+          { h: 180, s: 100, label: 'Cyan' },
+          { h: 225, s: 100, label: 'Blue' },
+          { h: 280, s: 100, label: 'Purple' },
+          { h: 0, s: 0, label: 'White' }
+        ].map((c) => {
+          const [r, g, b] = hslRgb(c.h, c.s, 50);
+          const bg = c.s === 0 ? '#fff' : `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
+          const isActive = !isBlack && Math.abs(hue - c.h) < 5 && Math.abs(saturation - c.s) < 5;
+          return (
+            <button
+              key={c.label}
+              onClick={() => pickColor(c.h, c.s)}
+              title={c.label}
+              className="shrink-0 rounded-full transition-transform"
+              style={{
+                width: 26,
+                height: 26,
+                background: bg,
+                border: isActive ? '2.5px solid #fff' : '2px solid rgba(255,255,255,0.15)',
+                boxShadow: isActive ? `0 0 8px ${bg}` : 'none',
+                transform: isActive ? 'scale(1.15)' : 'scale(1)'
+              }}
+            />
+          );
+        })}
+
+        {/* Black is no brightness at all, so it paints lasers off. The outline
               is what makes it visible against the panel. */}
-          <button
-            onClick={pickBlack}
-            title="Black — paints lasers off"
-            className="shrink-0 rounded-full transition-transform"
-            style={{
-              width: 26,
-              height: 26,
-              background: '#000',
-              border: isBlack ? '2.5px solid #fff' : '2px solid rgba(255,255,255,0.55)',
-              boxShadow: isBlack ? '0 0 8px rgba(255,255,255,0.5)' : 'none',
-              transform: isBlack ? 'scale(1.15)' : 'scale(1)'
-            }}
-          />
-        </div>
+        <button
+          onClick={pickBlack}
+          title="Black — paints lasers off"
+          className="shrink-0 rounded-full transition-transform"
+          style={{
+            width: 26,
+            height: 26,
+            background: '#000',
+            border: isBlack ? '2.5px solid #fff' : '2px solid rgba(255,255,255,0.55)',
+            boxShadow: isBlack ? '0 0 8px rgba(255,255,255,0.5)' : 'none',
+            transform: isBlack ? 'scale(1.15)' : 'scale(1)'
+          }}
+        />
+      </div>
+    </>
+  );
+}
+
+export function ColorWheel({
+  hue,
+  saturation,
+  brightness,
+  brushSize,
+  softEdge,
+  trailFade,
+  onHueChange,
+  onSatChange,
+  onBrightChange,
+  onBrushSizeChange,
+  onSoftEdgeChange,
+  onTrailFadeChange,
+  onClear,
+  compact = false
+}: ColorWheelProps) {
+  return (
+    <ColorPicker
+      hue={hue}
+      saturation={saturation}
+      brightness={brightness}
+      onHueChange={onHueChange}
+      onSatChange={onSatChange}
+      onBrightChange={onBrightChange}
+      compact={compact}
+    >
+      <ControlGroup label="Brush">
+        <QuickColors hue={hue} saturation={saturation} brightness={brightness} onHueChange={onHueChange} onSatChange={onSatChange} onBrightChange={onBrightChange} />
 
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium shrink-0" style={{ color: '#888898', minWidth: 36 }}>Size</span>
@@ -352,6 +410,6 @@ export function ColorWheel({
           )}
         </div>
       </ControlGroup>
-    </ControlGrid>
+    </ColorPicker>
   );
 }
