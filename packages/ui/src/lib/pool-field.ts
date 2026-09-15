@@ -313,7 +313,7 @@ export class PoolField {
       if (s.kind === 'ring') {
         s.ring += ringGrow;
         // A ring thins as it widens so the total light stays about the same.
-        s.energy *= Math.exp(-dt * ringGrow * 2.5);
+        s.energy *= Math.exp(-ringGrow * 2.5);
         continue;
       }
       s.x += s.vx * dt;
@@ -340,7 +340,12 @@ export class PoolField {
     let sat = 0;
     let bright = 0;
     for (const s of this.sources) {
-      const d = Math.hypot(x - s.x, y - s.y);
+      if (s.energy < 1e-5) continue;
+      const dx = x - s.x;
+      const dy = y - s.y;
+      const reach = s.ring + 3.2 * s.sigma;
+      if (Math.abs(dx) > reach || Math.abs(dy) > reach) continue;
+      const d = Math.hypot(dx, dy);
       const u = s.kind === 'ring' ? (d - s.ring) / s.sigma : d / s.sigma;
       if (u > 3.2) continue;
       const w = s.energy * Math.exp(-0.5 * u * u);

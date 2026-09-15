@@ -251,19 +251,47 @@ export function PoolCanvas({
     return () => {
       cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onHide);
+      // Leaving the tab: the lasers must not freeze at whatever was glowing.
+      field.reset();
+      smoother.reset();
+      const sent = lastSentRef.current;
+      for (let i = 0; i < sent.length; i++) {
+        if (sent[i].b !== 0) onCannonRef.current(i, 0, 0, 0);
+      }
+      lastSentRef.current = [];
     };
   }, [draw, field]);
 
   const toField = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    // The rect is of the *transformed* element; the canvas is square so its
+    // centre and side survive rotation/mirroring. Undo the CSS transform in
+    // the same order GridDisplay does (rotate back, then un-flip).
     const rect = e.currentTarget.getBoundingClientRect();
-    const scale = rect.width / Math.max(1, sizeRef.current);
-    const inset = INSET * scale;
-    const draw = Math.max(1, rect.width - 2 * inset);
+    const size = sizeRef.current;
+    const scale = Math.max(rect.width, rect.height) / Math.max(1, size);
+    const half = size / 2;
+    let x = (e.clientX - (rect.left + rect.width / 2)) / scale;
+    let y = (e.clientY - (rect.top + rect.height / 2)) / scale;
+    const o = viewFlip;
+    if (o) {
+      if (o.rotation !== 0) {
+        const rad = (o.rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const rx = x * cos + y * sin;
+        const ry = -x * sin + y * cos;
+        x = rx;
+        y = ry;
+      }
+      if (o.flipH) x = -x;
+      if (o.flipV) y = -y;
+    }
+    const area = Math.max(1, size - 2 * INSET);
     return {
-      x: (e.clientX - rect.left - inset) / draw,
-      y: (e.clientY - rect.top - inset) / draw
+      x: (half + x - INSET) / area,
+      y: (half + y - INSET) / area
     };
-  }, []);
+  }, [viewFlip]);
 
   const handleDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
