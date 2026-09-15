@@ -207,9 +207,11 @@ export function PoolTab({
             })}
           </div>
           <p className="text-sm" style={{ color: 'rgba(136,136,152,0.6)' }}>
-            {hold
-              ? 'What you paint stays and keeps drifting; painting over it recolours it.'
-              : 'What you paint dissolves on its own.'}
+            {!hold
+              ? 'What you paint dissolves on its own.'
+              : settings.mode === 'droplets'
+                ? 'Ripples still travel out, but each leaves its colour behind.'
+                : 'What you paint stays and keeps drifting; painting over it recolours it.'}
           </p>
           {[
             { label: 'Motion', key: 'motion' as const, val: settings.motion },

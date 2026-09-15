@@ -137,6 +137,23 @@ describe('PoolField', () => {
     expect(Math.abs(centre.h - 20)).toBeLessThan(10);
   });
 
+  it('hold + droplets: the ripple passes but leaves its colour at the touch', () => {
+    const held = new PoolField({ ...DEFAULT_POOL_SETTINGS, mode: 'droplets', hold: true, persistence: 0 });
+    const fading = new PoolField({ ...DEFAULT_POOL_SETTINGS, mode: 'droplets', hold: false, persistence: 0 });
+    for (const f of [held, fading]) {
+      f.pointerDown(1, 0.5, 0.5, COLOR);
+      f.step(DT);
+      f.pointerUp(1);
+    }
+    // Long after the ring has rippled off the edge.
+    const heldCentre = run(held, 40)[24];
+    const fadingCentre = run(fading, 40)[24];
+    expect(fadingCentre.b).toBeLessThan(1);
+    expect(heldCentre.b).toBeGreaterThan(20);
+    expect(heldCentre.h).toBeCloseTo(COLOR.hue, 0);
+    expect(held.sourceCount).toBe(1);
+  });
+
   it('brightness is monotonic-ish on release: no flicker back up', () => {
     const field = new PoolField();
     field.pointerDown(1, 0.5, 0.5, COLOR);
