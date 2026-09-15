@@ -108,6 +108,35 @@ describe('PoolField', () => {
     expect(after30).toBeLessThan(1);
   });
 
+  it('hold keeps a released stroke lit until release(), then it dissolves', () => {
+    const field = new PoolField({ ...DEFAULT_POOL_SETTINGS, hold: true, persistence: 0 });
+    field.pointerDown(1, 0.5, 0.5, COLOR);
+    run(field, 1.5);
+    field.pointerUp(1);
+    const atRelease = maxB(field.sampleAll(gracePoints));
+    expect(atRelease).toBeGreaterThan(40);
+    const after30 = maxB(run(field, 30));
+    expect(after30).toBeGreaterThan(atRelease * 0.9);
+    expect(field.sampleAll(gracePoints)[24].h).toBeCloseTo(COLOR.hue, 0);
+    field.release();
+    expect(maxB(run(field, 6))).toBeLessThan(1);
+  });
+
+  it('hold: painting over a spot recolours it instead of piling up sources', () => {
+    const field = new PoolField({ ...DEFAULT_POOL_SETTINGS, hold: true });
+    field.pointerDown(1, 0.5, 0.5, COLOR);
+    run(field, 2);
+    field.pointerUp(1);
+    const before = field.sourceCount;
+    field.pointerDown(2, 0.5, 0.5, { hue: 20, sat: 90, bright: 100 });
+    run(field, 2);
+    field.pointerUp(2);
+    expect(field.sourceCount).toBe(before);
+    const centre = run(field, 2)[24];
+    expect(centre.b).toBeGreaterThan(40);
+    expect(Math.abs(centre.h - 20)).toBeLessThan(10);
+  });
+
   it('brightness is monotonic-ish on release: no flicker back up', () => {
     const field = new PoolField();
     field.pointerDown(1, 0.5, 0.5, COLOR);
