@@ -72,7 +72,7 @@ function ToolContent({
   hue, sat, bright, brushSize, softEdge, trailFade,
   setHue, setSat, setBright, setBrushSize, setSoftEdge, setTrailFade,
   gradient, dropsConfig, setDropsConfig,
-  poolSettings, setPoolSettings, onPoolRelease, onPoolStop,
+  poolSettings, setPoolSettings, onPoolRelease, onPoolStop, poolBeamsOnly, setPoolBeamsOnly,
   activeScene, handleScene,
   activeAnim, handleAnim,
   animSpeed, onAnimSpeed,
@@ -95,6 +95,8 @@ function ToolContent({
   setPoolSettings: (s: PoolSettings) => void;
   onPoolRelease: () => void;
   onPoolStop: () => void;
+  poolBeamsOnly: boolean;
+  setPoolBeamsOnly: (v: boolean) => void;
   activeScene: string | null;
   handleScene: (name: string) => void;
   activeAnim: string | null;
@@ -141,9 +143,15 @@ function ToolContent({
           onSettings={setPoolSettings}
           hue={hue}
           sat={sat}
-          onColor={(h, s) => { setHue(h); setSat(s); }}
+          bright={bright}
+          onHue={setHue}
+          onSat={setSat}
+          onBright={setBright}
+          beamsOnly={poolBeamsOnly}
+          onBeamsOnly={setPoolBeamsOnly}
           onRelease={onPoolRelease}
           onStop={onPoolStop}
+          compact={isPhone}
         />
       )}
 
@@ -564,6 +572,13 @@ export default function Home() {
   // The pool's settings live in the brain (they outlive this iPad); this is
   // the slider's local echo so it doesn't lag behind a finger.
   const [poolSettings, setPoolSettings] = useState<PoolSettings>(DEFAULT_POOL_SETTINGS);
+  const [poolBeamsOnly, setPoolBeamsOnlyState] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem('wavegrid-pool-beams-only') === '1'
+  );
+  const setPoolBeamsOnly = useCallback((v: boolean) => {
+    setPoolBeamsOnlyState(v);
+    localStorage.setItem('wavegrid-pool-beams-only', v ? '1' : '0');
+  }, []);
   const [sheetSnap, setSheetSnap] = useState<SnapPoint>('peek');
   const [showMasterSliders, setShowMasterSliders] = useState(false);
   const [viewFlip, setViewFlip] = useState(() => {
@@ -892,6 +907,7 @@ export default function Home() {
     gradient, dropsConfig, setDropsConfig,
     poolSettings, setPoolSettings: handlePoolSettings,
     onPoolRelease: handlePoolRelease, onPoolStop: handlePoolStop,
+    poolBeamsOnly, setPoolBeamsOnly,
     activeScene, handleScene,
     activeAnim, handleAnim,
     animSpeed, onAnimSpeed: handleAnimSpeed,
@@ -1141,6 +1157,7 @@ export default function Home() {
               pool={pool}
               color={{ hue, sat, bright }}
               viewFlip={viewFlip && hasOrientation ? orientation : null}
+              beamsOnly={poolBeamsOnly}
               onTouch={handlePoolTouch}
             />
           ) : (
@@ -1303,6 +1320,7 @@ export default function Home() {
               pool={pool}
               color={{ hue, sat, bright }}
               viewFlip={viewFlip && hasOrientation ? orientation : null}
+              beamsOnly={poolBeamsOnly}
               onTouch={handlePoolTouch}
             />
           ) : (
