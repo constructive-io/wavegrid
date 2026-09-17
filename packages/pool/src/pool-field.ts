@@ -17,6 +17,8 @@
  * hue and saturation are the energy-weighted mix of whatever is glowing there.
  */
 
+import { Current, CURRENT_MAX_SPEED, CURRENT_N } from './current';
+
 export type PoolMode = 'flow' | 'spiral' | 'droplets';
 
 export interface PoolSettings {
@@ -98,7 +100,11 @@ export interface PoolSnapshot {
   settings: PoolSettings;
   sources: SourceSnapshot[];
   spiral: { cx: number; cy: number; omega: number };
+  /** The current, CURRENT_N² cells of [u, v], row-major; empty when the water is still. */
+  current: number[];
 }
+
+export { CURRENT_N };
 
 interface Touch {
   /** Where the finger actually is. */
@@ -164,6 +170,8 @@ export class PoolField {
   private spiral = { cx: 0.5, cy: 0.5, omega: 0, targetCx: 0.5, targetCy: 0.5, targetOmega: 0 };
   /** Total smoothed finger speed — the field brightens a touch when it is stirred. */
   private stir = 0;
+  /** How the water remembers being stirred; sources ride it. */
+  private current = new Current();
   /** Bumped by reset(), so whoever smooths the output knows to drop its state too. */
   generation = 0;
 
@@ -230,6 +238,17 @@ export class PoolField {
       s.releasing = true;
       s.target = 0;
     }
+    this.current.release();
+  }
+
+  /** Whether the water is still moving on its own. */
+  get currentActive(): boolean {
+    return this.current.active;
+  }
+
+  /** Flow at a point in normalized units per second. */
+  currentAt(x: number, y: number): { vx: number; vy: number } {
+    return this.current.at(x, y);
   }
 
   /** Drop everything at once. Only for leaving the tab; the show uses release(). */
@@ -240,6 +259,7 @@ export class PoolField {
     this.spiral.omega = 0;
     this.spiral.targetOmega = 0;
     this.stir = 0;
+    this.current.reset();
   }
 
   /** Advance the field by `dt` seconds. */
@@ -253,6 +273,7 @@ export class PoolField {
 
     // 1. Fingers: chase the raw position, measure velocity, deposit along the way.
     const k = lagStep(dt, INPUT_TAU);
+    const currentSpeed = lerp(0.3, 1, this.settings.motion) * CURRENT_MAX_SPEED;
     let stirTarget = 0;
     let sumX = 0;
     let sumY = 0;
@@ -269,6 +290,8 @@ export class PoolField {
       t.age += dt;
       t.sinceDeposit += dt;
       stirTarget += Math.hypot(t.vx, t.vy);
+      // Every drag stirs the water, whatever it deposits.
+      this.current.push(t.x, t.y, t.vx, t.vy, sigma * 1.5, dt, currentSpeed);
       sumX += t.x;
       sumY += t.y;
 
@@ -304,6 +327,7 @@ export class PoolField {
       }
     }
     this.stir = lerp(this.stir, stirTarget, lagStep(dt, 0.5));
+    this.current.step(dt);
 
     // 2. Spiral: centre is the fingers' centroid, spin follows their circling.
     if (mode === 'spiral') {
@@ -360,8 +384,9 @@ export class PoolField {
         s.energy *= Math.exp(-ringGrow * 2.5);
         continue;
       }
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
+      const c = this.current.at(s.x, s.y);
+      s.x = clamp(s.x + (s.vx + c.vx) * dt, -0.05, 1.05);
+      s.y = clamp(s.y + (s.vy + c.vy) * dt, -0.05, 1.05);
       s.vx -= s.vx * dragK;
       s.vy -= s.vy * dragK;
       s.sigma += diffusion * dt;
@@ -438,7 +463,7 @@ export class PoolField {
         kind: s.kind
       });
     }
-    return { settings: { ...this.settings }, sources, spiral: this.spiralState };
+    return { settings: { ...this.settings }, sources, spiral: this.spiralState, current: this.current.snapshot() };
   }
 
   private deposit(x: number, y: number, vx: number, vy: number, color: PoolColor, kind: Source['kind']): void {

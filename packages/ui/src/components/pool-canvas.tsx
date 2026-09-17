@@ -1,4 +1,4 @@
-import { cannonPoints, type PoolColor } from '@wavegrid/pool';
+import { cannonPoints, CURRENT_N, type PoolColor } from '@wavegrid/pool';
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { CannonColor, Orientation, PoolState } from '@/lib/socket-state';
@@ -170,6 +170,31 @@ export function PoolCanvas({
         ctx.beginPath();
         ctx.arc(X(sp.cx), X(sp.cy), 10, 0, Math.PI * 2);
         ctx.stroke();
+      }
+    }
+
+    // The current: a short streak per cell, so you can see how the water is
+    // moving where nothing glows yet.
+    const cur = showField && field?.active ? field.current : [];
+    if (cur.length >= CURRENT_N * CURRENT_N * 2) {
+      ctx.lineWidth = 1;
+      ctx.lineCap = 'round';
+      for (let j = 0; j < CURRENT_N; j++) {
+        for (let i = 0; i < CURRENT_N; i++) {
+          const k = (j * CURRENT_N + i) * 2;
+          const vx = cur[k];
+          const vy = cur[k + 1];
+          const speed = Math.hypot(vx, vy);
+          if (speed < 0.002) continue;
+          const cx = X((i + 0.5) / CURRENT_N);
+          const cy = X((j + 0.5) / CURRENT_N);
+          const len = S(Math.min(0.045, speed * 0.6));
+          ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.22, speed * 3)})`;
+          ctx.beginPath();
+          ctx.moveTo(cx - (vx / speed) * len * 0.5, cy - (vy / speed) * len * 0.5);
+          ctx.lineTo(cx + (vx / speed) * len * 0.5, cy + (vy / speed) * len * 0.5);
+          ctx.stroke();
+        }
       }
     }
 

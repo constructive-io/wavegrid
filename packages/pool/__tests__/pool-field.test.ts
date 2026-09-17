@@ -2,6 +2,7 @@ import { presets } from '@wavegrid/layout/client';
 
 import {
   cannonPoints,
+  CURRENT_N,
   DEFAULT_POOL_SETTINGS,
   type Hsb,
   OutputSmoother,
@@ -320,5 +321,84 @@ describe('OutputSmoother', () => {
 
   it('quantize gives wire-ready integers', () => {
     expect(quantize({ h: 359.6, s: 49.5, b: 0.4 })).toEqual({ h: 0, s: 50, b: 0 });
+  });
+});
+
+describe('the current', () => {
+  /** Drag a finger round the centre for `seconds`. */
+  function circle(field: PoolField, seconds: number, radius = 0.3) {
+    field.pointerDown(1, 0.5 + radius, 0.5, COLOR);
+    for (let t = 0; t < seconds; t += DT) {
+      const a = t * 2;
+      field.pointerMove(1, 0.5 + radius * Math.cos(a), 0.5 + radius * Math.sin(a));
+      field.step(DT);
+    }
+    field.pointerUp(1);
+  }
+  const angleOfFirst = (field: PoolField) => {
+    let first: { x: number; y: number } | null = null;
+    field.forEachSource((s) => {
+      if (!first) first = { x: s.x, y: s.y };
+    });
+    return first ? Math.atan2(first!.y - 0.5, first!.x - 0.5) : NaN;
+  };
+
+  it('a circling drag leaves a slow swirl that keeps carrying the light after release', () => {
+    const field = new PoolField({ ...DEFAULT_POOL_SETTINGS, hold: true });
+    circle(field, 3);
+    expect(field.currentActive).toBe(true);
+    const c = field.currentAt(0.8, 0.5);
+    // Anticlockwise drag (in screen coords) → the water at the right moves down-screen.
+    expect(c.vy).toBeGreaterThan(0.005);
+    expect(Math.hypot(c.vx, c.vy)).toBeLessThan(0.1);
+    const a0 = angleOfFirst(field);
+    run(field, 20);
+    const turned = ((angleOfFirst(field) - a0 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+    // Carried round, slowly: a clear fraction of a lap in 20s, not a whole one.
+    expect(turned).toBeGreaterThan(0.4);
+    expect(turned).toBeLessThan(Math.PI);
+    expect(maxB(field.sampleAll(gracePoints))).toBeGreaterThan(20);
+  });
+
+  it('the water settles over minutes on its own and within seconds on release()', () => {
+    const slow = new PoolField();
+    circle(slow, 3);
+    const s0 = Math.hypot(slow.currentAt(0.8, 0.5).vx, slow.currentAt(0.8, 0.5).vy);
+    run(slow, 30);
+    const s30 = Math.hypot(slow.currentAt(0.8, 0.5).vx, slow.currentAt(0.8, 0.5).vy);
+    expect(s30).toBeLessThan(s0);
+    expect(s30).toBeGreaterThan(s0 * 0.25);
+
+    const released = new PoolField();
+    circle(released, 3);
+    released.release();
+    run(released, 12);
+    const c = released.currentAt(0.8, 0.5);
+    expect(Math.hypot(c.vx, c.vy)).toBeLessThan(s0 * 0.02);
+  });
+
+  it('reset() stills the water at once; a still pool sends no current', () => {
+    const field = new PoolField();
+    expect(field.snapshot().current).toEqual([]);
+    circle(field, 2);
+    expect(field.snapshot().current.length).toBe(CURRENT_N * CURRENT_N * 2);
+    field.reset();
+    expect(field.currentActive).toBe(false);
+    expect(field.currentAt(0.8, 0.5)).toEqual({ vx: 0, vy: 0 });
+  });
+
+  it('sources carried by the current stay inside the pool', () => {
+    const field = new PoolField({ ...DEFAULT_POOL_SETTINGS, hold: true, motion: 1 });
+    field.pointerDown(1, 0.1, 0.5, COLOR);
+    for (let t = 0; t < 2; t += DT) {
+      field.pointerMove(1, 0.1 + t * 0.4, 0.5);
+      field.step(DT);
+    }
+    field.pointerUp(1);
+    run(field, 30);
+    field.forEachSource((s) => {
+      expect(s.x).toBeGreaterThanOrEqual(-0.05);
+      expect(s.x).toBeLessThanOrEqual(1.05);
+    });
   });
 });

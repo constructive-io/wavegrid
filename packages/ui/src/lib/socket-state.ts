@@ -129,7 +129,8 @@ export function applySocketMessage(
         touches: typeof message.touches === 'number' ? message.touches : 0,
         settings: message.settings as PoolState['settings'],
         sources: message.sources as PoolState['sources'],
-        spiral: (message.spiral as PoolState['spiral']) ?? { cx: 0.5, cy: 0.5, omega: 0 }
+        spiral: (message.spiral as PoolState['spiral']) ?? { cx: 0.5, cy: 0.5, omega: 0 },
+        current: Array.isArray(message.current) ? (message.current as number[]) : (snapshot.pool?.current ?? [])
       },
       lastMessageAt: now
     };
