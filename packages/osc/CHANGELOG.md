@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.1.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/osc@1.0.1...@wavegrid/osc@1.1.0) (2026-09-17)
+
+### Features
+
+- **cli:** wavegrid signals — send, probe and listen to OSC for debugging Pangolin ([37079fe](https://github.com/constructive-io/wavegrid/commit/37079fe96d597bc4820ceef6c357849a30a18ca2))
+- probe the OSC target, default BEYOND to 8000, add an in-app OSC debugger ([db95d9e](https://github.com/constructive-io/wavegrid/commit/db95d9e47aa68f1e70e88bec852f2fc870de2793))
+
 ## [1.0.1](https://github.com/constructive-io/wavegrid/compare/@wavegrid/osc@1.0.0...@wavegrid/osc@1.0.1) (2026-08-09)
 
 **Note:** Version bump only for package @wavegrid/osc

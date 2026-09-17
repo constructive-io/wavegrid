@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.1.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/animations@1.0.2...@wavegrid/animations@1.1.0) (2026-09-17)
+
+### Features
+
+- sequences and playlists that know which rig they are for ([6c1d5a4](https://github.com/constructive-io/wavegrid/commit/6c1d5a4bc6d8066366261c1519cc9431fe781048))
+
 ## [1.0.2](https://github.com/constructive-io/wavegrid/compare/@wavegrid/animations@1.0.1...@wavegrid/animations@1.0.2) (2026-08-09)
 
 **Note:** Version bump only for package @wavegrid/animations

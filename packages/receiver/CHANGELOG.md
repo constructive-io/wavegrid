@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/receiver@1.2.0...@wavegrid/receiver@1.3.0) (2026-09-17)
+
+### Bug Fixes
+
+- **desktop:** give the show's receiver the selected project's OSC target ([da89e52](https://github.com/constructive-io/wavegrid/commit/da89e5279be9690bc18f65e605b955170885c654))
+
+### Features
+
+- probe the OSC target, default BEYOND to 8000, add an in-app OSC debugger ([db95d9e](https://github.com/constructive-io/wavegrid/commit/db95d9e47aa68f1e70e88bec852f2fc870de2793))
+
 # [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/receiver@1.1.0...@wavegrid/receiver@1.2.0) (2026-08-09)
 
 ### Bug Fixes

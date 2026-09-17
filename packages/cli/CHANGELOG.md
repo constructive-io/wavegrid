@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.6.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/cli@1.5.0...@wavegrid/cli@1.6.0) (2026-09-17)
+
+### Bug Fixes
+
+- **desktop:** give the show's receiver the selected project's OSC target ([da89e52](https://github.com/constructive-io/wavegrid/commit/da89e5279be9690bc18f65e605b955170885c654))
+- **osc:** default the BEYOND host to 127.0.0.1 ([b97d1b5](https://github.com/constructive-io/wavegrid/commit/b97d1b5834537772c55b0be5efb5f2ce2a2cfc87))
+
+### Features
+
+- **cli:** wavegrid signals — send, probe and listen to OSC for debugging Pangolin ([37079fe](https://github.com/constructive-io/wavegrid/commit/37079fe96d597bc4820ceef6c357849a30a18ca2))
+- **desktop,doctor:** scan-to-open QR, network diagnostics, scrollable tool panel ([a37d30b](https://github.com/constructive-io/wavegrid/commit/a37d30b69a2f139bba0659414b1a7d4e10ee272f))
+- **layout:** concentric ring layouts — hollow centres, symmetric discs, per-project shorthand ([8c97330](https://github.com/constructive-io/wavegrid/commit/8c973305d8341de2de7de8b1975d9e2b8dc75444))
+- probe the OSC target, default BEYOND to 8000, add an in-app OSC debugger ([db95d9e](https://github.com/constructive-io/wavegrid/commit/db95d9e47aa68f1e70e88bec852f2fc870de2793))
+- **traffic:** guided experiments, a replay test for the plaintext live-control lines, and the frame-repeat answer ([39b8f00](https://github.com/constructive-io/wavegrid/commit/39b8f00570a33f5b0752fc1876d822d0bbf3f6e7))
+- **ui,desktop:** explain a red connection dot + follow the project in use ([5848cf6](https://github.com/constructive-io/wavegrid/commit/5848cf6ca704e867380ae687614df014c94a87fe))
+
 # [1.5.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/cli@1.4.0...@wavegrid/cli@1.5.0) (2026-08-09)
 
 ### Features

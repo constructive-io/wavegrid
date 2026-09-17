@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/settings@1.1.0...@wavegrid/settings@1.2.0) (2026-09-17)
+
+### Bug Fixes
+
+- **auth:** enforce session revocation on live sockets and add a sign-out button ([997b6ae](https://github.com/constructive-io/wavegrid/commit/997b6ae01a8b89117d4221a33c3ccbbbdb66f28a))
+
 # [1.1.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/settings@1.0.1...@wavegrid/settings@1.1.0) (2026-08-09)
 
 ### Features

@@ -3,6 +3,38 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/ui@1.2.0...@wavegrid/ui@1.3.0) (2026-09-17)
+
+### Bug Fixes
+
+- a UI that falls behind the state feed skips frames instead of freezing ([1601642](https://github.com/constructive-io/wavegrid/commit/1601642e43266b0ba26bcc53eb921f3e342edf56))
+- **auth:** enforce session revocation on live sockets and add a sign-out button ([997b6ae](https://github.com/constructive-io/wavegrid/commit/997b6ae01a8b89117d4221a33c3ccbbbdb66f28a))
+- **pool:** send the current at ~4 Hz, not every pool frame; UI keeps the last one ([7795425](https://github.com/constructive-io/wavegrid/commit/7795425a654bc3c797dcae2f48e6a10ac5f4e48b))
+- **server:** isolate websocket fanout and resync clients ([0f15b7a](https://github.com/constructive-io/wavegrid/commit/0f15b7a39d678e679623ddeb3ca42dd2d86d85ce))
+- **ui:** a slider gutter you can actually see, and no Debug tab in the show UI ([7079a18](https://github.com/constructive-io/wavegrid/commit/7079a18f17ba7453c589bced54737a8dc12469a7))
+- **ui:** keep sync refetch outside state updates ([57f2e45](https://github.com/constructive-io/wavegrid/commit/57f2e45a5e6266bc15e5fd6b5b60292d597f4896))
+- **ui:** login screen shows the product name ([755f4ba](https://github.com/constructive-io/wavegrid/commit/755f4baac02fd75ccec668587b82052c2facd7e5))
+- **ui:** pool blackout stays black; markers land on Paint's orbs ([a722a01](https://github.com/constructive-io/wavegrid/commit/a722a017d9d22bded010366fbd5f01ce1957a852))
+- **ui:** pool review fixes — undo orientation on touch, black out on tab leave, ring thinning, cheap source cull ([a44f0aa](https://github.com/constructive-io/wavegrid/commit/a44f0aa527f540620b34751e146e8ab482217ff1))
+- **ui:** recover from a dead session instead of stranding the operator ([9d9a2d4](https://github.com/constructive-io/wavegrid/commit/9d9a2d48cd7b2faa05038b73fcc1f4f6467eae01))
+- **ui:** the range gutter reads as a dark blue channel, not a grey bar ([05a359f](https://github.com/constructive-io/wavegrid/commit/05a359f74f468dd99f73766bcd8ca6e1ded57354))
+- **ws:** tighten heartbeat and reconnect handling ([d944736](https://github.com/constructive-io/wavegrid/commit/d94473623abc0a38929a731015e3d05b2f5db2e2))
+
+### Features
+
+- **desktop,doctor:** scan-to-open QR, network diagnostics, scrollable tool panel ([a37d30b](https://github.com/constructive-io/wavegrid/commit/a37d30b69a2f139bba0659414b1a7d4e10ee272f))
+- **desktop,ui:** sign the embedded artist UI in so a project switch doesn't ask for a password ([9397445](https://github.com/constructive-io/wavegrid/commit/939744535b092495953e377fff83dbac5b41749b))
+- **desktop:** OSC debugging moves into Output, and looks stay in the show UI ([7b7188e](https://github.com/constructive-io/wavegrid/commit/7b7188ec9895808301b3422c4a4a85b7958750cc))
+- full-screen embedded show UI, and speed+fade as the fixed master sliders ([dac9ecf](https://github.com/constructive-io/wavegrid/commit/dac9ecf3bae648d6472252a0a4018989985a2eb5))
+- **pool:** Hold / Fade toggle — held strokes stay until Dissolve or Blackout ([cf86996](https://github.com/constructive-io/wavegrid/commit/cf86996cabb47a608ecb6e1597b4ab96c1e0ff76))
+- **pool:** Hold works in Droplets — each ripple leaves its colour behind ([676cd46](https://github.com/constructive-io/wavegrid/commit/676cd46ab7b972916aef658bdc5581aa19cd4e4b))
+- **pool:** reuse Paint's colour picker and add a beams-only preview toggle ([dc0601a](https://github.com/constructive-io/wavegrid/commit/dc0601a87e9bd77fd0008a39d43ce6fc65ee5e6d))
+- **pool:** run the Pool field on the server; UI sends gestures and draws the shared field ([c4e2496](https://github.com/constructive-io/wavegrid/commit/c4e249628fcadbd9bf852f28746cec4de649a1c1))
+- **pool:** the current — drags stir a slow persistent flow that carries the light ([b885847](https://github.com/constructive-io/wavegrid/commit/b8858474e4a2177a4782776c98a7450f6e97723b))
+- sequences and playlists that know which rig they are for ([6c1d5a4](https://github.com/constructive-io/wavegrid/commit/6c1d5a4bc6d8066366261c1519cc9431fe781048))
+- **ui,desktop:** explain a red connection dot + follow the project in use ([5848cf6](https://github.com/constructive-io/wavegrid/commit/5848cf6ca704e867380ae687614df014c94a87fe))
+- **ui:** Pool tab — touch a field of light that drifts, spirals and dissolves ([187d7b1](https://github.com/constructive-io/wavegrid/commit/187d7b1a8dc83c0cba885c82fc1050c7d42638ee))
+
 # [1.2.0](https://github.com/constructive-io/Illuminate/compare/@wavegrid/ui@1.1.0...@wavegrid/ui@1.2.0) (2026-08-09)
 
 ### Features

@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/server@1.2.0...@wavegrid/server@1.3.0) (2026-09-17)
+
+### Bug Fixes
+
+- a UI that falls behind the state feed skips frames instead of freezing ([1601642](https://github.com/constructive-io/wavegrid/commit/1601642e43266b0ba26bcc53eb921f3e342edf56))
+- **auth:** enforce session revocation on live sockets and add a sign-out button ([997b6ae](https://github.com/constructive-io/wavegrid/commit/997b6ae01a8b89117d4221a33c3ccbbbdb66f28a))
+- **pool:** send the current at ~4 Hz, not every pool frame; UI keeps the last one ([7795425](https://github.com/constructive-io/wavegrid/commit/7795425a654bc3c797dcae2f48e6a10ac5f4e48b))
+- **server:** isolate websocket fanout and resync clients ([0f15b7a](https://github.com/constructive-io/wavegrid/commit/0f15b7a39d678e679623ddeb3ca42dd2d86d85ce))
+- **ws:** tighten heartbeat and reconnect handling ([d944736](https://github.com/constructive-io/wavegrid/commit/d94473623abc0a38929a731015e3d05b2f5db2e2))
+
+### Features
+
+- **desktop,doctor:** scan-to-open QR, network diagnostics, scrollable tool panel ([a37d30b](https://github.com/constructive-io/wavegrid/commit/a37d30b69a2f139bba0659414b1a7d4e10ee272f))
+- **pool:** Hold / Fade toggle — held strokes stay until Dissolve or Blackout ([cf86996](https://github.com/constructive-io/wavegrid/commit/cf86996cabb47a608ecb6e1597b4ab96c1e0ff76))
+- **pool:** run the Pool field on the server; UI sends gestures and draws the shared field ([c4e2496](https://github.com/constructive-io/wavegrid/commit/c4e249628fcadbd9bf852f28746cec4de649a1c1))
+- sequences and playlists that know which rig they are for ([6c1d5a4](https://github.com/constructive-io/wavegrid/commit/6c1d5a4bc6d8066366261c1519cc9431fe781048))
+- **ui,desktop:** explain a red connection dot + follow the project in use ([5848cf6](https://github.com/constructive-io/wavegrid/commit/5848cf6ca704e867380ae687614df014c94a87fe))
+
 # [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/server@1.1.0...@wavegrid/server@1.2.0) (2026-08-09)
 
 ### Features

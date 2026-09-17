@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/desktop@0.1.0...@wavegrid/desktop@0.2.0) (2026-09-17)
+
+### Bug Fixes
+
+- **auth:** enforce session revocation on live sockets and add a sign-out button ([997b6ae](https://github.com/constructive-io/wavegrid/commit/997b6ae01a8b89117d4221a33c3ccbbbdb66f28a))
+- **desktop:** centre the brand and project tiles on the collapsed icon rail ([0080a1a](https://github.com/constructive-io/wavegrid/commit/0080a1a941f83814f6c67143f59267dd4c56523b))
+- **desktop:** externalize @wavegrid/doctor so main.js stops requiring ws itself ([99f794e](https://github.com/constructive-io/wavegrid/commit/99f794ea573440fabdf05e9d1b6bc5c262ebf7f1))
+- **desktop:** give the show's receiver the selected project's OSC target ([da89e52](https://github.com/constructive-io/wavegrid/commit/da89e5279be9690bc18f65e605b955170885c654))
+- **desktop:** keep electron-forge start working from packages/desktop under pnpm ([e7b80da](https://github.com/constructive-io/wavegrid/commit/e7b80da8082b6f1ae63b318ab400a606a1d44d3a))
+- **desktop:** keep the native laser view out of the way and on the current project ([95a1189](https://github.com/constructive-io/wavegrid/commit/95a11896d8deceddf5d0a889b1c7d0cb1aa612dd))
+- **desktop:** load forge makers only when making artifacts ([4e2d340](https://github.com/constructive-io/wavegrid/commit/4e2d34040ad5aba5649256b0f40712e6092f61c6))
+- **desktop:** make user delete work, refetch panels on a project change ([daf827a](https://github.com/constructive-io/wavegrid/commit/daf827a168081eec806856f7417d881152fe5066))
+- **desktop:** recover the embedded laser view when a project switch restarts the brain ([cb631e6](https://github.com/constructive-io/wavegrid/commit/cb631e6024813ee84bbe1fa74e6a253d12e4e9cb))
+- **osc:** default the BEYOND host to 127.0.0.1 ([b97d1b5](https://github.com/constructive-io/wavegrid/commit/b97d1b5834537772c55b0be5efb5f2ce2a2cfc87))
+
+### Features
+
+- **desktop,doctor:** scan-to-open QR, network diagnostics, scrollable tool panel ([a37d30b](https://github.com/constructive-io/wavegrid/commit/a37d30b69a2f139bba0659414b1a7d4e10ee272f))
+- **desktop,ui:** sign the embedded artist UI in so a project switch doesn't ask for a password ([9397445](https://github.com/constructive-io/wavegrid/commit/939744535b092495953e377fff83dbac5b41749b))
+- **desktop:** group the sidebar by Run/Set up/Advanced behind one project switcher ([5ce1571](https://github.com/constructive-io/wavegrid/commit/5ce15711bdec776751c1a559212cdcc3e6a608e7))
+- **desktop:** OSC debugging moves into Output, and looks stay in the show UI ([7b7188e](https://github.com/constructive-io/wavegrid/commit/7b7188ec9895808301b3422c4a4a85b7958750cc))
+- full-screen embedded show UI, and speed+fade as the fixed master sliders ([dac9ecf](https://github.com/constructive-io/wavegrid/commit/dac9ecf3bae648d6472252a0a4018989985a2eb5))
+- **layout:** concentric ring layouts — hollow centres, symmetric discs, per-project shorthand ([8c97330](https://github.com/constructive-io/wavegrid/commit/8c973305d8341de2de7de8b1975d9e2b8dc75444))
+- probe the OSC target, default BEYOND to 8000, add an in-app OSC debugger ([db95d9e](https://github.com/constructive-io/wavegrid/commit/db95d9e47aa68f1e70e88bec852f2fc870de2793))
+- **ui,desktop:** explain a red connection dot + follow the project in use ([5848cf6](https://github.com/constructive-io/wavegrid/commit/5848cf6ca704e867380ae687614df014c94a87fe))
+
 # 0.1.0 (2026-08-09)
 
 ### Bug Fixes

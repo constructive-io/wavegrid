@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/pool",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "The Pool: a continuous field of light stirred by touch — shared by server and UI",
   "main": "index.js",
@@ -28,7 +28,13 @@
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch"
   },
-  "keywords": ["wavegrid", "laser", "pool", "touch", "field"],
+  "keywords": [
+    "wavegrid",
+    "laser",
+    "pool",
+    "touch",
+    "field"
+  ],
   "devDependencies": {
     "@wavegrid/layout": "workspace:*",
     "makage": "^0.3.0"

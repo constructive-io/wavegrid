@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/animations",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "author": "Dan Lynch <pyramation@gmail.com>",
   "description": "Shared animation and scene engine — used by both server and receiver",
   "main": "index.js",
