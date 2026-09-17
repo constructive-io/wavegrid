@@ -7,18 +7,18 @@ const MODES: { key: PoolMode; label: string; hint: string }[] = [
   {
     key: 'flow',
     label: 'Flow',
-    hint: 'Soft strokes that drift, blend and dissolve.',
+    hint: 'Soft strokes that drift, blend and dissolve.'
   },
   {
     key: 'spiral',
     label: 'Spiral',
-    hint: 'A slowly turning field. Circle to set the spin; hands off and it keeps turning.',
+    hint: 'A slowly turning field. Circle to set the spin; hands off and it keeps turning.'
   },
   {
     key: 'droplets',
     label: 'Droplets',
-    hint: 'Slow rings that widen and thin from wherever you touch.',
-  },
+    hint: 'Slow rings that widen and thin from wherever you touch.'
+  }
 ];
 
 interface PoolTabProps {
@@ -53,7 +53,7 @@ export function PoolTab({
   onBeamsOnly,
   onRelease,
   onStop,
-  compact = false,
+  compact = false
 }: PoolTabProps) {
   const set = <K extends keyof PoolSettings>(key: K, value: PoolSettings[K]) =>
     onSettings({ ...settings, [key]: value });
@@ -104,7 +104,7 @@ export function PoolTab({
                     border: active ? '1px solid #4a7cff' : '1px solid #1a1a25',
                     color: active ? '#4a7cff' : '#888898',
                     fontSize: 14,
-                    fontWeight: 600,
+                    fontWeight: 600
                   }}
                 >
                   {m.label}
@@ -129,7 +129,7 @@ export function PoolTab({
               border: beamsOnly ? '1px solid #4a7cff' : '1px solid #1a1a25',
               color: beamsOnly ? '#4a7cff' : '#888898',
               fontSize: 14,
-              fontWeight: 600,
+              fontWeight: 600
             }}
           >
             Beams only
@@ -146,7 +146,7 @@ export function PoolTab({
                 border: '1px solid #1a1a25',
                 color: '#888898',
                 fontSize: 14,
-                fontWeight: 600,
+                fontWeight: 600
               }}
             >
               Dissolve
@@ -162,7 +162,7 @@ export function PoolTab({
                 border: '1px solid rgba(255,80,80,0.4)',
                 color: '#ff6b6b',
                 fontSize: 14,
-                fontWeight: 600,
+                fontWeight: 600
               }}
             >
               Blackout
@@ -176,13 +176,13 @@ export function PoolTab({
               {
                 hold: false,
                 label: 'Fade',
-                hint: 'Strokes dissolve on Linger.',
+                hint: 'Strokes dissolve on Linger.'
               },
               {
                 hold: true,
                 label: 'Hold',
-                hint: 'Strokes stay, like Paint, until Dissolve or Blackout.',
-              },
+                hint: 'Strokes stay, like Paint, until Dissolve or Blackout.'
+              }
             ].map((o) => {
               const active = o.hold === hold;
               return (
@@ -198,7 +198,7 @@ export function PoolTab({
                     border: active ? '1px solid #4a7cff' : '1px solid #1a1a25',
                     color: active ? '#4a7cff' : '#888898',
                     fontSize: 14,
-                    fontWeight: 600,
+                    fontWeight: 600
                   }}
                 >
                   {o.label}
@@ -219,8 +219,8 @@ export function PoolTab({
             {
               label: 'Linger',
               key: 'persistence' as const,
-              val: settings.persistence,
-            },
+              val: settings.persistence
+            }
           ].map((s) => (
             <div
               key={s.key}
