@@ -217,12 +217,16 @@ function activatePool() {
   scheduleSave();
 }
 
-function poolPayload(): string {
-  return JSON.stringify({ type: 'pool', active: poolActive, touches: pool.touchCount, ...pool.snapshot() });
+/** The current changes over seconds, so it rides along only every Nth pool frame; UIs keep the last one. */
+const POOL_CURRENT_EVERY = 4;
+
+function poolPayload(withCurrent = true): string {
+  const { current, ...rest } = pool.snapshot();
+  return JSON.stringify({ type: 'pool', active: poolActive, touches: pool.touchCount, ...rest, ...(withCurrent ? { current } : {}) });
 }
 
-function broadcastPool() {
-  fanoutLossy(wss.clients, poolPayload(), dropClient);
+function broadcastPool(withCurrent = true) {
+  fanoutLossy(wss.clients, poolPayload(withCurrent), dropClient);
 }
 
 /** One 60 fps step: run the field, sample the fixtures, write grid targets. */
@@ -248,7 +252,7 @@ function tickPool(dt: number) {
     broadcastCommand({ action: 'paint', cells });
     framesSinceLastCommand = 0;
   }
-  broadcastPool();
+  broadcastPool((poolFrame / 4) % POOL_CURRENT_EVERY === 0);
 }
 let playlistCurrentStep = 0;
 const patternEngine = new ServerPatternEngine(layout);

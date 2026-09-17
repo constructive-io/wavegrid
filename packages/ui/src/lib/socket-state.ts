@@ -130,7 +130,7 @@ export function applySocketMessage(
         settings: message.settings as PoolState['settings'],
         sources: message.sources as PoolState['sources'],
         spiral: (message.spiral as PoolState['spiral']) ?? { cx: 0.5, cy: 0.5, omega: 0 },
-        current: Array.isArray(message.current) ? (message.current as number[]) : []
+        current: Array.isArray(message.current) ? (message.current as number[]) : (snapshot.pool?.current ?? [])
       },
       lastMessageAt: now
     };
