@@ -36,6 +36,11 @@ export interface PoolSettings {
    * `persistence`.
    */
   hold?: boolean;
+  /**
+   * -1..1 — a constant, slow turn of the whole pool about the layout centre,
+   * under whatever else is happening. 0 is still; sign is direction.
+   */
+  rotate?: number;
 }
 
 export const DEFAULT_POOL_SETTINGS: PoolSettings = {
@@ -43,7 +48,8 @@ export const DEFAULT_POOL_SETTINGS: PoolSettings = {
   motion: 0.35,
   spread: 0.5,
   persistence: 0.55,
-  hold: false
+  hold: false,
+  rotate: 0
 };
 
 export interface PoolColor {
@@ -130,6 +136,10 @@ const SPIRAL_CENTRE_TAU = 1.6;
 const SPIRAL_SPIN_TAU = 2.2;
 /** A released stroke dissolves on this clock. */
 const RELEASE_TAU = 0.9;
+/** Rotate at full deflection: one lap of the pool in this many seconds. */
+export const ROTATE_LAP_SECONDS = 20;
+/** Moving the Rotate slider eases the turn in on this clock. */
+const ROTATE_TAU = 3;
 /** A new source swells in on this clock, so a tap blooms rather than pops. */
 const BLOOM_TAU = 0.4;
 /** A held blob never spreads wider than this, so a held field keeps its shape. */
@@ -152,6 +162,11 @@ export function spreadSigma(s: number): number {
 }
 
 /** Motion 0..1 → spiral spin in radians per second (a lap takes 20s to 2min). */
+/** Angular speed (rad/s) for a Rotate setting of -1..1. */
+export function rotateOmega(r: number): number {
+  return (clamp(r, -1, 1) * 2 * Math.PI) / ROTATE_LAP_SECONDS;
+}
+
 export function spiralOmega(m: number): number {
   return lerp(0.05, 0.32, clamp(m, 0, 1));
 }
@@ -172,6 +187,8 @@ export class PoolField {
   private stir = 0;
   /** How the water remembers being stirred; sources ride it. */
   private current = new Current();
+  /** The constant turn, eased toward the slider. */
+  private rotOmega = 0;
   /** Bumped by reset(), so whoever smooths the output knows to drop its state too. */
   generation = 0;
 
@@ -352,6 +369,18 @@ export class PoolField {
       this.spiral.omega += (0 - this.spiral.omega) * lagStep(dt, SPIRAL_SPIN_TAU);
     }
 
+    this.rotOmega += (rotateOmega(this.settings.rotate ?? 0) - this.rotOmega) * lagStep(dt, ROTATE_TAU);
+    const rot = this.rotOmega * dt;
+    const cosR = Math.cos(rot);
+    const sinR = Math.sin(rot);
+    const carousel = (s: { x: number; y: number }) => {
+      if (Math.abs(rot) < 1e-7) return;
+      const rx = s.x - 0.5;
+      const ry = s.y - 0.5;
+      s.x = 0.5 + rx * cosR - ry * sinR;
+      s.y = 0.5 + rx * sinR + ry * cosR;
+    };
+
     // 3. Sources: drift, spread, turn, dissolve.
     const hold = this.settings.hold === true;
     const tau = persistenceSeconds(this.settings.persistence);
@@ -382,6 +411,7 @@ export class PoolField {
         s.ring += ringGrow;
         // A ring thins as it widens so the total light stays about the same.
         s.energy *= Math.exp(-ringGrow * 2.5);
+        carousel(s);
         continue;
       }
       const c = this.current.at(s.x, s.y);
@@ -397,6 +427,7 @@ export class PoolField {
         s.x = cx + rx * cosT - ry * sinT;
         s.y = cy + rx * sinT + ry * cosT;
       }
+      carousel(s);
     }
 
     this.sources = this.sources.filter((s) => (s.energy > 0.004 || s.target > 0.004) && (s.kind === 'blob' || s.ring < 1.6));

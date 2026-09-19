@@ -59,6 +59,7 @@ export function PoolTab({
     onSettings({ ...settings, [key]: value });
   const mode = MODES.find((m) => m.key === settings.mode) ?? MODES[0];
   const hold = settings.hold === true;
+  const rotate = settings.rotate ?? 0;
 
   return (
     <div className="space-y-3">
@@ -252,8 +253,32 @@ export function PoolTab({
               </span>
             </div>
           ))}
+          <div className="flex items-center gap-3">
+            <span
+              className="text-sm font-medium shrink-0"
+              style={{ color: '#888898', minWidth: 48 }}
+            >
+              Rotate
+            </span>
+            <input
+              type="range"
+              className="flex-1"
+              min={-100}
+              max={100}
+              value={Math.round(rotate * 100)}
+              onChange={(e) => set('rotate', Number(e.target.value) / 100)}
+              onDoubleClick={() => set('rotate', 0)}
+            />
+            <span
+              className="text-sm font-mono shrink-0"
+              style={{ color: '#888898', minWidth: 28, textAlign: 'right' }}
+            >
+              {rotate === 0 ? 'off' : `${rotate > 0 ? '↻' : '↺'}${Math.round(Math.abs(rotate) * 100)}`}
+            </span>
+          </div>
           <p className="text-sm" style={{ color: 'rgba(136,136,152,0.5)' }}>
-            Intensity and fade are the master sliders above; Clear up top
+            Rotate turns the whole pool slowly, under everything else; centre
+            is off. Intensity and fade are the master sliders above; Clear up top
             dissolves too.
           </p>
         </ControlGroup>
