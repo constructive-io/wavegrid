@@ -831,7 +831,11 @@ function handleMessage(msg: any, ws?: WebSocket) {
       motion: num(msg.motion, s.motion),
       spread: num(msg.spread, s.spread),
       persistence: num(msg.persistence, s.persistence),
-      hold: typeof msg.hold === 'boolean' ? msg.hold : s.hold === true
+      hold: typeof msg.hold === 'boolean' ? msg.hold : s.hold === true,
+      rotate:
+        typeof msg.rotate === 'number' && Number.isFinite(msg.rotate)
+          ? Math.max(-1, Math.min(1, msg.rotate))
+          : (s.rotate ?? 0)
     };
     broadcastPool();
     scheduleSave();

@@ -3,6 +3,7 @@ import { presets } from '@wavegrid/layout/client';
 import {
   cannonPoints,
   CURRENT_N,
+  ROTATE_LAP_SECONDS,
   DEFAULT_POOL_SETTINGS,
   type Hsb,
   OutputSmoother,
@@ -400,5 +401,48 @@ describe('the current', () => {
       expect(s.x).toBeGreaterThanOrEqual(-0.05);
       expect(s.x).toBeLessThanOrEqual(1.05);
     });
+  });
+});
+
+describe('rotate', () => {
+  const posOfFirst = (field: PoolField) => {
+    let first: { x: number; y: number } | null = null;
+    field.forEachSource((s) => {
+      if (!first) first = { x: s.x, y: s.y };
+    });
+    return first!;
+  };
+
+  it('turns a held spot about the centre at one lap per ROTATE_LAP_SECONDS, eased in', () => {
+    const field = new PoolField({ ...DEFAULT_POOL_SETTINGS, hold: true, motion: 0, rotate: 1 });
+    field.pointerDown(1, 0.8, 0.5, COLOR);
+    field.step(DT);
+    field.pointerUp(1);
+    const p0 = posOfFirst(field);
+    run(field, ROTATE_LAP_SECONDS / 4);
+    const p1 = posOfFirst(field);
+    const a0 = Math.atan2(p0.y - 0.5, p0.x - 0.5);
+    const a1 = Math.atan2(p1.y - 0.5, p1.x - 0.5);
+    const turned = ((a1 - a0 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+    // A quarter lap, less the ~3 s ease-in; clockwise on screen (y down).
+    expect(turned).toBeGreaterThan(Math.PI / 2 - 1.2);
+    expect(turned).toBeLessThan(Math.PI / 2);
+    expect(Math.hypot(p1.x - 0.5, p1.y - 0.5)).toBeCloseTo(0.3, 2);
+  });
+
+  it('negative rotate turns the other way; 0 leaves a still pool still', () => {
+    const ccw = new PoolField({ ...DEFAULT_POOL_SETTINGS, hold: true, motion: 0, rotate: -0.5 });
+    ccw.pointerDown(1, 0.8, 0.5, COLOR);
+    ccw.step(DT);
+    ccw.pointerUp(1);
+    run(ccw, 5);
+    expect(posOfFirst(ccw).y).toBeLessThan(0.49);
+
+    const still = new PoolField({ ...DEFAULT_POOL_SETTINGS, hold: true, motion: 0, rotate: 0 });
+    still.pointerDown(1, 0.8, 0.5, COLOR);
+    still.step(DT);
+    still.pointerUp(1);
+    run(still, 5);
+    expect(posOfFirst(still).y).toBeCloseTo(0.5, 3);
   });
 });
