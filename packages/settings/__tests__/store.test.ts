@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { openStore } from '../src';
+import { openStore, projectSecretsFile } from '../src';
 
 function tmpBase(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'wg-store-'));
@@ -48,6 +48,16 @@ describe('SettingsStore projects', () => {
     store.deleteProject('a');
     expect(store.getActiveProject()).toBe('b');
     expect(store.listProjects()).toEqual(['b']);
+  });
+
+  it('deleting a project removes its secrets too', () => {
+    const store = openStore({ baseDir: tmpBase() });
+    store.createProject('p', {});
+    store.generateSecrets('p');
+    const file = projectSecretsFile(store.paths, 'p');
+    expect(fs.existsSync(file)).toBe(true);
+    store.deleteProject('p');
+    expect(fs.existsSync(file)).toBe(false);
   });
 });
 

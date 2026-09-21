@@ -4,6 +4,7 @@ import fs from 'fs';
 import {
   projectConfigFile,
   projectDir,
+  projectSecretsFile,
   readJsonFile,
   type StorePaths,
   writeFileAtomic
@@ -105,6 +106,7 @@ export function deleteProject(paths: StorePaths, name: string): boolean {
   writeRegistry(paths, reg);
   try {
     fs.rmSync(projectDir(paths, name), { recursive: true, force: true });
+    fs.rmSync(projectSecretsFile(paths, name), { force: true });
   } catch {
     /* best effort */
   }

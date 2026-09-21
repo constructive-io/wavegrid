@@ -9,8 +9,11 @@
  * read its secrets, add users and mint access keys — so requiring them to
  * re-type a password into their own machine protects nothing.
  *
- * The session is a real store session with a recognisable user agent, so it
- * appears in Access → Sessions and can be revoked like any other.
+ * Against a local brain the session is a real store session with a recognisable
+ * user agent, so it appears in Access → Sessions and can be revoked like any
+ * other. Against a joined remote brain there is no session to create — see
+ * `operatorToken` — so the token carries no `sid` and expires rather than being
+ * revoked.
  */
 import { signJwt } from '@wavegrid/server';
 import { openStore } from '@wavegrid/settings';
@@ -32,6 +35,20 @@ export function operatorToken(project: string): string | null {
   // The brain sets this when it starts; set it anyway so a token minted before
   // the first start is signed with the same project's secret.
   process.env.WG_JWT_SECRET = store.requireSecret(project, 'jwtSecret');
+
+  // Receiver-only mode: the brain is someone else's process, and it validates
+  // `sid` against *its* session store. A session we create here exists only in
+  // this laptop's store, so embedding its id gets the token rejected with
+  // "Session expired or revoked" — matching secrets are not enough. Both the
+  // brain's `/api/me` and its WebSocket upgrade skip the session lookup when
+  // there is no `sid`, so a sid-less token is the one that authenticates.
+  // It cannot be revoked from Access → Sessions; the TTL is what bounds it.
+  if (store.getProjectConfig(project)?.receiver?.server) {
+    return signJwt(account.username, {
+      role: account.role,
+      ttlSec: Math.floor(TTL_MS / 1000)
+    });
+  }
 
   const session = store.createSession(project, {
     username: account.username,

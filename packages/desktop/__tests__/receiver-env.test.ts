@@ -23,6 +23,13 @@ import { applyReceiverEnv, resolveProjectConfig } from '@/main/receiver-env';
 
 const root = mkdtempSync(join(tmpdir(), 'wavegrid-receiver-env-'));
 
+// The loader's `userStash` layer is a real file — ~/.wavegrid/config/config.json,
+// the active project's mirror. Without an isolated base dir these tests read
+// whoever's machine they run on, and a developer whose active project has joined
+// a brain sees `SIMULATOR_URL` come back as that brain instead of the local
+// default. Pin the store to this run's temp dir so the layer is empty.
+process.env.APPSTASH_BASE_DIR = root;
+
 /** Just the store surface the receiver env needs. */
 const store = {
   requireSecret: () => 'receiver-key',
