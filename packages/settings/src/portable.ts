@@ -105,6 +105,8 @@ export interface ImportResult {
   generatedSecrets: boolean;
   deviceCount: number;
   userCount: number;
+  /** True when an overwrite kept this machine's `osc` block because the bundle had none. */
+  keptLocalOsc: boolean;
 }
 
 /** Validate an untrusted object as a PortableProject bundle. */
@@ -141,7 +143,20 @@ export function importProject(paths: StorePaths, bundle: PortableProject, opts: 
     throw new Error(`Project "${project}" already exists — pass overwrite to replace it, or import under a new name.`);
   }
 
-  createProject(paths, project, bundle.config, { activate: opts.activate });
+  // The OSC target (BEYOND/FB4/routing) is a fact about the hardware next to
+  // this machine, not portable project state — a bundle exported from a laptop
+  // with no target must not wipe the one configured here.
+  let config = bundle.config;
+  let keptLocalOsc = false;
+  if (hasProject(paths, project) && config.osc == null) {
+    const localOsc = getProjectConfig(paths, project)?.osc;
+    if (localOsc && Object.keys(localOsc).length > 0) {
+      config = { ...config, osc: localOsc };
+      keptLocalOsc = true;
+    }
+  }
+
+  createProject(paths, project, config, { activate: opts.activate });
 
   // Device-scoped configs travel; runtime facts (address/lastSeen) do not —
   // each device re-registers with its own address when it next connects.
@@ -168,5 +183,5 @@ export function importProject(paths: StorePaths, bundle: PortableProject, opts: 
     generatedSecrets = true;
   }
 
-  return { project, generatedSecrets, deviceCount: devices.length, userCount: users.length };
+  return { project, generatedSecrets, deviceCount: devices.length, userCount: users.length, keptLocalOsc };
 }

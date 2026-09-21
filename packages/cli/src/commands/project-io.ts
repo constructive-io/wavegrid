@@ -79,6 +79,9 @@ export function runProjectsImport(flags: Flags, file: string | undefined): void 
     console.log('');
     console.log(c.green(`  ✓ Imported project ${c.bold(result.project)}`));
     console.log(`  ${c.gray(`devices: ${result.deviceCount} · users: ${result.userCount}`)}`);
+    if (result.keptLocalOsc) {
+      console.log(`  ${c.gray('kept this machine’s OSC target — the bundle had none')}`);
+    }
     if (result.generatedSecrets) {
       console.log('');
       console.log(c.yellow('  ⚠ The bundle had no secrets — fresh receiverKey/jwtSecret were generated.'));

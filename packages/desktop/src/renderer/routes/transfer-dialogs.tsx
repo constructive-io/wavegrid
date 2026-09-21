@@ -207,6 +207,7 @@ export function ImportProjectDialog({
             Imported “{result.project}” — {result.deviceCount} device(s), {result.userCount} user(s).
             {result.generatedSecrets &&
               ' The bundle carried no secrets, so fresh ones were generated — they will not match the brain until synced.'}
+            {result.keptLocalOsc && ' This machine’s OSC target was kept (the bundle had none).'}
           </p>
         )}
 

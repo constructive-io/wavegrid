@@ -19,6 +19,22 @@ describe('configEnvMap', () => {
     expect(env.WAVEGRID_LAYOUT).toBe('grace-cathedral');
   });
 
+  it('exports an inline layout as JSON instead of the stale default preset', () => {
+    const inline = {
+      kind: 'rings' as const,
+      id: 'grace-28',
+      rings: [{ count: 12, radius: 1, phase: 15 }, { count: 12, radius: 0.62 }, { count: 4, radius: 0.25 }]
+    };
+    // A store layer merged over DEFAULT_CONFIG keeps the defaults' preset alongside `kind`.
+    const env = configEnvMap({ ...DEFAULT_CONFIG, layout: { ...DEFAULT_CONFIG.layout, ...inline } });
+    expect(env.WAVEGRID_LAYOUT).not.toBe('grid-7x7');
+    expect(JSON.parse(env.WAVEGRID_LAYOUT)).toMatchObject(inline);
+
+    const resolved = loadWavegridConfig({ cwd: '/', env: { WAVEGRID_LAYOUT: env.WAVEGRID_LAYOUT } });
+    expect(resolved.layout.count).toBe(28);
+    expect(resolved.layout.id).toBe('grace-28');
+  });
+
   it('projects an FB4 target', () => {
     const env = configEnvMap({ ...DEFAULT_CONFIG, osc: { fb4: { host: '192.168.1.40', port: 8000 } } });
     expect(env.FB4_HOST).toBe('192.168.1.40');
