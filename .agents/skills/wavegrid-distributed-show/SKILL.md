@@ -50,8 +50,9 @@ still overrides it. The receiver key must match the brain's project:
 `wavegrid projects export --include-secrets` on the brain and import the bundle
 (or use Desktop Projects → Export/Import), or run `wavegrid projects secrets set
 receiverKey`. Clearing `receiver.server` returns to local-brain mode. Importing
-without secrets means the embedded artist UI shows the brain's login screen;
-import with `--include-secrets` (or set `receiverKey`) to avoid it.
+without secrets means the embedded artist UI shows the brain's login screen
+(the desktop signs it in with the project's `jwtSecret`); import with
+`--include-secrets` to avoid it.
 
 **At showtime:** operator paints → UI → server `broadcastCommand()` → every receiver filters to its shard → OSC to its hardware.
 
