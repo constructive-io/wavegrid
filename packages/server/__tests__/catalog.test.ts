@@ -51,7 +51,7 @@ describe('catalog', () => {
 
   it('offers a filter per rig an operator builds shows for', () => {
     const filters = layoutFilters();
-    expect(filters.map(f => f.id)).toEqual(['all', 'grid-7x7', 'grace-cathedral', 'nova']);
+    expect(filters.map(f => f.id)).toEqual(['all', 'grid-7x7', 'grace-cathedral', 'grace-28', 'nova']);
     expect(filters[0].layout).toBeNull();
     expect(filters[3].layout?.count).toBe(6);
   });
