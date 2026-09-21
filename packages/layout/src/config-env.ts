@@ -41,7 +41,11 @@ export function configEnvMap(config: WavegridConfig): Record<string, string> {
     if (v !== undefined && v !== '') env[k] = String(v);
   };
 
-  if (config.layout.preset) set('WAVEGRID_LAYOUT', config.layout.preset);
+  // An inline shape (`kind`) wins over `preset` in resolveLayout, and the
+  // defaults' preset survives the merge underneath it — so export the whole
+  // spec as JSON rather than that stale preset id.
+  if (config.layout.kind) set('WAVEGRID_LAYOUT', JSON.stringify(config.layout));
+  else if (config.layout.preset) set('WAVEGRID_LAYOUT', config.layout.preset);
   set('WAVEGRID_MODE', config.mode);
   set('WAVEGRID_HOST', config.server.host);
   set('WAVEGRID_PORT', config.server.port);

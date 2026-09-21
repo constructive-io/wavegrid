@@ -103,6 +103,8 @@ export interface ImportSummary {
   generatedSecrets: boolean;
   deviceCount: number;
   userCount: number;
+  /** True when overwriting kept this machine's OSC target because the bundle had none. */
+  keptLocalOsc: boolean;
   path: string;
 }
 

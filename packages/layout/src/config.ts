@@ -1,7 +1,7 @@
 import { createConfigLoader } from 'confstash';
 
 import { resolveLayout } from './presets';
-import { Layout, RunMode, WavegridConfig } from './types';
+import { Layout, LayoutSpec, RunMode, WavegridConfig } from './types';
 
 /**
  * BEYOND's factory OSC receive port (`[OSC] PortIn` in BEYOND.ini). Every
@@ -45,6 +45,17 @@ function toFloat(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/** `WAVEGRID_LAYOUT` is a preset id, or a JSON LayoutSpec for inline shapes. */
+function parseLayoutEnv(value: string): LayoutSpec {
+  const text = value.trim();
+  if (!text.startsWith('{')) return { preset: text };
+  const spec = JSON.parse(text) as LayoutSpec;
+  if (!spec || typeof spec !== 'object' || (!spec.kind && !spec.preset)) {
+    throw new Error(`WAVEGRID_LAYOUT JSON must be a layout spec with "kind" or "preset", got: ${text}`);
+  }
+  return spec;
+}
+
 /**
  * Map environment variables into a config layer. Env sits just below CLI
  * overrides so a single build can be re-pointed at another layout at runtime.
@@ -52,7 +63,7 @@ function toFloat(value: string | undefined): number | undefined {
 function envLayer(env: NodeJS.ProcessEnv): Partial<WavegridConfig> {
   const out: Partial<WavegridConfig> = {};
 
-  if (env.WAVEGRID_LAYOUT) out.layout = { preset: env.WAVEGRID_LAYOUT };
+  if (env.WAVEGRID_LAYOUT) out.layout = parseLayoutEnv(env.WAVEGRID_LAYOUT);
   if (env.WAVEGRID_MODE === 'simple' || env.WAVEGRID_MODE === 'distributed' || env.WAVEGRID_MODE === 'auto') {
     out.mode = env.WAVEGRID_MODE;
   }

@@ -113,6 +113,40 @@ describe('portable project import (round-trip)', () => {
     expect(() => src.importProject(bundle, { overwrite: true })).not.toThrow();
   });
 
+  it('overwrite keeps the local OSC target when the bundle has none', () => {
+    const base = tmpBase();
+    const local = seedProject(base);
+    local.saveProjectConfig('ring-demo', {
+      layout: { preset: 'nova' },
+      osc: { beyond: { host: '10.0.0.5', port: 8000, gridOrder: 'row' } }
+    } as never);
+
+    const bundle = seedProject(tmpBase()).exportProject('ring-demo');
+    bundle.config = { layout: { preset: 'grace-cathedral' } } as never;
+
+    const result = local.importProject(bundle, { overwrite: true });
+    expect(result.keptLocalOsc).toBe(true);
+    const cfg = local.getProjectConfig('ring-demo')!;
+    expect(cfg.layout).toEqual({ preset: 'grace-cathedral' });
+    expect(cfg.osc?.beyond?.host).toBe('10.0.0.5');
+  });
+
+  it('overwrite takes the bundle’s OSC target when it has one', () => {
+    const base = tmpBase();
+    const local = seedProject(base);
+    local.saveProjectConfig('ring-demo', {
+      layout: { preset: 'nova' },
+      osc: { beyond: { host: '10.0.0.5', port: 8000, gridOrder: 'row' } }
+    } as never);
+
+    const bundle = seedProject(tmpBase()).exportProject('ring-demo');
+    bundle.config = { layout: { preset: 'nova' }, osc: { beyond: { host: '10.0.0.9', port: 8000, gridOrder: 'row' } } } as never;
+
+    const result = local.importProject(bundle, { overwrite: true });
+    expect(result.keptLocalOsc).toBe(false);
+    expect(local.getProjectConfig('ring-demo')!.osc?.beyond?.host).toBe('10.0.0.9');
+  });
+
   it('can import under a new name', () => {
     const src = seedProject(tmpBase());
     const bundle = src.exportProject('ring-demo');
