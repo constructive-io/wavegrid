@@ -26,6 +26,8 @@ import type {
 
 const EMPTY_STATUS: BrainStatus = {
   running: false,
+  role: null,
+  remoteUrl: null,
   url: null,
   project: null,
   runMode: null,

@@ -24,6 +24,7 @@ import { resolve } from 'path';
 import { ConsoleOutput, MultiOutput, OutputAdapter, WebSocketInput, WebSocketOutput } from './adapters';
 import { startDebugUI } from './debug-ui';
 import { Receiver, ShardConfig } from './receiver';
+import { upstreamUrl } from './upstream';
 
 export interface ReceiverHandle {
   receiver: Receiver;
@@ -76,9 +77,7 @@ function logToFile(level: string, msg: string) {
 export function startReceiver(resolved: ResolvedConfig = loadWavegridConfig()): ReceiverHandle {
   const RAW_SIMULATOR_URL = process.env.SIMULATOR_URL || 'ws://localhost:3000';
   const RECEIVER_KEY = process.env.WG_RECEIVER_KEY || '';
-  const SIMULATOR_URL = RECEIVER_KEY
-    ? (() => { const u = new URL(RAW_SIMULATOR_URL); u.searchParams.set('key', RECEIVER_KEY); return u.toString(); })()
-    : RAW_SIMULATOR_URL;
+  const SIMULATOR_URL = upstreamUrl(RAW_SIMULATOR_URL, RECEIVER_KEY);
   const ALPHA = parseFloat(process.env.RECEIVER_ALPHA || '0.06');
   const FALLBACK_DELAY = parseInt(process.env.FALLBACK_DELAY || '3000', 10);
   const WS_OUTPUT_PORT = process.env.WS_OUTPUT_PORT ? parseInt(process.env.WS_OUTPUT_PORT, 10) : undefined;

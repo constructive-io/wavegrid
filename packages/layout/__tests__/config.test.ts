@@ -141,4 +141,9 @@ describe('loadWavegridConfig', () => {
     const resolved = loadWavegridConfig({ cwd: '/', env: { WG_SYNC_SECRETS: 'true' } });
     expect(resolved.config.sync).toEqual({ enabled: true, secrets: true });
   });
+
+  it('picks up SIMULATOR_URL as the receiver brain', () => {
+    expect(loadWavegridConfig({ cwd: '/', env: { SIMULATOR_URL: 'wss://grace.hipzap.com' } }).config.receiver.server)
+      .toBe('wss://grace.hipzap.com');
+  });
 });

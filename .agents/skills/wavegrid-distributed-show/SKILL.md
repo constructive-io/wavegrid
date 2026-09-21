@@ -40,6 +40,20 @@ wavegrid receiver                      # discovers the server via mDNS, connects
 ```
 A bare `wavegrid receiver` also picks up the shard the operator assigned this laptop (`wavegrid devices assign`, below) — no `--shard` needed. Explicit override for multicast-blocked networks: `wavegrid receiver --server ws://192.168.1.42:3333 --shard 0-24` (an explicit `--shard` wins over the assigned one).
 
+### Desktop app as a receiver (Join a brain)
+
+On a receiver laptop, open Devices → Join a brain, paste the brain's `ws://`
+or `wss://` URL (or use one found by scanning), choose Save, and then Start.
+The CLI equivalent is `wavegrid projects config set receiver.server
+wss://grace.hipzap.com` followed by `wavegrid receiver`; the `--server` flag
+still overrides it. The receiver key must match the brain's project:
+`wavegrid projects export --include-secrets` on the brain and import the bundle
+(or use Desktop Projects → Export/Import), or run `wavegrid projects secrets set
+receiverKey`. Clearing `receiver.server` returns to local-brain mode. Importing
+without secrets means the embedded artist UI shows the brain's login screen
+(the desktop signs it in with the project's `jwtSecret`); import with
+`--include-secrets` to avoid it.
+
 **At showtime:** operator paints → UI → server `broadcastCommand()` → every receiver filters to its shard → OSC to its hardware.
 
 ## Devices: identity, naming, management

@@ -12,6 +12,8 @@ export const runtime: Runtime = {
   mainWindow: null,
   lastStatus: {
     running: false,
+    role: null,
+    remoteUrl: null,
     url: null,
     project: null,
     runMode: null,

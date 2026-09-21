@@ -18,6 +18,18 @@ ELECTRON_ENABLE_LOGGING=1 DISPLAY=:0 \
 
 - The CLI runs from built output, not a global binary: `node packages/cli/dist/bin.js …`
   (`projects config`, `signals send|probe|listen`, `doctor`).
+- If Forge reports "Electron failed to install correctly", pnpm may have skipped
+  Electron's install script. From `packages/desktop`, run
+  `node node_modules/electron/install.js`, then retry startup.
+- For receiver-only GUI tests, run a separate real brain with
+  `WAVEGRID_PORT=3555 node packages/cli/dist/bin.js server`, using the same active
+  project as the desktop so receiver and embedded-UI secrets match. Join
+  `ws://127.0.0.1:3555` in Devices. Check that port 3000 is not listening in
+  receiver-only mode, then returns when Use local brain restarts the show.
+- CLI subcommand `--help` may execute the command instead of displaying help;
+  avoid probing `server --help` while preparing port-sensitive tests.
+- Receiver startup logs may include a `?key=` secret. Redact query key values
+  before sharing log artifacts.
 - Store lives in `~/.wavegrid`; logs in `~/.wavegrid/logs/<project>/`.
 - Set the layout explicitly or you may land in `distributed` run mode (49 cannons):
   `node packages/cli/dist/bin.js projects config set layout nova` (6-cannon ring, simple mode).

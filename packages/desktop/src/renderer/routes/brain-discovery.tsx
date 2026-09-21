@@ -11,6 +11,7 @@ interface BrainDiscoveryProps {
   scanning: boolean;
   scanned: boolean;
   onScan: () => void;
+  onUse?: (url: string) => void;
 }
 
 /**
@@ -19,7 +20,7 @@ interface BrainDiscoveryProps {
  * explicit because multicast is frequently blocked; an empty result is a real
  * answer ("nothing found"), not a failure, and typing the URL always works.
  */
-export function BrainDiscovery({ brains, scanning, scanned, onScan }: BrainDiscoveryProps) {
+export function BrainDiscovery({ brains, scanning, scanned, onScan, onUse }: BrainDiscoveryProps) {
   const [copied, setCopied] = React.useState<string | null>(null);
 
   const copy = (url: string) => {
@@ -80,9 +81,12 @@ export function BrainDiscovery({ brains, scanning, scanned, onScan }: BrainDisco
                     {b.deviceName ? ` · ${b.deviceName}` : ''}
                   </span>
                 </div>
-                <Button size='sm' variant='ghost' onClick={() => copy(b.serverUrl)}>
-                  {copied === b.serverUrl ? 'Copied' : 'Copy URL'}
-                </Button>
+                <div className='flex items-center gap-2'>
+                  <Button size='sm' variant='ghost' onClick={() => copy(b.serverUrl)}>
+                    {copied === b.serverUrl ? 'Copied' : 'Copy URL'}
+                  </Button>
+                  {onUse && <Button size='sm' variant='outline' onClick={() => onUse(b.serverUrl)}>Use</Button>}
+                </div>
               </div>
             ))}
           </div>

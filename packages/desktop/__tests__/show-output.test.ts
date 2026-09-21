@@ -3,6 +3,8 @@ import type { BrainStatus } from '@/types/ipc';
 
 const status = (receiverOutputs: string[]): BrainStatus => ({
   running: true,
+  role: 'brain',
+  remoteUrl: null,
   url: 'http://127.0.0.1:3000',
   project: 'grace',
   runMode: 'simple',

@@ -32,10 +32,12 @@ import {
   tally
 } from '@/renderer/lib/doctor-format';
 import { NetworkPanel } from '@/renderer/routes/network-panel';
-import type { DoctorCheck, DoctorReport, NetworkReport } from '@/types/ipc';
+import type { BrainStatus, DoctorCheck, DoctorReport, NetworkReport } from '@/types/ipc';
 
 interface StatusRouteProps {
   project: string | null;
+  role: BrainStatus['role'];
+  remoteUrl: string | null;
   report: DoctorReport | null;
   loading: boolean;
   error: string | null;
@@ -86,6 +88,8 @@ function Card({ title, children, action }: {
  */
 export function StatusRoute({
   project,
+  role,
+  remoteUrl,
   report,
   loading,
   error,
@@ -146,6 +150,7 @@ export function StatusRoute({
         <Badge variant={server ? 'secondary' : 'outline'}>
           {server ? `brain up · ${formatUptime(server.uptimeMs)}` : 'brain down'}
         </Badge>
+        {role === 'receiver' && <Badge variant='secondary'>receiver-only → {remoteUrl}</Badge>}
         {server && (
           <Badge variant='outline'>
             {server.receivers.length} receiver{server.receivers.length === 1 ? '' : 's'} · {server.uiClients} UI
@@ -169,7 +174,7 @@ export function StatusRoute({
         {/* ── The show ─────────────────────────────────────────────────── */}
         <div className='flex min-h-0 flex-col gap-3 overflow-y-auto pr-1'>
           <Card
-            title='Brain'
+            title={role === 'receiver' ? 'Remote brain' : 'Brain'}
             action={
               <span className='text-muted-foreground text-xs'>{report?.serverUrl}</span>
             }

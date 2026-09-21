@@ -69,6 +69,12 @@ export function hasSecret(paths: StorePaths, project: string, name: SecretName):
   return Boolean(readSecrets(paths, project)[name]);
 }
 
+export function setSecret(paths: StorePaths, project: string, name: SecretName, value: string): void {
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error(`Secret "${name}" cannot be empty.`);
+  writeSecrets(paths, project, { ...readSecrets(paths, project), [name]: trimmed });
+}
+
 /**
  * Read a secret, throwing an explicit, actionable error when it is missing.
  * No implicit generation, no null return — callers get a value or an error.

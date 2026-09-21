@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { applyAssignedShard, applyShardFlag, parseShardRange } from '../src/commands/runtime';
-import { runReceiver } from '../src/commands/receiver';
+import { resolveUpstream, runReceiver } from '../src/commands/receiver';
 import { runServer } from '../src/commands/server';
 import { buildConfig, CONFIG_FILENAME, serializeConfig } from '../src/config-file';
 
@@ -147,5 +147,53 @@ describe('runReceiver (dry-run)', () => {
     const cwd = scratchDir('ring-6');
     await runReceiver({ cwd, dryRun: true, flags: { shard: '99-1' } });
     expect(process.exitCode).toBe(1);
+  });
+
+  it('uses the configured brain when no flag is supplied', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'wg-rt-'));
+    const cfg = buildConfig({ shape: 'preset', preset: 'ring-6', mode: 'auto' });
+    cfg.receiver = { alpha: 0.06, fallbackDelay: 3000, server: 'wss://grace.hipzap.com' };
+    writeFileSync(join(cwd, CONFIG_FILENAME), serializeConfig(cfg));
+    const result = await runReceiver({ cwd, dryRun: true, flags: { discover: false } });
+    expect(result.server).toBe('wss://grace.hipzap.com');
+  });
+
+  it('lets an explicit flag override the configured brain', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'wg-rt-'));
+    const cfg = buildConfig({ shape: 'preset', preset: 'ring-6', mode: 'auto' });
+    cfg.receiver = { alpha: 0.06, fallbackDelay: 3000, server: 'wss://grace.hipzap.com' };
+    writeFileSync(join(cwd, CONFIG_FILENAME), serializeConfig(cfg));
+    const result = await runReceiver({
+      cwd,
+      dryRun: true,
+      flags: { discover: false, server: 'ws://127.0.0.1:3000' }
+    });
+    expect(result.server).toBe('ws://127.0.0.1:3000');
+  });
+});
+
+describe('resolveUpstream', () => {
+  it('prefers an explicit flag over the configured brain', async () => {
+    const discover = jest.fn(async () => 'ws://discovered:3000');
+    await expect(resolveUpstream('ws://flag:3000', 'ws://configured:3000', discover)).resolves.toBe('ws://flag:3000');
+    expect(discover).not.toHaveBeenCalled();
+  });
+
+  it('prefers the configured brain without discovery', async () => {
+    const discover = jest.fn(async () => 'ws://discovered:3000');
+    await expect(resolveUpstream(undefined, 'ws://configured:3000', discover)).resolves.toBe('ws://configured:3000');
+    expect(discover).not.toHaveBeenCalled();
+  });
+
+  it('uses the discovered brain when no flag or config is set', async () => {
+    const discover = jest.fn(async () => 'ws://discovered:3000');
+    await expect(resolveUpstream(undefined, undefined, discover)).resolves.toBe('ws://discovered:3000');
+    expect(discover).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns undefined when no upstream is available', async () => {
+    const discover = jest.fn(async (): Promise<string | undefined> => undefined);
+    await expect(resolveUpstream(undefined, undefined, discover)).resolves.toBeUndefined();
+    expect(discover).toHaveBeenCalledTimes(1);
   });
 });

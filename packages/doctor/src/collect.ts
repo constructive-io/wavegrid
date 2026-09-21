@@ -190,9 +190,9 @@ export async function collectDiagnostics(input: CollectInput): Promise<Diagnosti
     (endpoint ? await udpProbe(endpoint.host, endpoint.port, oscTimeoutMs) : undefined);
   const checks = localChecks({ ...input, oscProbe });
 
-  const url = serverUrl ?? `ws://localhost:${resolved.config.server.port}`;
+  const url = serverUrl ?? resolved.config.receiver.server ?? `ws://localhost:${resolved.config.server.port}`;
   const parsed = new URL(url);
-  const port = parseInt(parsed.port || '3000', 10);
+  const port = parsed.port ? parseInt(parsed.port, 10) : parsed.protocol === 'wss:' ? 443 : 80;
   const portState = await tcpProbe(parsed.hostname, port, timeoutMs);
 
   const key = store.hasSecret(project, 'receiverKey') ? store.requireSecret(project, 'receiverKey') : '';
