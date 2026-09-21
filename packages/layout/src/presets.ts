@@ -32,6 +32,20 @@ export const presets: Record<string, () => Layout> = {
     id: 'grace-cathedral',
     name: 'Grace Cathedral (12 + 12 + centre)'
   }),
+  /**
+   * Grace with three extra lasers: the centre dot becomes a ring of four
+   * (indices 25–28, a diamond at 12/3/6/9 o'clock). Outer and inner rings are
+   * unchanged so 1–24 still match the venue numbering.
+   */
+  'grace-28': () => ringsLayout({
+    rings: [
+      { count: 12, radius: 1, phase: 15 },
+      { count: 12, radius: 0.62 },
+      { count: 4, radius: 0.25 }
+    ],
+    id: 'grace-28',
+    name: 'Grace Cathedral (12 + 12 + 4)'
+  }),
   'ring-25-filled': () => filledRingLayout({ count: 25, id: 'ring-25-filled', name: '25-cannon filled ring' }),
   'ring-25-hollow': () => annulusLayout({ count: 25, innerRadius: 0.5, id: 'ring-25-hollow', name: '25-cannon ring with a hollow centre' }),
   'disc-25': () => annulusLayout({ count: 25, innerRadius: 0, id: 'disc-25', name: '25-cannon disc (concentric rings)' })
