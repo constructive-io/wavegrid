@@ -35,6 +35,24 @@ describe('resolveLayout', () => {
     expect(grace.fixtures[0].ring).toBe(2);
   });
 
+  it('resolves grace-28 as grace-cathedral with a ring of four in place of the centre', () => {
+    const grace = resolveLayout({ preset: 'grace-cathedral' });
+    const g28 = resolveLayout({ preset: 'grace-28' });
+    expect(g28.count).toBe(28);
+    expect(g28.topology).toBe('rings');
+
+    // 1–24 keep the venue's positions and numbering.
+    for (let i = 0; i < 24; i++) {
+      expect(g28.fixtures[i].x).toBeCloseTo(grace.fixtures[i].x, 6);
+      expect(g28.fixtures[i].y).toBeCloseTo(grace.fixtures[i].y, 6);
+    }
+
+    const centre = g28.fixtures.slice(24);
+    expect(centre).toHaveLength(4);
+    expect(centre.every(f => +f.radius.toFixed(3) === 0.25)).toBe(true);
+    expect(centre.every(f => f.ring === 0)).toBe(true);
+  });
+
   it('staggers grace-cathedral’s inner ring half a step off the outer one', () => {
     const grace = resolveLayout({ preset: 'grace-cathedral' });
     const posOf = (f: { angle: number }) =>

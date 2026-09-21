@@ -158,6 +158,7 @@ export function layoutFilters(): LayoutFilter[] {
     { id: 'all', label: 'All', layout: null },
     { id: 'grid-7x7', label: '7×7', layout: presets['grid-7x7']() },
     { id: 'grace-cathedral', label: 'Grace', layout: presets['grace-cathedral']() },
+    { id: 'grace-28', label: 'Grace 28', layout: presets['grace-28']() },
     { id: 'nova', label: 'Nova', layout: presets.nova() }
   ];
 }
