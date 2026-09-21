@@ -123,6 +123,11 @@ export function ShowRoute({ status, activeProject, onStart, onStop, busy }: Show
         {status.url && (
           <span className='text-muted-foreground font-mono text-sm'>{status.url}</span>
         )}
+        {running && status.role === 'receiver' && status.remoteUrl && (
+          <span className='text-muted-foreground text-sm'>
+            Receiver-only — driving lasers for the brain at {status.remoteUrl}
+          </span>
+        )}
         {running && status.lanUrls.length > 0 && (
           <ShareShow lanUrls={status.lanUrls} />
         )}

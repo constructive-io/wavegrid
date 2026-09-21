@@ -1,4 +1,4 @@
-import { LAYOUT_SPEC_FORMS, parseLayoutSpec, resolveLayout, type WavegridConfig } from '@wavegrid/layout';
+import { DEFAULT_CONFIG, LAYOUT_SPEC_FORMS, parseBrainUrl, parseLayoutSpec, resolveLayout, type WavegridConfig } from '@wavegrid/layout';
 import type { Inquirerer, Question } from 'inquirerer';
 import c from 'yanse';
 
@@ -32,6 +32,12 @@ const SETTERS: Record<string, (config: Partial<WavegridConfig>, value: string) =
   sync: (config, value) => {
     const on = boolOrThrow('sync', value);
     config.sync = { secrets: config.sync?.secrets ?? false, ...config.sync, enabled: on };
+  },
+  'receiver.server': (config, value) => {
+    const receiver = { ...DEFAULT_CONFIG.receiver, ...config.receiver };
+    if (value.trim() === '') delete receiver.server;
+    else receiver.server = parseBrainUrl(value);
+    config.receiver = receiver;
   }
 };
 
@@ -45,7 +51,8 @@ const KEY_CHOICES = [
   { value: 'port', description: 'Server port' },
   { value: 'host', description: 'Server host/bind address' },
   { value: 'ui-port', description: 'UI port' },
-  { value: 'sync', description: 'Config sync across devices: true | false' }
+  { value: 'sync', description: 'Config sync across devices: true | false' },
+  { value: 'receiver.server', description: 'Remote brain this laptop’s receiver dials (ws:// or wss://); empty = local' }
 ];
 
 function boolOrThrow(key: string, value: string): boolean {
@@ -130,7 +137,7 @@ export async function runConfigSet(
   }
 
   let resolvedValue = value;
-  if (resolvedValue == null || resolvedValue === '') {
+  if (resolvedValue == null || (resolvedValue === '' && resolvedKey !== 'receiver.server')) {
     if (!prompter) {
       console.log(c.red(`  Missing value for "${resolvedKey}".`));
       process.exitCode = 1;

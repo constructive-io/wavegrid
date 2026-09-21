@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG, loadWavegridConfig } from '../src/config';
-import { applyConfigToEnv, CONFIG_ENV_KEYS, configEnvMap, resetConfigEnv } from '../src/config-env';
+import { applyConfigToEnv, brainHttpOrigin, CONFIG_ENV_KEYS, configEnvMap, parseBrainUrl, resetConfigEnv } from '../src/config-env';
 import type { WavegridConfig } from '../src/types';
 
 const beyondProject: WavegridConfig = {
@@ -26,6 +26,12 @@ describe('configEnvMap', () => {
     expect(env.BEYOND_HOST).toBeUndefined();
   });
 
+  it('projects the configured brain or the local default', () => {
+    expect(configEnvMap(DEFAULT_CONFIG).SIMULATOR_URL).toBe('ws://localhost:3000');
+    expect(configEnvMap({ ...DEFAULT_CONFIG, receiver: { ...DEFAULT_CONFIG.receiver, server: 'wss://grace.hipzap.com' } }).SIMULATOR_URL)
+      .toBe('wss://grace.hipzap.com');
+  });
+
   it('names no OSC key for a project that sends nowhere', () => {
     const env = configEnvMap(consoleOnlyProject);
     for (const key of ['BEYOND_HOST', 'FB4_HOST', 'ROUTING_CONFIG']) {
@@ -49,6 +55,20 @@ describe('configEnvMap', () => {
     const resolved = loadWavegridConfig({ env: configEnvMap(beyondProject), cwd: '/nonexistent' });
     expect(resolved.config.osc.beyond).toEqual({ host: '10.0.0.5', port: 8000, gridOrder: 'row' });
     expect(resolved.layout.count).toBe(25);
+  });
+});
+
+describe('brain URLs', () => {
+  it('maps ws origins to their HTTP UI origin', () => {
+    expect(brainHttpOrigin('ws://209.38.133.17:3000')).toBe('http://209.38.133.17:3000');
+    expect(brainHttpOrigin('wss://grace.hipzap.com')).toBe('https://grace.hipzap.com');
+  });
+
+  it('normalises and validates brain URLs', () => {
+    expect(parseBrainUrl('  wss://grace.hipzap.com/path?q=1  ')).toBe('wss://grace.hipzap.com');
+    expect(() => parseBrainUrl('http://x')).toThrow(/ws:\/\//);
+    expect(() => parseBrainUrl('')).toThrow();
+    expect(() => parseBrainUrl('garbage')).toThrow();
   });
 });
 

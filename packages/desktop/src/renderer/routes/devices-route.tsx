@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { BrainDiscovery } from '@/renderer/routes/brain-discovery';
+import { JoinBrain } from '@/renderer/routes/join-brain';
 import type { DeviceInfo, DiscoveredBrainInfo, ShardRange } from '@/types/ipc';
 
 interface DevicesRouteProps {
@@ -25,6 +26,14 @@ interface DevicesRouteProps {
     scanning: boolean;
     scanned: boolean;
     onScan: () => void;
+  };
+  join: {
+    value: string;
+    saved: string;
+    onChange: (value: string) => void;
+    onSave: () => void;
+    onClear: () => void;
+    busy: boolean;
   };
 }
 
@@ -179,12 +188,18 @@ export function DevicesRoute({
   onRename,
   onAssignShard,
   busy,
-  discovery
+  discovery,
+  join
 }: DevicesRouteProps) {
   // Discovery is project-independent (it browses the LAN, not the store), so it
   // stays visible above every state — including "no devices yet", where it is
   // the most useful: it tells you the brain a laptop should point at.
-  const scanner = <BrainDiscovery {...discovery} />;
+  const scanner = (
+    <>
+      <BrainDiscovery {...discovery} onUse={join.onChange} />
+      <JoinBrain {...join} disabled={!activeProject} />
+    </>
+  );
 
   if (!activeProject) {
     return (

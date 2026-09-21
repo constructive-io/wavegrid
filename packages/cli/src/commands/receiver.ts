@@ -6,8 +6,8 @@
  *
  *   wavegrid receiver --server ws://192.168.1.42:3333 --shard 0-24
  *
- * `--server` is the explicit upstream (required when the brain isn't this
- * machine); `--shard start-end` restricts which cannons this laptop drives.
+ * `--server` is the explicit upstream; a configured receiver.server is used
+ * when no flag or discovered brain is available.
  */
 import { browse, type DiscoveredBrain } from '@wavegrid/discovery';
 import { loadWavegridConfig, type ResolvedConfig } from '@wavegrid/layout';
@@ -89,6 +89,7 @@ export async function runReceiver(opts: ReceiverOptions = {}): Promise<ReceiverR
 
   if (opts.dryRun) {
     const resolved = loadWavegridConfig({ cwd });
+    serverFlag ??= resolved.config.receiver.server;
     printPlan(resolved, serverFlag);
     return { server: serverFlag ?? process.env.SIMULATOR_URL ?? '', stop: () => {} };
   }
@@ -97,6 +98,7 @@ export async function runReceiver(opts: ReceiverOptions = {}): Promise<ReceiverR
   const project = await selectProject(opts);
 
   const resolved = loadWavegridConfig({ cwd });
+  if (!serverFlag && resolved.config.receiver.server) serverFlag = resolved.config.receiver.server;
 
   // No brain on the LAN and this project replicates config across devices →
   // elect a coordinator so sync still has an authority. The winner promotes

@@ -62,7 +62,8 @@ const OWNED = [
   'WG_STATE_DIR',
   'WG_DEVICE_ID',
   'WG_DEVICE_NAME',
-  'RECEIVER_LOG'
+  'RECEIVER_LOG',
+  'SIMULATOR_URL'
 ];
 
 beforeEach(() => {
@@ -82,6 +83,13 @@ describe('applyReceiverEnv', () => {
     applyReceiverEnv(store, 'fb4', resolve({ osc: { fb4: { host: '192.168.1.40', port: 8000 } } }));
     expect(process.env.FB4_HOST).toBe('192.168.1.40');
     expect(process.env.FB4_PORT).toBe('8000');
+  });
+
+  it('projects the configured brain URL, or the local default', () => {
+    applyReceiverEnv(store, 'remote', resolve({ receiver: { ...DEFAULT_CONFIG.receiver, server: 'wss://grace.hipzap.com' } }));
+    expect(process.env.SIMULATOR_URL).toBe('wss://grace.hipzap.com');
+    applyReceiverEnv(store, 'local', consoleOnly);
+    expect(process.env.SIMULATOR_URL).toBe('ws://localhost:3000');
   });
 
   // The desktop app is long-lived: one process starts many projects, so a stale

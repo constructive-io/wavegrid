@@ -7,7 +7,7 @@ export { runPrintConfig } from './commands/print-config';
 export { runProjects, runUse } from './commands/projects';
 export { type ReceiverOptions, type ReceiverResult, runReceiver } from './commands/receiver';
 export { applyReceiverEnv, applyServerEnv, applyShardFlag, lanAddresses, resolveUiDir } from './commands/runtime';
-export { runSecretsInit, runSecretsList } from './commands/secrets';
+export { runSecretsInit, runSecretsList, runSecretsSet } from './commands/secrets';
 export { runServer, type ServerOptions, type ServerResult } from './commands/server';
 export { runStart, servicesForMode, type ServiceSpec, type StartOptions, type StartResult } from './commands/start';
 export { runUsersAdd, runUsersList, runUsersRemove } from './commands/users';

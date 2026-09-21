@@ -154,6 +154,8 @@ export interface ReceiverConfig {
   alpha: number;
   /** Milliseconds of silence before falling back to idle. */
   fallbackDelay: number;
+  /** Remote brain to dial (ws:// or wss://). Unset = the local server. */
+  server?: string;
   /** Distributed mode only: the cannon range this laptop drives. */
   shard?: ShardConfig;
   /** Absolute path to a fixture→light map JSON, when required by the outputs. */

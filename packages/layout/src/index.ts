@@ -74,7 +74,14 @@ export {
 } from './routing';
 
 // Config → env projection (the receiver reads its OSC target from env only)
-export { applyConfigToEnv, CONFIG_ENV_KEYS, configEnvMap, resetConfigEnv } from './config-env';
+export {
+  applyConfigToEnv,
+  brainHttpOrigin,
+  CONFIG_ENV_KEYS,
+  configEnvMap,
+  parseBrainUrl,
+  resetConfigEnv
+} from './config-env';
 
 // Config loading (confstash) + run-mode derivation
 export {

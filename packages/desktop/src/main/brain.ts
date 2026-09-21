@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 
-import type { ResolvedConfig } from '@wavegrid/layout';
+import { brainHttpOrigin, type ResolvedConfig } from '@wavegrid/layout';
 import type { ReceiverHandle } from '@wavegrid/receiver';
 import type { ServerHandle } from '@wavegrid/server';
 import { openStore, type SettingsStore } from '@wavegrid/settings';
@@ -24,7 +24,9 @@ interface RunningBrain {
   project: string;
   url: string;
   runMode: BrainStatus['runMode'];
-  server: ServerHandle;
+  server: ServerHandle | null;
+  role: 'brain' | 'receiver';
+  remoteUrl: string | null;
   receiver: ReceiverHandle | null;
   /** Why the output stage isn't running, when the brain came up without it. */
   receiverError: string | null;
@@ -75,17 +77,23 @@ export function status(): BrainStatus {
   const s: BrainStatus = current
     ? {
       running: true,
+      role: current.role,
+      remoteUrl: current.remoteUrl,
       url: current.url,
       project: current.project,
       runMode: current.runMode,
       receiverRunning: current.receiver != null,
-      lanUrls: lanAddresses().map((ip) => `http://${ip}:${new URL(current!.url).port}`),
+      lanUrls: current.role === 'brain'
+        ? lanAddresses().map((ip) => `http://${ip}:${new URL(current!.url).port}`)
+        : [],
       receiverError: current.receiverError,
       receiverOutputs: current.receiver?.outputs ?? [],
       lastError: null
     }
     : {
       running: false,
+      role: null,
+      remoteUrl: null,
       url: null,
       project: null,
       runMode: null,
@@ -123,6 +131,23 @@ async function start(project: string): Promise<BrainStatus> {
   if (store.getActiveProject() !== project) store.setActiveProject(project);
 
   const resolved: ResolvedConfig = resolveProjectConfig();
+  const remote = resolved.config.receiver.server;
+  if (remote) {
+    applyReceiverEnv(store, project, resolved);
+    const { startReceiver } = await import('@wavegrid/receiver');
+    const receiver = startReceiver(resolved);
+    current = {
+      project,
+      url: brainHttpOrigin(remote),
+      runMode: resolved.runMode,
+      server: null,
+      role: 'receiver',
+      remoteUrl: remote,
+      receiver,
+      receiverError: null
+    };
+    return broadcast();
+  }
   applyServerEnv(store, project);
 
   const { startServer } = await import('@wavegrid/server');
@@ -155,6 +180,8 @@ async function start(project: string): Promise<BrainStatus> {
     project,
     url: `http://127.0.0.1:${port}`,
     runMode: resolved.runMode,
+    role: 'brain',
+    remoteUrl: null,
     server,
     receiver,
     receiverError
@@ -162,11 +189,11 @@ async function start(project: string): Promise<BrainStatus> {
   return broadcast();
 }
 
-/** What the running server bound to, or null when the brain is down. Network
+/** What the running brain bound to, or null when it is down. Network
  *  diagnostics need the bind host, which the status object deliberately hides
  *  (it reports the loopback URL the embedded UI loads). */
 export function runningBind(): { host: string; port: number } | null {
-  if (!current) return null;
+  if (!current || !current.server) return null;
   return {
     host: resolveProjectConfig().config.server.host,
     port: Number(new URL(current.url).port)
@@ -218,7 +245,7 @@ export function stopLocalReceiver(): BrainStatus {
  * show — so a light-map identify can never light the wrong project's rig.
  */
 export function sendToBrain(project: string, cmd: Record<string, unknown>): boolean {
-  if (!current || current.project !== project) return false;
+  if (!current?.server || current.project !== project) return false;
   current.server.send(cmd);
   return true;
 }
@@ -231,7 +258,7 @@ export async function stopBrain(): Promise<BrainStatus> {
       console.error('[brain] receiver stop failed:', err);
     }
     try {
-      current.server.stop();
+      current.server?.stop();
     } catch (err) {
       console.error('[brain] server stop failed:', err);
     }

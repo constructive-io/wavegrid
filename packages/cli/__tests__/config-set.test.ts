@@ -131,4 +131,20 @@ describe('runConfigSet', () => {
     getStore().createProject('p', { layout: { preset: 'ring-6' } });
     await expect(runConfigSet('sync', 'maybe', {})).rejects.toThrow(/true or false/);
   });
+
+  it('sets and clears a remote receiver brain', async () => {
+    isolate();
+    const store = getStore();
+    store.createProject('p', { layout: { preset: 'ring-6' } });
+    await runConfigSet('receiver.server', 'wss://grace.hipzap.com/path', {});
+    expect(store.getProjectConfig('p')?.receiver?.server).toBe('wss://grace.hipzap.com');
+    await runConfigSet('receiver.server', '', {});
+    expect(store.getProjectConfig('p')?.receiver).not.toHaveProperty('server');
+  });
+
+  it('rejects a non-ws receiver brain URL', async () => {
+    isolate();
+    getStore().createProject('p', { layout: { preset: 'ring-6' } });
+    await expect(runConfigSet('receiver.server', 'http://x', {})).rejects.toThrow(/ws:\/\//);
+  });
 });

@@ -1,3 +1,5 @@
+import { SECRET_NAMES, type SecretName } from '@wavegrid/settings';
+import type { Inquirerer } from 'inquirerer';
 import c from 'yanse';
 
 import { type Flags, getStore, resolveProjectName } from '../project';
@@ -48,4 +50,32 @@ export function runSecretsInit(flags: Flags): void {
     console.log(c.gray('  (nothing to do)'));
   }
   console.log('');
+}
+
+export async function runSecretsSet(args: string[], flags: Flags, prompter?: Inquirerer): Promise<void> {
+  const name = args[0];
+  if (!name || !SECRET_NAMES.includes(name as SecretName)) {
+    console.log(c.red(`  Unknown secret "${name ?? ''}". Valid names: ${SECRET_NAMES.join(', ')}`));
+    process.exitCode = 1;
+    return;
+  }
+  let value = args[1];
+  if (value == null && prompter) {
+    const answer = (await prompter.prompt({}, [{
+      type: 'password',
+      name: 'value',
+      message: `Value for ${name}`,
+      required: true
+    }])) as unknown as { value: unknown };
+    value = String(answer.value ?? '');
+  }
+  if (value == null || value.trim() === '') {
+    console.log(c.red('  Missing secret value.'));
+    process.exitCode = 1;
+    return;
+  }
+  const store = getStore();
+  const project = resolveProjectName(store, flags);
+  store.setSecret(project, name as SecretName, value);
+  console.log(`  ${c.green('✓')} ${name} set · ${project}`);
 }

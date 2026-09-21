@@ -297,6 +297,16 @@ export function App() {
     },
     [saveConfig, refreshLightMap, editingProject, status.running, status.project]
   );
+  const [joinUrl, setJoinUrl] = React.useState('');
+  React.useEffect(() => setJoinUrl(config?.receiverServer ?? ''), [config?.receiverServer]);
+  const saveJoin = React.useCallback(async () => {
+    if (!config) return;
+    await onSaveConfig({ ...config, receiverServer: joinUrl });
+  }, [config, joinUrl, onSaveConfig]);
+  const clearJoin = React.useCallback(async () => {
+    setJoinUrl('');
+    if (config) await onSaveConfig({ ...config, receiverServer: '' });
+  }, [config, onSaveConfig]);
 
   // Hash links drive an in-app route switch (no real navigation — the window
   // never leaves the renderer bundle).
@@ -394,6 +404,8 @@ export function App() {
       {route === 'status' && (
         <StatusRoute
           project={activeProject}
+          role={status.role}
+          remoteUrl={status.remoteUrl}
           report={doctorReport}
           loading={doctorLoading}
           error={doctorError}
@@ -481,6 +493,14 @@ export function App() {
           onRename={(id, name) => void renameDevice(id, name)}
           onAssignShard={(id, shard) => void assignShard(id, shard)}
           busy={busy}
+          join={{
+            value: joinUrl,
+            saved: config?.receiverServer ?? '',
+            onChange: setJoinUrl,
+            onSave: () => void saveJoin(),
+            onClear: () => void clearJoin(),
+            busy
+          }}
           discovery={{
             brains: discovery.brains,
             scanning: discovery.scanning,

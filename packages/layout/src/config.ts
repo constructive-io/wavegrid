@@ -79,6 +79,7 @@ function envLayer(env: NodeJS.ProcessEnv): Partial<WavegridConfig> {
   if (alpha != null) receiver.alpha = alpha;
   const fallback = toInt(env.FALLBACK_DELAY);
   if (fallback != null) receiver.fallbackDelay = fallback;
+  if (env.SIMULATOR_URL) receiver.server = env.SIMULATOR_URL;
   const shardStart = toInt(env.SHARD_START);
   const shardEnd = toInt(env.SHARD_END);
   if (shardStart != null && shardEnd != null) receiver.shard = { start: shardStart, end: shardEnd };

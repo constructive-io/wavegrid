@@ -10,6 +10,31 @@
  */
 import type { WavegridConfig } from './types';
 
+/** The http(s) origin a brain's ws(s):// URL serves its UI on. */
+export function brainHttpOrigin(wsUrl: string): string {
+  const u = new URL(wsUrl);
+  if (u.protocol !== 'ws:' && u.protocol !== 'wss:') {
+    throw new Error('Brain URL must use ws:// or wss://.');
+  }
+  return `${u.protocol === 'wss:' ? 'https:' : 'http:'}//${u.host}`;
+}
+
+/** Accept and normalise an absolute ws:// or wss:// brain URL. */
+export function parseBrainUrl(input: string): string {
+  const value = input.trim();
+  let u: URL;
+  try {
+    u = new URL(value);
+  } catch {
+    throw new Error('Brain URL must be an absolute ws:// or wss:// URL.');
+  }
+  if (u.protocol !== 'ws:' && u.protocol !== 'wss:') {
+    throw new Error('Brain URL must use ws:// or wss://.');
+  }
+  if (!u.hostname) throw new Error('Brain URL must include a hostname.');
+  return `${u.protocol}//${u.host}`;
+}
+
 export function configEnvMap(config: WavegridConfig): Record<string, string> {
   const env: Record<string, string> = {};
   const set = (k: string, v: string | number | undefined) => {
@@ -21,7 +46,7 @@ export function configEnvMap(config: WavegridConfig): Record<string, string> {
   set('WAVEGRID_HOST', config.server.host);
   set('WAVEGRID_PORT', config.server.port);
   set('WAVEGRID_UI_PORT', config.ui.port);
-  set('SIMULATOR_URL', `ws://localhost:${config.server.port}`);
+  set('SIMULATOR_URL', config.receiver.server || `ws://localhost:${config.server.port}`);
 
   set('RECEIVER_ALPHA', config.receiver.alpha);
   set('FALLBACK_DELAY', config.receiver.fallbackDelay);

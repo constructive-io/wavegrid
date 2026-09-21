@@ -5,6 +5,7 @@ import {
   DEFAULT_CONFIG,
   getPresetNames,
   type LayoutSpec,
+  parseBrainUrl,
   parseLayoutSpec,
   resolveLayout,
   type WavegridConfig
@@ -96,6 +97,7 @@ export function toEditable(stored: ProjectConfig | null): EditableConfig {
     uiPort: stored?.ui?.port ?? DEFAULT_CONFIG.ui.port,
     alpha: stored?.receiver?.alpha ?? DEFAULT_CONFIG.receiver.alpha,
     fallbackDelay: stored?.receiver?.fallbackDelay ?? DEFAULT_CONFIG.receiver.fallbackDelay,
+    receiverServer: stored?.receiver?.server ?? '',
     layoutLabel: resolved.name,
     cannonCount: resolved.count
   };
@@ -106,7 +108,14 @@ export function toEditable(stored: ProjectConfig | null): EditableConfig {
  *  debug). Returns a new ProjectConfig ready for saveProjectConfig. */
 export function applyEditable(existing: ProjectConfig | null, edit: EditableConfig): ProjectConfig {
   const prev: ProjectConfig = existing ?? {};
-  const prevReceiver: Partial<WavegridConfig['receiver']> = prev.receiver ?? {};
+  const prevReceiver = prev.receiver ?? {};
+  const receiver: WavegridConfig['receiver'] = {
+    ...prevReceiver,
+    alpha: edit.alpha,
+    fallbackDelay: edit.fallbackDelay
+  };
+  if (edit.receiverServer.trim()) receiver.server = parseBrainUrl(edit.receiverServer);
+  else delete receiver.server;
   return {
     ...prev,
     layout: buildLayoutSpec(edit.layout),
@@ -114,6 +123,6 @@ export function applyEditable(existing: ProjectConfig | null, edit: EditableConf
     simpleModeMax: edit.simpleModeMax,
     server: { host: edit.serverHost, port: edit.serverPort },
     ui: { port: edit.uiPort },
-    receiver: { ...prevReceiver, alpha: edit.alpha, fallbackDelay: edit.fallbackDelay }
+    receiver
   };
 }

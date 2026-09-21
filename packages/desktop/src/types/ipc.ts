@@ -5,6 +5,8 @@ export type RunMode = 'simple' | 'distributed' | 'auto';
 
 export interface BrainStatus {
   running: boolean;
+  role: 'brain' | 'receiver' | null;
+  remoteUrl: string | null;
   /** Origin the embedded laser UI + API are served on, e.g. http://127.0.0.1:3000. */
   url: string | null;
   project: string | null;
@@ -70,6 +72,7 @@ export interface EditableConfig {
   uiPort: number;
   alpha: number;
   fallbackDelay: number;
+  receiverServer: string;
   /** Resolved layout summary for display (name + cannon count). */
   layoutLabel: string;
   cannonCount: number;

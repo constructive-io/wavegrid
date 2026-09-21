@@ -148,4 +148,26 @@ describe('runReceiver (dry-run)', () => {
     await runReceiver({ cwd, dryRun: true, flags: { shard: '99-1' } });
     expect(process.exitCode).toBe(1);
   });
+
+  it('uses the configured brain when no flag is supplied', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'wg-rt-'));
+    const cfg = buildConfig({ shape: 'preset', preset: 'ring-6', mode: 'auto' });
+    cfg.receiver = { alpha: 0.06, fallbackDelay: 3000, server: 'wss://grace.hipzap.com' };
+    writeFileSync(join(cwd, CONFIG_FILENAME), serializeConfig(cfg));
+    const result = await runReceiver({ cwd, dryRun: true, flags: { discover: false } });
+    expect(result.server).toBe('wss://grace.hipzap.com');
+  });
+
+  it('lets an explicit flag override the configured brain', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'wg-rt-'));
+    const cfg = buildConfig({ shape: 'preset', preset: 'ring-6', mode: 'auto' });
+    cfg.receiver = { alpha: 0.06, fallbackDelay: 3000, server: 'wss://grace.hipzap.com' };
+    writeFileSync(join(cwd, CONFIG_FILENAME), serializeConfig(cfg));
+    const result = await runReceiver({
+      cwd,
+      dryRun: true,
+      flags: { discover: false, server: 'ws://127.0.0.1:3000' }
+    });
+    expect(result.server).toBe('ws://127.0.0.1:3000');
+  });
 });

@@ -67,7 +67,8 @@ import {
   type ProjectSecrets,
   readSecrets,
   requireSecret,
-  type SecretName
+  type SecretName,
+  setSecret
 } from './secrets';
 import {
   createSession,
@@ -129,6 +130,7 @@ export interface SettingsStore {
   // Secrets (generated once; runtime reads must be explicit)
   generateSecrets(project: string, opts?: { force?: boolean }): GenerateResult;
   hasSecret(project: string, name: SecretName): boolean;
+  setSecret(project: string, name: SecretName, value: string): void;
   requireSecret(project: string, name: SecretName): string;
   readSecrets(project: string): Partial<ProjectSecrets>;
   requiredSecrets(project: string): RequiredSecret[];
@@ -230,6 +232,7 @@ export function openStore(opts: StoreOptions = {}): SettingsStore {
 
     generateSecrets: (project, o) => generateSecrets(paths, project, o),
     hasSecret: (project, name) => hasSecret(paths, project, name),
+    setSecret: (project, name, value) => setSecret(paths, project, name, value),
     requireSecret: (project, name) => requireSecret(paths, project, name),
     readSecrets: (project) => readSecrets(paths, project),
     requiredSecrets: (project) => requiredSecrets(paths, project),

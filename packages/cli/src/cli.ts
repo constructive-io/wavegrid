@@ -27,7 +27,7 @@ import {
   runRoutingImport,
   runRoutingShow
 } from './commands/routing';
-import { runSecretsInit, runSecretsList } from './commands/secrets';
+import { runSecretsInit, runSecretsList, runSecretsSet } from './commands/secrets';
 import { runServer } from './commands/server';
 import { runSettingsEnvironment, runSettingsInitialize } from './commands/settings';
 import { runStart } from './commands/start';
@@ -48,7 +48,7 @@ ${c.bold('Projects')} — manage and edit projects
   projects use <name>           Set the active project
   projects config               Print the resolved config + provenance
   projects config set <k> <v>   Set a field (layout, mode, port, host, ui-port)
-  projects secrets list|init    List / generate the project's secrets
+  projects secrets list|init|set List / generate / set the project's secrets
   projects users list|add|rm    Manage UI login users
   projects keys ls|new|rm       Named access keys (per-person or shared passphrases)
   projects devices list|assign  List / name / shard-assign devices that joined
@@ -129,12 +129,13 @@ const SETTINGS_SUBS: SubCommand[] = [
 
 const CONFIG_SUBS: SubCommand[] = [
   { value: 'show', description: 'Print the resolved config + provenance (secrets masked)' },
-  { value: 'set', description: 'Set a field: layout, mode, port, host, ui-port' }
+  { value: 'set', description: 'Set a field: layout, mode, port, host, ui-port, receiver.server' }
 ];
 
 const SECRETS_SUBS: SubCommand[] = [
   { value: 'list', description: 'List required secrets and whether each is set' },
-  { value: 'init', description: 'Generate any missing secrets (--force to rotate)' }
+  { value: 'init', description: 'Generate any missing secrets (--force to rotate)' },
+  { value: 'set', description: 'Set a secret value (e.g. receiverKey from the brain’s project)' }
 ];
 
 const USERS_SUBS: SubCommand[] = [
@@ -283,6 +284,7 @@ async function dispatchSecrets(
   if (sub == null) return;
   if (sub === 'init') runSecretsInit(flags);
   else if (sub === 'list') runSecretsList(flags);
+  else if (sub === 'set') await runSecretsSet(args.slice(1), flags, nonInteractive ? undefined : prompter);
   else unknownSub('secrets', sub);
 }
 

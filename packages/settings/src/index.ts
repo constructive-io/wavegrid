@@ -50,7 +50,8 @@ export {
   type GenerateResult,
   type ProjectSecrets,
   SECRET_NAMES,
-  type SecretName
+  type SecretName,
+  setSecret
 } from './secrets';
 
 // Light-map library (named correction maps + active selection)

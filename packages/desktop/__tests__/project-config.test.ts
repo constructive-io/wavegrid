@@ -21,6 +21,20 @@ describe('buildLayoutSpec', () => {
 });
 
 describe('editable round-trip', () => {
+  it('sets and clears a remote receiver brain', () => {
+    const base = toEditable(null);
+    const stored = applyEditable(null, { ...base, receiverServer: 'wss://grace.hipzap.com/path' });
+    expect(stored.receiver?.server).toBe('wss://grace.hipzap.com');
+    expect(toEditable(stored).receiverServer).toBe('wss://grace.hipzap.com');
+    const cleared = applyEditable(stored, { ...toEditable(stored), receiverServer: '' });
+    expect(cleared.receiver).not.toHaveProperty('server');
+  });
+
+  it('rejects a non-ws receiver brain URL', () => {
+    expect(() => applyEditable(null, { ...toEditable(null), receiverServer: 'http://grace.hipzap.com' }))
+      .toThrow(/ws:\/\//);
+  });
+
   it('keeps an annulus intact through the editor', () => {
     const stored = applyEditable(null, {
       ...toEditable({ layout: { kind: 'annulus', count: 25, innerRadius: 0.5 } }),
