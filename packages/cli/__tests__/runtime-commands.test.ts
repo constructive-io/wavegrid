@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { applyAssignedShard, applyShardFlag, parseShardRange } from '../src/commands/runtime';
-import { runReceiver } from '../src/commands/receiver';
+import { resolveUpstream, runReceiver } from '../src/commands/receiver';
 import { runServer } from '../src/commands/server';
 import { buildConfig, CONFIG_FILENAME, serializeConfig } from '../src/config-file';
 
@@ -169,5 +169,31 @@ describe('runReceiver (dry-run)', () => {
       flags: { discover: false, server: 'ws://127.0.0.1:3000' }
     });
     expect(result.server).toBe('ws://127.0.0.1:3000');
+  });
+});
+
+describe('resolveUpstream', () => {
+  it('prefers an explicit flag over the configured brain', async () => {
+    const discover = jest.fn(async () => 'ws://discovered:3000');
+    await expect(resolveUpstream('ws://flag:3000', 'ws://configured:3000', discover)).resolves.toBe('ws://flag:3000');
+    expect(discover).not.toHaveBeenCalled();
+  });
+
+  it('prefers the configured brain without discovery', async () => {
+    const discover = jest.fn(async () => 'ws://discovered:3000');
+    await expect(resolveUpstream(undefined, 'ws://configured:3000', discover)).resolves.toBe('ws://configured:3000');
+    expect(discover).not.toHaveBeenCalled();
+  });
+
+  it('uses the discovered brain when no flag or config is set', async () => {
+    const discover = jest.fn(async () => 'ws://discovered:3000');
+    await expect(resolveUpstream(undefined, undefined, discover)).resolves.toBe('ws://discovered:3000');
+    expect(discover).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns undefined when no upstream is available', async () => {
+    const discover = jest.fn(async (): Promise<string | undefined> => undefined);
+    await expect(resolveUpstream(undefined, undefined, discover)).resolves.toBeUndefined();
+    expect(discover).toHaveBeenCalledTimes(1);
   });
 });

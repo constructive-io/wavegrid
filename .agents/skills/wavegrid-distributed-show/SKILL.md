@@ -47,9 +47,11 @@ or `wss://` URL (or use one found by scanning), choose Save, and then Start.
 The CLI equivalent is `wavegrid projects config set receiver.server
 wss://grace.hipzap.com` followed by `wavegrid receiver`; the `--server` flag
 still overrides it. The receiver key must match the brain's project:
-`wavegrid projects export --with-secrets` on the brain and import the bundle
+`wavegrid projects export --include-secrets` on the brain and import the bundle
 (or use Desktop Projects → Export/Import), or run `wavegrid projects secrets set
-receiverKey`. Clearing `receiver.server` returns to local-brain mode.
+receiverKey`. Clearing `receiver.server` returns to local-brain mode. Importing
+without secrets means the embedded artist UI shows the brain's login screen;
+import with `--include-secrets` (or set `receiverKey`) to avoid it.
 
 **At showtime:** operator paints → UI → server `broadcastCommand()` → every receiver filters to its shard → OSC to its hardware.
 

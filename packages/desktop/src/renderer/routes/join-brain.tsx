@@ -42,7 +42,7 @@ export function JoinBrain({ value, saved, onChange, onSave, onClear, busy, disab
         )}
       </div>
       <p className='text-muted-foreground text-sm'>
-        This laptop runs only a receiver and dials that brain instead of starting its own server. Its receiver key must match the brain’s project: import the project from the brain’s export with secrets (<code>wavegrid projects export --with-secrets</code>, or Projects → Export here), or set it with <code>wavegrid projects secrets set receiverKey</code>. Takes effect on the next Start.
+        This laptop runs only a receiver and dials that brain instead of starting its own server. Its receiver key must match the brain’s project: import the project from the brain’s export with secrets (<code>wavegrid projects export --include-secrets</code>, or Projects → Export here), or set it with <code>wavegrid projects secrets set receiverKey</code>. Takes effect on the next Start. Without the brain’s secrets the embedded artist UI shows the brain’s login screen — import with secrets (or set receiverKey) to avoid it.
       </p>
     </div>
   );

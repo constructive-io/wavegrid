@@ -5,7 +5,7 @@ export { buildEnvLines, runEnvExport } from './commands/env';
 export { runInit } from './commands/init';
 export { runPrintConfig } from './commands/print-config';
 export { runProjects, runUse } from './commands/projects';
-export { type ReceiverOptions, type ReceiverResult, runReceiver } from './commands/receiver';
+export { type ReceiverOptions, type ReceiverResult, resolveUpstream, runReceiver } from './commands/receiver';
 export { applyReceiverEnv, applyServerEnv, applyShardFlag, lanAddresses, resolveUiDir } from './commands/runtime';
 export { runSecretsInit, runSecretsList, runSecretsSet } from './commands/secrets';
 export { runServer, type ServerOptions, type ServerResult } from './commands/server';

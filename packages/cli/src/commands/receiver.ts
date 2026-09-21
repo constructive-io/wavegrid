@@ -6,8 +6,9 @@
  *
  *   wavegrid receiver --server ws://192.168.1.42:3333 --shard 0-24
  *
- * `--server` is the explicit upstream; a configured receiver.server is used
- * when no flag or discovered brain is available.
+ * Upstream precedence is `--server`, configured receiver.server, mDNS
+ * discovery, coordinator election, then localhost. An explicitly joined
+ * remote brain must not be hijacked by a stray brain on the LAN.
  */
 import { browse, type DiscoveredBrain } from '@wavegrid/discovery';
 import { loadWavegridConfig, type ResolvedConfig } from '@wavegrid/layout';
@@ -28,6 +29,17 @@ export function brainToWsUrl(brain: DiscoveredBrain): string {
 export function brainLabel(brain: DiscoveredBrain): string {
   const where = brain.addresses[0] || brain.host;
   return `${brain.project} — ${where}:${brain.port}${brain.deviceName ? ` (${brain.deviceName})` : ''}`;
+}
+
+/** Upstream resolution order: --server flag, then the project's receiver.server, then a discovered brain. */
+export async function resolveUpstream(
+  flag: string | undefined,
+  configured: string | undefined,
+  discover: () => Promise<string | undefined>
+): Promise<string | undefined> {
+  if (flag) return flag;
+  if (configured) return configured;
+  return discover();
 }
 
 export interface ReceiverOptions {
@@ -70,16 +82,7 @@ async function selectProject(opts: ReceiverOptions): Promise<string> {
 export async function runReceiver(opts: ReceiverOptions = {}): Promise<ReceiverResult> {
   const cwd = opts.cwd ?? process.cwd();
   const flags = opts.flags ?? {};
-
-  // `--server ws://host:port` sets the upstream the receiver dials. Without it
-  // we try mDNS discovery, then (if nothing is found) hold a coordinator
-  // election, and only then fall back to the config/localhost default.
-  let serverFlag = typeof flags.server === 'string' ? flags.server : undefined;
-  const discover = flags.discover !== false && flags['no-discover'] !== true;
-  if (!serverFlag && !opts.dryRun && discover) {
-    const discovered = await discoverServer(opts);
-    if (discovered) serverFlag = discovered;
-  }
+  const resolved = loadWavegridConfig({ cwd });
 
   if (!applyShardFlag(flags.shard)) {
     console.log(c.red(`Invalid --shard: expected "start-end" (e.g. 0-24), got "${String(flags.shard)}"`));
@@ -87,42 +90,50 @@ export async function runReceiver(opts: ReceiverOptions = {}): Promise<ReceiverR
     return { server: '', stop: () => {} };
   }
 
+  // An explicit flag or configured remote takes precedence over discovery:
+  // an operator who joined a remote brain must not be hijacked by a stray LAN
+  // brain.
+  const serverFlag = await resolveUpstream(
+    typeof flags.server === 'string' ? flags.server : undefined,
+    resolved.config.receiver.server,
+    !opts.dryRun && flags.discover !== false && flags['no-discover'] !== true
+      ? () => discoverServer(opts)
+      : async () => undefined
+  );
+  let resolvedServer = serverFlag;
+  const discover = flags.discover !== false && flags['no-discover'] !== true;
+
   if (opts.dryRun) {
-    const resolved = loadWavegridConfig({ cwd });
-    serverFlag ??= resolved.config.receiver.server;
-    printPlan(resolved, serverFlag);
-    return { server: serverFlag ?? process.env.SIMULATOR_URL ?? '', stop: () => {} };
+    printPlan(resolved, resolvedServer);
+    return { server: resolvedServer ?? process.env.SIMULATOR_URL ?? '', stop: () => {} };
   }
 
   const store = getStore();
   const project = await selectProject(opts);
 
-  const resolved = loadWavegridConfig({ cwd });
-  if (!serverFlag && resolved.config.receiver.server) serverFlag = resolved.config.receiver.server;
-
   // No brain on the LAN and this project replicates config across devices →
   // elect a coordinator so sync still has an authority. The winner promotes
   // itself to a transient brain (server + local receiver); everyone else homes
   // to it. Simple/one-laptop projects skip this entirely.
-  if (!serverFlag && discover && p2pEligible(resolved, flags)) {
+  if (!resolvedServer && discover && p2pEligible(resolved, flags)) {
     const device = store.getDevice();
     console.log(c.gray('  No brain on the LAN — holding a coordinator election (mDNS)…'));
     const result = await coordinate({ project, deviceId: device.id });
     if (result.role === 'client' && result.server) {
       console.log(`  ${c.green('✓')} homing to elected brain ${c.cyan(result.server)}`);
-      serverFlag = result.server;
+      resolvedServer = result.server;
     } else {
       console.log(`  ${c.green('▶')} ${c.bold('promoted to transient brain')} ${c.gray('— no server on the LAN; peers will connect here.')}`);
       return promoteToBrain({ store, project, resolved });
     }
   }
 
-  if (serverFlag) process.env.SIMULATOR_URL = serverFlag;
+  if (resolvedServer) process.env.SIMULATOR_URL = resolvedServer;
 
   // Wire env first (may set SHARD_START/END from this device's assigned shard)
   // so the printed plan reflects the shard the receiver will actually drive.
   applyReceiverEnv(store, project, resolved);
-  printPlan(resolved, serverFlag, project);
+  printPlan(resolved, resolvedServer, project);
 
   const { startReceiver } = await import('@wavegrid/receiver');
   const receiverHandle = startReceiver(resolved);
@@ -209,9 +220,10 @@ async function promoteToBrain(ctx: {
 
 /**
  * Browse the LAN for advertised brains. Returns a ws:// URL, or undefined to
- * fall through to the config/localhost default. Prompts when several are found
- * and a prompter is available; picks the only one automatically. Discovery is
- * pure convenience — the connection still authenticates with the shared key.
+ * fall through to coordinator election or the config/localhost default.
+ * Prompts when several are found and a prompter is available; picks the only
+ * one automatically. Discovery is pure convenience — the connection still
+ * authenticates with the shared key.
  */
 async function discoverServer(opts: ReceiverOptions): Promise<string | undefined> {
   console.log(c.gray('  Searching the LAN for a Wavegrid brain (mDNS)…'));
