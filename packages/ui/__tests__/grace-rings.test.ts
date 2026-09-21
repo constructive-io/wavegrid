@@ -1,6 +1,15 @@
 import { resolveLayout } from '@wavegrid/layout';
 
-import { graceMotion, graceStills, hsbCss, type Look, PAIRS } from '../src/lib/grace-rings';
+import {
+  graceGradients,
+  graceMotion,
+  graceStills,
+  gradientCss,
+  GRADIENTS,
+  hsbCss,
+  type Look,
+  PAIRS
+} from '../src/lib/grace-rings';
 
 interface Cell {
   h: number;
@@ -9,14 +18,15 @@ interface Cell {
 }
 
 const GRACE = resolveLayout({ preset: 'grace-cathedral' });
+const GRACE28 = resolveLayout({ preset: 'grace-28' });
 const AMBER = PAIRS[0];
 const CHAPEL = PAIRS.find(p => p.name === 'Chapel')!;
 
 /** A stand-in for the receiver's pattern ctx, over the real Grace geometry. */
-function run(code: string, t = 0): Cell[] {
-  const cells: Cell[] = GRACE.fixtures.map(() => ({ h: -1, s: -1, b: -1 }));
+function run(code: string, t = 0, layout = GRACE): Cell[] {
+  const cells: Cell[] = layout.fixtures.map(() => ({ h: -1, s: -1, b: -1 }));
   const ctx = {
-    count: GRACE.count,
+    count: layout.count,
     cols: 0,
     rows: 0,
     t,
@@ -29,15 +39,15 @@ function run(code: string, t = 0): Cell[] {
       return [c.h, c.s, c.b];
     },
     polar(i: number): [number, number] {
-      const f = GRACE.fixtures[i];
+      const f = layout.fixtures[i];
       return [f.radius, f.angle];
     },
     xy(i: number): [number, number] {
-      const f = GRACE.fixtures[i];
+      const f = layout.fixtures[i];
       return [f.x, f.y];
     },
     uv(i: number): [number, number] {
-      const f = GRACE.fixtures[i];
+      const f = layout.fixtures[i];
       return [f.u, f.v];
     }
   };
@@ -244,6 +254,121 @@ describe('ring dynamics', () => {
     expect(inner[INNER[0]].b).toBeGreaterThan(inner[CENTRE[0]].b);
     const outer = at(0.5 / 0.8);
     expect(outer[OUTER[0]].b).toBeGreaterThan(outer[INNER[0]].b);
+  });
+});
+
+describe('grace-28 (inner ring of four)', () => {
+  const INNER4 = GRACE28.fixtures.filter(f => f.radius < 0.45).map(f => f.index);
+
+  it('has 12 + 12 + 4', () => {
+    expect(INNER4).toEqual([24, 25, 26, 27]);
+  });
+
+  it('treats the inner four as the centre in pair looks', () => {
+    const cells = run(get('Core'), 0, GRACE28);
+    for (const i of INNER4) expect(cells[i].b).toBe(100);
+    expect(cells[12].b).toBe(75);
+    expect(cells[0].b).toBe(22);
+  });
+
+  it('every pair look writes all 28 fixtures in range', () => {
+    for (const l of [...graceStills(CHAPEL), ...graceMotion(CHAPEL)]) {
+      const cells = run(l.code, 0.7, GRACE28);
+      expect(cells).toHaveLength(28);
+      for (const c of cells) {
+        expect(c.b).toBeGreaterThanOrEqual(0);
+        expect(c.b).toBeLessThanOrEqual(100);
+      }
+    }
+  });
+});
+
+describe('grace gradients', () => {
+  const DAWN = GRADIENTS[0];
+  const all = graceGradients(DAWN);
+  const gradientLook = (name: string) => {
+    const l = all.find(x => x.name === name);
+    if (!l) throw new Error(`no gradient look ${name}`);
+    return l.code;
+  };
+
+  it('offers many palettes and looks', () => {
+    expect(GRADIENTS.length).toBeGreaterThanOrEqual(12);
+    expect(all.length).toBeGreaterThanOrEqual(12);
+    expect(new Set(all.map(l => l.name)).size).toBe(all.length);
+  });
+
+  it.each(GRADIENTS.map(g => [g.name] as const))('%s: every look writes every fixture on 25 and 28', (name) => {
+    const g = GRADIENTS.find(x => x.name === name)!;
+    for (const l of graceGradients(g)) {
+      for (const layout of [GRACE, GRACE28]) {
+        for (const t of [0, 13.7, 61.2]) {
+          const cells = run(l.code, t, layout);
+          expect(cells).toHaveLength(layout.count);
+          for (const c of cells) {
+            expect(c.h).toBeGreaterThanOrEqual(0);
+            expect(c.h).toBeLessThan(360);
+            expect(c.s).toBeGreaterThanOrEqual(0);
+            expect(c.s).toBeLessThanOrEqual(100);
+            expect(c.b).toBeGreaterThanOrEqual(0);
+            expect(c.b).toBeLessThanOrEqual(100);
+          }
+        }
+      }
+    }
+  });
+
+  it('Wheel lays the gradient around the ring and turns a full lap in 60 s', () => {
+    const t0 = run(gradientLook('Wheel'), 0);
+    const hues = OUTER.map(i => t0[i].h);
+    expect(new Set(hues.map(h => Math.round(h))).size).toBeGreaterThan(6);
+    const lap = run(gradientLook('Wheel'), 60);
+    for (const i of OUTER) expect(lap[i].h).toBeCloseTo(t0[i].h, 3);
+    const quarter = run(gradientLook('Wheel'), 15);
+    expect(quarter[OUTER[0]].h).not.toBeCloseTo(t0[OUTER[0]].h, 0);
+  });
+
+  it('Wheel moves slowly: a second barely changes the colour', () => {
+    const a = run(gradientLook('Wheel'), 0)[OUTER[0]].h;
+    const b = run(gradientLook('Wheel'), 1)[OUTER[0]].h;
+    expect(Math.abs(a - b)).toBeLessThan(12);
+  });
+
+  it('Counter turns the inner ring against the outer', () => {
+    const t0 = run(gradientLook('Counter'), 0);
+    // 5 s is one twelfth of a lap: each ring's colours land on a neighbour,
+    // the outer ring on one side and the inner ring on the other.
+    const t1 = run(gradientLook('Counter'), 5);
+    const step = (ring: number[], from: number) => {
+      const j = ring.indexOf(from);
+      const next = ring[(j + 1) % 12];
+      const prev = ring[(j + 11) % 12];
+      if (Math.abs(t1[from].h - t0[next].h) < 0.01) return 1;
+      if (Math.abs(t1[from].h - t0[prev].h) < 0.01) return -1;
+      return 0;
+    };
+    const outerDir = step(OUTER, OUTER[3]);
+    const innerDir = step(INNER, INNER[3]);
+    expect(outerDir).not.toBe(0);
+    expect(innerDir).toBe(-outerDir);
+  });
+
+  it('Sweep puts opposite sides of the window on opposite ends of the band', () => {
+    const cells = run(gradientLook('Sweep'), 0);
+    expect(cells[OUTER[0]].h).not.toBeCloseTo(cells[OUTER[6]].h, 0);
+  });
+
+  it('Still does not move', () => {
+    const a = run(gradientLook('Still'), 0);
+    const b = run(gradientLook('Still'), 100);
+    a.forEach((c, i) => expect(c.h).toBeCloseTo(b[i].h, 6));
+  });
+
+  it('gradientCss is a conic loop back to its first stop', () => {
+    const css = gradientCss(DAWN);
+    expect(css.startsWith('conic-gradient(')).toBe(true);
+    expect(css).toContain('0%');
+    expect(css).toContain('100%');
   });
 });
 

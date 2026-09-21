@@ -1,8 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import {
+  graceGradients,
   graceMotion,
   graceStills,
+  type Gradient,
+  gradientCss,
+  GRADIENTS,
   hsbCss,
   type Look,
   pairGradient,
@@ -15,6 +19,7 @@ import { MiniGridPreview, type PreviewFixture } from './mini-grid-preview';
 
 const STILL_PREFIX = 'grace-still';
 const MOTION_PREFIX = 'grace-motion';
+const GRADIENT_PREFIX = 'grace-gradient';
 
 /** The two rings of twelve, so a tile reads as the room even without previews. */
 function PairSwatch({ pair, active, onClick }: { pair: RingPair; active: boolean; onClick: () => void }) {
@@ -41,9 +46,34 @@ function PairSwatch({ pair, active, onClick }: { pair: RingPair; active: boolean
   );
 }
 
+/** One tile per gradient palette; the swatch is the loop itself. */
+function GradientSwatch({ gradient, active, onClick }: { gradient: Gradient; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={gradient.name}
+      className="relative overflow-hidden transition-all active:scale-93"
+      style={{
+        width: 56,
+        height: 56,
+        borderRadius: 14,
+        background: gradientCss(gradient),
+        border: active ? '2.5px solid #fff' : '2.5px solid transparent'
+      }}
+    >
+      <span
+        className="absolute bottom-0.5 left-0 right-0 text-center font-semibold"
+        style={{ fontSize: 9, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.9)', letterSpacing: '0.02em' }}
+      >
+        {gradient.name}
+      </span>
+    </button>
+  );
+}
+
 function LookTile({
   look,
-  pair,
+  background,
   active,
   onClick,
   showPreview,
@@ -51,7 +81,7 @@ function LookTile({
   fixtures
 }: {
   look: Look;
-  pair: RingPair;
+  background: string;
   active: boolean;
   onClick: () => void;
   showPreview: boolean;
@@ -67,7 +97,7 @@ function LookTile({
         width: tileSize,
         height: tileSize,
         borderRadius: 16,
-        background: showPreview ? '#0a0a12' : pairGradient(pair),
+        background: showPreview ? '#0a0a12' : background,
         border: active ? '2.5px solid #fff' : '2.5px solid transparent'
       }}
     >
@@ -107,9 +137,12 @@ export function GraceTab({
   const [showPreview, setShowPreview] = useState(true);
   const [pairName, setPairName] = useState(PAIRS[0].name);
   const pair = useMemo(() => PAIRS.find((p) => p.name === pairName) ?? PAIRS[0], [pairName]);
+  const [gradientName, setGradientName] = useState(GRADIENTS[0].name);
+  const gradient = useMemo(() => GRADIENTS.find((g) => g.name === gradientName) ?? GRADIENTS[0], [gradientName]);
 
   const stills = useMemo(() => graceStills(pair), [pair]);
   const motion = useMemo(() => graceMotion(pair), [pair]);
+  const gradients = useMemo(() => graceGradients(gradient), [gradient]);
 
   const pickPair = useCallback((next: RingPair) => {
     setPairName(next.name);
@@ -121,19 +154,26 @@ export function GraceTab({
     if (running) send({ type: 'evalPattern', code: running[1].code, params: {} });
   }, [activePattern, send]);
 
+  const pickGradient = useCallback((next: Gradient) => {
+    setGradientName(next.name);
+    if (!activePattern) return;
+    const running = graceGradients(next).find((l) => activePattern === `${GRADIENT_PREFIX}-${l.name}`);
+    if (running) send({ type: 'evalPattern', code: running.code, params: {} });
+  }, [activePattern, send]);
+
   const handleSelect = useCallback((prefix: string, look: Look) => {
     onPatternSelect(`${prefix}-${look.name}`);
     send({ type: 'evalPattern', code: look.code, params: {} });
   }, [onPatternSelect, send]);
 
-  const renderGroup = (label: string, prefix: string, looks: Look[]) => (
+  const renderGroup = (label: string, prefix: string, looks: Look[], background: string) => (
     <ControlGroup label={label}>
       <div className="flex gap-2.5 flex-wrap overflow-y-auto" style={{ maxHeight: showPreview ? 320 : undefined }}>
         {looks.map((l) => (
           <LookTile
             key={`${prefix}-${l.name}`}
             look={l}
-            pair={pair}
+            background={background}
             active={activePattern === `${prefix}-${l.name}`}
             onClick={() => handleSelect(prefix, l)}
             showPreview={showPreview}
@@ -197,8 +237,19 @@ export function GraceTab({
             Inner 12
           </div>
         </ControlGroup>
-        {renderGroup('Shapes', STILL_PREFIX, stills)}
-        {renderGroup('Droplets & Chases', MOTION_PREFIX, motion)}
+        {renderGroup('Shapes', STILL_PREFIX, stills, pairGradient(pair))}
+        {renderGroup('Droplets & Chases', MOTION_PREFIX, motion, pairGradient(pair))}
+        <ControlGroup label={`Gradient — ${gradient.name}`}>
+          <div className="flex gap-2.5 flex-wrap">
+            {GRADIENTS.map((g) => (
+              <GradientSwatch key={g.name} gradient={g} active={g.name === gradient.name} onClick={() => pickGradient(g)} />
+            ))}
+          </div>
+          <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
+            Slow sweeps of blended colour — one lap about a minute at 1×
+          </div>
+        </ControlGroup>
+        {renderGroup('Slow Gradients', GRADIENT_PREFIX, gradients, gradientCss(gradient))}
       </ControlGrid>
     </div>
   );
