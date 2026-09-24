@@ -62,3 +62,17 @@ describe('socket state snapshots', () => {
     expect(isFeedStale(updated, 8_009)).toBe(false);
   });
 });
+
+describe('pattern_state', () => {
+  it('records the running pattern and clears it when the brain stops it', () => {
+    const running = applySocketMessage(
+      createSocketSnapshot(0),
+      { type: 'pattern_state', active: true, code: '({ render() {} })', params: { anim: 'collapse' } },
+      10
+    );
+    expect(running.pattern).toEqual({ active: true, code: '({ render() {} })', params: { anim: 'collapse' } });
+    const stopped = applySocketMessage(running, { type: 'pattern_state', active: false, code: null, params: {} }, 20);
+    expect(stopped.pattern).toEqual({ active: false, code: null, params: {} });
+    expect(beginConnection(stopped, 30).pattern).toBeNull();
+  });
+});

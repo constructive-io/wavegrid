@@ -9,24 +9,51 @@ import {
   paintPane
 } from './grace-paint';
 import { GRADIENTS } from './grace-rings';
+import type { PatternState } from './socket-state';
+
+const PATTERN_CODE = gracePaintPattern();
+/** How long after our last stroke the brain's echo of `paint` is treated as stale. */
+const PAINT_SETTLE_MS = 1500;
+
+/** True when the brain reports it is running the GracePaint pattern. */
+export function isGracePaintRunning(pattern: PatternState | null): boolean {
+  return !!pattern && pattern.active && pattern.code === PATTERN_CODE;
+}
+
+/** The brain's live GracePaint `ctx.p`, if it is well-formed enough to adopt. */
+export function paramsFromPattern(pattern: PatternState | null): GracePaintParams | null {
+  if (!isGracePaintRunning(pattern)) return null;
+  const p = pattern!.params;
+  if (typeof p.anim !== 'string' || typeof p.flow !== 'string') return null;
+  if (!Array.isArray(p.stops) || !Array.isArray(p.paint)) return null;
+  return {
+    anim: p.anim,
+    flow: p.flow,
+    stops: p.stops as [number, number][],
+    paint: p.paint as number[],
+    level: typeof p.level === 'number' ? p.level : 100,
+    spin: typeof p.spin === 'number' ? p.spin : 1
+  };
+}
 
 /**
- * Owns the GracePaint parameters and keeps the receiver in step: while the
- * GracePaint pattern is the one running, every change is a setPatternParam;
- * otherwise (nothing running, or another tab took over) the first change
- * starts the pattern with everything the operator has set so far. Painted
- * colours therefore outlive switching tabs and stopping the show.
+ * Owns the GracePaint parameters and keeps the receiver in step. Whether
+ * GracePaint is running is the brain's word, not this tab's memory: while the
+ * brain runs it, every change is a setPatternParam on top of the brain's live
+ * params (so a reloaded or second iPad joins the running animation instead of
+ * restarting it); otherwise the first change starts the pattern with
+ * everything the operator has set so far.
  */
 export function useGracePaint(
   count: number,
   send: (msg: Record<string, unknown>) => void,
-  activePattern: string | null,
+  pattern: PatternState | null,
   onPatternSelect: (id: string) => void
 ) {
   const [params, setParams] = useState<GracePaintParams>(() => defaultParams(count, GRADIENTS[0]));
   const paramsRef = useRef(params);
   paramsRef.current = params;
-  const running = activePattern === GRACE_PAINT_ID;
+  const running = isGracePaintRunning(pattern);
   const runningRef = useRef(running);
   runningRef.current = running;
 
@@ -37,10 +64,25 @@ export function useGracePaint(
     setParams(next);
   }, [count]);
 
+  // Adopt the brain's live params whenever they differ from ours. Paint is the
+  // exception while a finger is on the window: the brain's echo of our own
+  // strokes lags, so taking it mid-stroke would drop the newest panes.
+  const lastPaintAtRef = useRef(0);
+  useEffect(() => {
+    const live = paramsFromPattern(pattern);
+    if (!live) return;
+    const mine = paramsRef.current;
+    const painting = Date.now() - lastPaintAtRef.current < PAINT_SETTLE_MS;
+    const next = painting ? { ...live, paint: mine.paint } : live;
+    if (JSON.stringify(next) === JSON.stringify(mine)) return;
+    paramsRef.current = next;
+    setParams(next);
+  }, [pattern]);
+
   const start = useCallback(() => {
     onPatternSelect(GRACE_PAINT_ID);
     runningRef.current = true;
-    send({ type: 'evalPattern', code: gracePaintPattern(), params: paramsRef.current });
+    send({ type: 'evalPattern', code: PATTERN_CODE, params: paramsRef.current });
   }, [onPatternSelect, send]);
 
   const update = useCallback(
@@ -48,6 +90,7 @@ export function useGracePaint(
       const next = { ...paramsRef.current, [key]: value };
       paramsRef.current = next;
       setParams(next);
+      if (key === 'paint') lastPaintAtRef.current = Date.now();
       if (runningRef.current) send({ type: 'setPatternParam', name: key, value });
       else start();
     },
@@ -78,6 +121,7 @@ export function useGracePaint(
       const next = { ...paramsRef.current, stops, paint: emptyPaint(count) };
       paramsRef.current = next;
       setParams(next);
+      lastPaintAtRef.current = Date.now();
       if (runningRef.current) {
         send({ type: 'setPatternParam', name: 'stops', value: stops });
         send({ type: 'setPatternParam', name: 'paint', value: next.paint });

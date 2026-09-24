@@ -27,17 +27,17 @@ export const ANIMS: Choice[] = [
   { key: 'ringBreathe', name: 'Ring Breathe', hint: 'Each ring breathes in its own time' },
   { key: 'collapse', name: 'Collapse', hint: 'Outer ring fades, then middle; centre stays; they return in reverse' },
   { key: 'collapsePanes', name: 'Collapse Panes', hint: 'Same, but each ring goes and returns one pane at a time' },
-  { key: 'unwind', name: 'Unwind', hint: 'One pane at a time from outer to centre and back, in a spiral' },
-  { key: 'droplet', name: 'Droplet', hint: 'Light ripples from the centre outward' },
-  { key: 'sink', name: 'Sink', hint: 'Light ripples inward toward the centre' },
+  { key: 'unwind', name: 'Unwind', hint: 'One pane at a time from outer ring in, then back out; centre stays on' },
+  { key: 'droplet', name: 'Droplet', hint: 'Rings light in turn as a ripple leaves the centre, which stays on' },
+  { key: 'sink', name: 'Sink', hint: 'Rings light in turn as a ripple sinks to the centre, which stays on' },
   { key: 'beacon', name: 'Beacon', hint: 'Centre pulses; a wave of light follows it out' },
   { key: 'swap', name: 'Swap', hint: 'Outer and middle rings take turns' },
   { key: 'chase', name: 'Chase', hint: 'A soft head of light runs around each ring' },
   { key: 'counter', name: 'Counter', hint: 'Chases run opposite ways on the two rings' },
-  { key: 'comet', name: 'Comet', hint: 'Bright head with a long fading tail' },
+  { key: 'comet', name: 'Comet', hint: 'Bright head with a tail that falls to dark behind it' },
   { key: 'spokes', name: 'Spokes', hint: 'Three slow spokes turn across both rings' },
-  { key: 'sweep', name: 'Sweep', hint: 'A straight band of light turns across the window' },
-  { key: 'pendulum', name: 'Pendulum', hint: 'Brightness swings side to side like a bell' },
+  { key: 'sweep', name: 'Sweep', hint: 'Half the window lit, the dividing line turning' },
+  { key: 'pendulum', name: 'Pendulum', hint: 'A band of light swings side to side like a bell' },
   { key: 'twinkle', name: 'Twinkle', hint: 'Each pane glimmers gently on its own' },
   { key: 'vortex', name: 'Vortex', hint: 'Rings turn opposite ways with the centre breathing' },
   { key: 'rainfall', name: 'Rainfall', hint: 'Panes fall dark one by one, then refill' },
@@ -65,7 +65,16 @@ export interface GracePaintParams {
   paint: number[];
   /** Brightness ceiling 0..100. */
   level: number;
+  /** Gradient rotation rate: multiplier on the flow's clock (0 = still, 1 = one lap a minute). */
+  spin: number;
 }
+
+export const SPINS: { key: number; name: string }[] = [
+  { key: 0, name: 'Still' },
+  { key: 0.5, name: 'Slow' },
+  { key: 1, name: 'Medium' },
+  { key: 2, name: 'Fast' }
+];
 
 export function emptyPaint(count: number): number[] {
   const out = new Array<number>(count * 2);
@@ -82,7 +91,8 @@ export function defaultParams(count: number, gradient: Gradient): GracePaintPara
     flow: 'wheel',
     stops: gradient.stops.map(([h, s]) => [h, s] as [number, number]),
     paint: emptyPaint(count),
-    level: 100
+    level: 100,
+    spin: 1
   };
 }
 
@@ -209,99 +219,118 @@ function collapsePanesLevel(r, x, s, n) {
   return 1 - rise(x, outAt + s * w, w) + rise(x, inAt + s * w, w);
 }
 
+// A pane meant to read as "on" never sits below PRESENT: on the lasers anything
+// dimmer looks off once the fade/brightness is under 100. So every choreography
+// is either PRESENT..1 (lit, with its motion inside that band) or 0 (dark),
+// with the crossings kept short.
+var PRESENT = 0.8;
+function lit(v) { return PRESENT + (1 - PRESENT) * clamp01(v); }
+// 0..1 -> mostly 0 or 1 with a short crossing around the middle.
+function crisp(v) { return ss((v - 0.3) / 0.4); }
+
 var ANIMS = {
   still: function() { return 1; },
-  breathe: function(ctx, i, t) { return 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * TAU / 9)); },
+  breathe: function(ctx, i, t) { return lit(0.5 + 0.5 * Math.sin(t * TAU / 9)); },
   ringBreathe: function(ctx, i, t) {
     var r = ring(ctx, i);
     var ph = r === 1 ? 0 : r === 0 ? TAU / 3 : 2 * TAU / 3;
-    return 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * TAU / 11 + ph));
+    return lit(0.5 + 0.5 * Math.sin(t * TAU / 11 + ph));
   },
   collapse: function(ctx, i, t) { return collapseLevel(ring(ctx, i), fract(t / CYCLE)); },
   collapsePanes: function(ctx, i, t) {
     return collapsePanesLevel(ring(ctx, i), fract(t / CYCLE), slots[i], counts[i]);
   },
   unwind: function(ctx, i, t) {
-    // One path: outer ring clockwise, then middle ring clockwise, then the
-    // centre. Light drains along it one pane at a time, then refills from the
-    // outside again.
+    // One path: outer ring clockwise, then middle ring clockwise. Light drains
+    // along it one pane at a time down to the centre (which stays on), then
+    // refills from the outside again.
     var r = ring(ctx, i);
-    var order = r === 1 ? slots[i] : r === 0 ? counts[i] + slots[i] : 2 * counts[i];
+    if (r === -1) return 1;
+    var order = r === 1 ? slots[i] : counts[i] + slots[i];
     var total = 0;
     for (var k = 0; k < ctx.count; k++) if (ring(ctx, k) !== -1) total = Math.max(total, counts[k]);
-    total = total * 2 + 1;
+    total = total * 2;
     var x = fract(t / CYCLE);
     var w = 0.45 / total;
     var off = 1 - rise(x, order * w, w);
     var on = rise(x, 0.5 + order * w, w);
-    return r === -1 ? Math.max(0.35, off + on) : clamp01(off + on);
+    return clamp01(off + on);
   },
   droplet: function(ctx, i, t) {
+    // The centre is the source and stays on; each ring lights as the ripple
+    // passes, rings overlapping so the window is never all dark.
+    if (ring(ctx, i) === -1) return 1;
     var d = fract(t / 8) - (rad(ctx, i) * 0.7);
-    var pulse = Math.exp(-Math.pow((fract(d + 0.5) - 0.5) * 6, 2));
-    return 0.15 + 0.85 * pulse;
+    return ss(1 - Math.abs(fract(d + 0.5) - 0.5) * 2.5);
   },
   sink: function(ctx, i, t) {
+    if (ring(ctx, i) === -1) return 1;
     var d = fract(t / 8) + (rad(ctx, i) * 0.7);
-    var pulse = Math.exp(-Math.pow((fract(d + 0.5) - 0.5) * 6, 2));
-    return 0.15 + 0.85 * pulse;
+    return ss(1 - Math.abs(fract(d + 0.5) - 0.5) * 2.5);
   },
   beacon: function(ctx, i, t) {
     var x = fract(t / 10);
     var r = ring(ctx, i);
-    var at = r === -1 ? 0 : r === 0 ? 0.25 : 0.5;
+    if (r === -1) return lit(0.5 + 0.5 * Math.cos(x * TAU));
+    var at = r === 0 ? 0.25 : 0.5;
     var d = Math.abs(fract(x - at + 0.5) - 0.5);
-    return 0.2 + 0.8 * Math.exp(-Math.pow(d * 7, 2));
+    return ss(1 - d * 2.5);
   },
   swap: function(ctx, i, t) {
     var r = ring(ctx, i);
     if (r === -1) return 1;
     var s = 0.5 + 0.5 * Math.sin(t * TAU / 14);
-    return 0.1 + 0.9 * (r === 1 ? s : 1 - s);
+    return crisp(r === 1 ? s : 1 - s);
   },
   chase: function(ctx, i, t) {
-    if (ring(ctx, i) === -1) return 0.7;
+    if (ring(ctx, i) === -1) return 1;
     var head = fract(t / 12);
-    return 0.15 + 0.85 * Math.exp(-Math.pow(gap(pos(ctx, i), head) * 5, 2));
+    return ss(1 - gap(pos(ctx, i), head) * 4);
   },
   counter: function(ctx, i, t) {
     var r = ring(ctx, i);
-    if (r === -1) return 0.7;
+    if (r === -1) return 1;
     var head = fract((r === 1 ? 1 : -1) * t / 12);
-    return 0.15 + 0.85 * Math.exp(-Math.pow(gap(pos(ctx, i), head) * 5, 2));
+    return ss(1 - gap(pos(ctx, i), head) * 4);
   },
   comet: function(ctx, i, t) {
-    if (ring(ctx, i) === -1) return 0.6;
+    if (ring(ctx, i) === -1) return 1;
     var head = fract(t / 14);
     var behind = fract(head - pos(ctx, i));
-    return 0.08 + 0.92 * Math.exp(-behind * 5);
+    // Head and the first panes behind it fully lit; the tail then drops to dark
+    // over the next few panes rather than lingering dim.
+    return ss(1.15 - behind * 2.3);
   },
   spokes: function(ctx, i, t) {
     if (ring(ctx, i) === -1) return 1;
     var a = pos(ctx, i) - t / 40;
-    return 0.15 + 0.85 * Math.pow(0.5 + 0.5 * Math.cos(a * TAU * 3), 2);
+    return crisp(0.5 + 0.5 * Math.cos(a * TAU * 3));
   },
   sweep: function(ctx, i, t) {
+    // Half the window lit, the dividing line turning; the centre sits on the
+    // line so it simply stays on.
+    if (ring(ctx, i) === -1) return 1;
     var p = ctx.polar(i);
     var d = p[0] * Math.cos(p[1] - t / 30 * TAU);
-    return 0.2 + 0.8 * ss((d + 0.6) / 1.2);
+    return ss((d + 0.2) / 0.4);
   },
   pendulum: function(ctx, i, t) {
+    // A band of light swinging left and right across the window.
     var p = ctx.polar(i);
     var x = p[0] * Math.cos(p[1]);
     var swing = Math.sin(t * TAU / 12);
-    return 0.25 + 0.75 * ss((x * swing + 0.8) / 1.6);
+    return ss(1 - Math.abs(x - 0.6 * swing) * 1.8);
   },
   twinkle: function(ctx, i, t) {
     var p = pos(ctx, i);
     var g = Math.sin(t * 0.9 + p * 13 + rad(ctx, i) * 7) * 0.6 + Math.sin(t * 0.55 + p * 29) * 0.4;
-    return 0.55 + 0.45 * g;
+    return lit(0.5 + 0.5 * g);
   },
   vortex: function(ctx, i, t) {
     var r = ring(ctx, i);
-    if (r === -1) return 0.5 + 0.5 * (0.5 + 0.5 * Math.sin(t * TAU / 9));
+    if (r === -1) return lit(0.5 + 0.5 * Math.sin(t * TAU / 9));
     var head = fract((r === 1 ? 1 : -1.6) * t / 16);
-    return 0.2 + 0.8 * Math.pow(0.5 + 0.5 * Math.cos((pos(ctx, i) - head) * TAU * 2), 2);
+    return crisp(0.5 + 0.5 * Math.cos((pos(ctx, i) - head) * TAU * 2));
   },
   rainfall: function(ctx, i, t) {
     if (ring(ctx, i) === -1) return 1;
@@ -317,7 +346,7 @@ var ANIMS = {
     var at = r === 1 ? 0 : r === 0 ? 1 : 2;
     var d = Math.abs(x - at);
     d = Math.min(d, Math.abs(x - (4 - at)), Math.abs(x - 4 - at));
-    return 0.08 + 0.92 * ss(1 - d);
+    return ss(1.5 - d * 1.5);
   }
 };
 
@@ -330,10 +359,12 @@ return {
     var anim = ANIMS[p.anim] || ANIMS.still;
     var flow = FLOWS[p.flow] || FLOWS.wheel;
     var level = p.level === undefined ? 100 : p.level;
+    var spin = p.spin === undefined ? 1 : p.spin;
     var t = ctx.t;
+    var ft = t * spin;
     for (var i = 0; i < ctx.count; i++) {
       var h = paint[i * 2];
-      var c = (h === undefined || h < 0) ? grad(stops, flow(ctx, i, t)) : [h, paint[i * 2 + 1]];
+      var c = (h === undefined || h < 0) ? grad(stops, flow(ctx, i, ft)) : [h, paint[i * 2 + 1]];
       var b = clamp01(anim(ctx, i, t)) * level;
       ctx.set(i, c[0], c[1], b < 0 ? 0 : (b > 100 ? 100 : b));
     }
