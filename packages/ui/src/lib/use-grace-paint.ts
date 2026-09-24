@@ -72,7 +72,21 @@ export function useGracePaint(
 
   const clearPaint = useCallback(() => update('paint', emptyPaint(count)), [count, update]);
 
-  return { params, running, start, update, paint, fill, clearPaint };
+  /** A gradient takes over the whole window: any paint is cleared with it. */
+  const setGradient = useCallback(
+    (stops: [number, number][]) => {
+      const next = { ...paramsRef.current, stops, paint: emptyPaint(count) };
+      paramsRef.current = next;
+      setParams(next);
+      if (runningRef.current) {
+        send({ type: 'setPatternParam', name: 'stops', value: stops });
+        send({ type: 'setPatternParam', name: 'paint', value: next.paint });
+      } else start();
+    },
+    [count, send, start]
+  );
+
+  return { params, running, start, update, paint, fill, clearPaint, setGradient };
 }
 
 export type GracePaintControls = ReturnType<typeof useGracePaint>;
