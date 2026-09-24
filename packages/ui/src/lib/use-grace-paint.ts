@@ -9,7 +9,7 @@ import {
   paintPane
 } from './grace-paint';
 import { GRADIENTS } from './grace-rings';
-import type { PatternState } from './socket-state';
+import type { Look, PatternState } from './socket-state';
 
 const PATTERN_CODE = gracePaintPattern();
 /** How long after our last stroke the brain's echo of `paint` is treated as stale. */
@@ -20,10 +20,8 @@ export function isGracePaintRunning(pattern: PatternState | null): boolean {
   return !!pattern && pattern.active && pattern.code === PATTERN_CODE;
 }
 
-/** The brain's live GracePaint `ctx.p`, if it is well-formed enough to adopt. */
-export function paramsFromPattern(pattern: PatternState | null): GracePaintParams | null {
-  if (!isGracePaintRunning(pattern)) return null;
-  const p = pattern!.params;
+/** A GracePaint param set from loosely-typed JSON (the brain's `ctx.p`, a saved Look), or null. */
+export function coerceParams(p: Record<string, unknown>): GracePaintParams | null {
   if (typeof p.anim !== 'string' || typeof p.flow !== 'string') return null;
   if (!Array.isArray(p.stops) || !Array.isArray(p.paint)) return null;
   return {
@@ -34,6 +32,22 @@ export function paramsFromPattern(pattern: PatternState | null): GracePaintParam
     level: typeof p.level === 'number' ? p.level : 100,
     spin: typeof p.spin === 'number' ? p.spin : 1
   };
+}
+
+/** The brain's live GracePaint `ctx.p`, if it is well-formed enough to adopt. */
+export function paramsFromPattern(pattern: PatternState | null): GracePaintParams | null {
+  if (!isGracePaintRunning(pattern)) return null;
+  return coerceParams(pattern!.params);
+}
+
+/** A saved Look's params fitted to this window: paint resized to `count` panes. */
+export function paramsFromLook(look: Look, count: number): GracePaintParams | null {
+  const p = coerceParams(look.params);
+  if (!p) return null;
+  if (p.paint.length === count * 2) return p;
+  const paint = emptyPaint(count);
+  for (let i = 0; i < Math.min(paint.length, p.paint.length); i++) paint[i] = p.paint[i];
+  return { ...p, paint };
 }
 
 /**
@@ -130,7 +144,32 @@ export function useGracePaint(
     [count, send, start]
   );
 
-  return { params, running, start, update, paint, fill, clearPaint, setGradient };
+  /** Recall a Look: every param at once, on top of the running animation (no restart). */
+  const applyLook = useCallback(
+    (look: Look) => {
+      const next = paramsFromLook(look, count);
+      if (!next) return;
+      paramsRef.current = next;
+      setParams(next);
+      lastPaintAtRef.current = Date.now();
+      if (runningRef.current) {
+        for (const key of Object.keys(next) as (keyof GracePaintParams)[]) {
+          send({ type: 'setPatternParam', name: key, value: next[key] });
+        }
+      } else start();
+    },
+    [count, send, start]
+  );
+
+  /** Save what is on the window right now as a Look on the brain. */
+  const saveLook = useCallback(
+    (name: string) => send({ type: 'saveLook', name, params: paramsRef.current }),
+    [send]
+  );
+  const renameLook = useCallback((id: string, name: string) => send({ type: 'renameLook', id, name }), [send]);
+  const deleteLook = useCallback((id: string) => send({ type: 'deleteLook', id }), [send]);
+
+  return { params, running, start, update, paint, fill, clearPaint, setGradient, applyLook, saveLook, renameLook, deleteLook };
 }
 
 export type GracePaintControls = ReturnType<typeof useGracePaint>;

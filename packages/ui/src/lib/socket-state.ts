@@ -43,6 +43,14 @@ export interface PatternState {
   params: Record<string, unknown>;
 }
 
+/** A GracePaint state saved on the brain. */
+export interface Look {
+  id: string;
+  name: string;
+  params: Record<string, unknown>;
+  createdAt: number;
+}
+
 export interface SocketSnapshot {
   grid: CannonColor[];
   orientation: Orientation;
@@ -50,6 +58,7 @@ export interface SocketSnapshot {
   settings: Settings | null;
   pool: PoolState | null;
   pattern: PatternState | null;
+  looks: Look[];
   epoch: number;
   lastMessageAt: number;
 }
@@ -66,6 +75,7 @@ export function createSocketSnapshot(now = 0): SocketSnapshot {
     settings: null,
     pool: null,
     pattern: null,
+    looks: [],
     epoch: 0,
     lastMessageAt: now
   };
@@ -151,6 +161,17 @@ export function applySocketMessage(
         code: typeof message.code === 'string' ? message.code : null,
         params: message.params && typeof message.params === 'object' ? (message.params as Record<string, unknown>) : {}
       },
+      lastMessageAt: now
+    };
+  case 'looks_state':
+    return {
+      ...snapshot,
+      looks: Array.isArray(message.looks)
+        ? (message.looks as unknown[]).filter(
+          (l): l is Look => !!l && typeof l === 'object' && typeof (l as Look).id === 'string' && typeof (l as Look).name === 'string'
+              && !!(l as Look).params && typeof (l as Look).params === 'object'
+        )
+        : [],
       lastMessageAt: now
     };
   case 'sync_update':

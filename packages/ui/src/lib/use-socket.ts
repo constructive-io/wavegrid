@@ -16,7 +16,7 @@ import {
   type SocketSnapshot
 } from '@/lib/socket-state';
 
-export type { CannonColor, Orientation, PatternState, PlaylistState, PoolState, Settings } from '@/lib/socket-state';
+export type { CannonColor, Look, Orientation, PatternState, PlaylistState, PoolState, Settings } from '@/lib/socket-state';
 
 export function useSocket(
   url: string | null,
@@ -152,6 +152,7 @@ export function useSocket(
     settings: snapshot.settings,
     pool: snapshot.pool,
     pattern: snapshot.pattern,
+    looks: snapshot.looks,
     epoch: snapshot.epoch,
     send
   };

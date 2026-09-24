@@ -36,6 +36,7 @@ import type {
   SyncUpdateMessage,
   SystemStatus
 } from './protocol';
+import { LookStore } from './looks';
 import { applyScene, scenes } from './scenes';
 
 export interface ServerHandle {
@@ -99,6 +100,7 @@ export function startServer(
   // Light-map lives in the per-project state dir (written by /api/light-map),
   // not a cwd-relative deploy file. Server + API read/write the same path.
   const LIGHT_MAP_FILE = process.env.LIGHT_MAP_CONFIG || resolve(STATE_DIR, 'light-map.json');
+  const LOOKS_FILE = resolve(STATE_DIR, 'looks.json');
 
 interface PersistedState {
   currentAnimation: string | null;
@@ -256,6 +258,7 @@ function tickPool(dt: number) {
 }
 let playlistCurrentStep = 0;
 const patternEngine = new ServerPatternEngine(layout);
+const looks = new LookStore(LOOKS_FILE);
 
 // Restore persisted state on boot
 const restored = loadPersistedState();
@@ -462,6 +465,14 @@ function patternStatePayload(): string {
     code: patternEngine.code,
     params: patternEngine.currentParams
   });
+}
+
+function looksPayload(): string {
+  return JSON.stringify({ type: 'looks_state', looks: looks.list() });
+}
+
+function broadcastLooks() {
+  fanout(wss.clients, looksPayload(), dropClient);
 }
 
 let lastPatternState = '';
@@ -756,6 +767,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   }
   sendToClient(ws, poolPayload());
   sendToClient(ws, patternStatePayload());
+  sendToClient(ws, looksPayload());
 
   ws.on('message', (raw) => {
     try {
@@ -1084,6 +1096,18 @@ function handleMessage(msg: any, ws?: WebSocket) {
   case 'stopPattern':
     patternEngine.stop();
     broadcastCommand({ action: 'stopPattern' });
+    break;
+  case 'saveLook':
+    if (looks.save(msg.name, msg.params)) broadcastLooks();
+    break;
+  case 'renameLook':
+    if (looks.rename(msg.id, msg.name)) broadcastLooks();
+    break;
+  case 'deleteLook':
+    if (looks.remove(msg.id)) broadcastLooks();
+    break;
+  case 'moveLook':
+    if (looks.move(msg.id, msg.to)) broadcastLooks();
     break;
   case 'playlist':
     if (Array.isArray(msg.steps) && msg.steps.length > 0) {
