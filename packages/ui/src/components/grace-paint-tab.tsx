@@ -2,8 +2,7 @@ import { useState } from 'react';
 
 import { ANIMS, type Choice, FLOWS, gracePaintPattern, hasPaint, ringPaint, SPINS } from '@/lib/grace-paint';
 import { type Gradient, gradientCss, GRADIENTS, pairGradient, PAIRS, type RingPair } from '@/lib/grace-rings';
-import type { Look } from '@/lib/socket-state';
-import { type GracePaintControls, paramsFromLook } from '@/lib/use-grace-paint';
+import type { GracePaintControls } from '@/lib/use-grace-paint';
 
 import { ColorPicker, QuickColors } from './color-wheel';
 import { ControlGrid, ControlGroup } from './control-grid';
@@ -166,135 +165,6 @@ function AnimTile({
   );
 }
 
-const LOOK_TILE = 72;
-
-/**
- * Looks: GracePaint states saved on the brain (every iPad sees the same list).
- * Tap to recall on top of the running animation; Save snapshots what is on the
- * window now; Edit exposes rename/delete.
- */
-function LooksStrip({
-  looks,
-  current,
-  speed,
-  easing,
-  fixtures,
-  onSave,
-  onApply,
-  onRename,
-  onDelete
-}: {
-  looks: Look[];
-  current: Record<string, unknown>;
-  speed: number;
-  easing: PreviewEasing;
-  fixtures?: PreviewFixture[];
-  onSave: (name: string) => void;
-  onApply: (look: Look) => void;
-  onRename: (id: string, name: string) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const count = fixtures?.length ?? 0;
-  const currentJson = JSON.stringify(current);
-  const save = () => {
-    const name = window.prompt('Name this look', `Look ${looks.length + 1}`);
-    if (name === null) return;
-    onSave(name);
-  };
-  const rename = (look: Look) => {
-    const name = window.prompt('Rename look', look.name);
-    if (name === null || !name.trim() || name.trim() === look.name) return;
-    onRename(look.id, name.trim());
-  };
-  const remove = (look: Look) => {
-    if (window.confirm(`Delete "${look.name}"?`)) onDelete(look.id);
-  };
-  return (
-    <ControlGroup label={`Looks${looks.length ? ` (${looks.length})` : ''}`}>
-      <div className="flex gap-2 items-start overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
-        <button
-          onClick={save}
-          className="flex flex-col items-center justify-center shrink-0 transition-all active:scale-93"
-          style={{
-            width: LOOK_TILE,
-            height: LOOK_TILE,
-            borderRadius: 14,
-            background: '#1a1a25',
-            border: '1.5px dashed #3a3a48',
-            color: '#c8c8d8'
-          }}
-          title="Save what is on the window now as a Look"
-        >
-          <span style={{ fontSize: 22, lineHeight: 1 }}>+</span>
-          <span className="text-xs font-medium mt-1">Save</span>
-        </button>
-        {looks.map((look) => {
-          const params = count ? paramsFromLook(look, count) : null;
-          const active = !!params && JSON.stringify(params) === currentJson;
-          return (
-            <div key={look.id} className="relative shrink-0" style={{ width: LOOK_TILE }}>
-              <button
-                onClick={() => (editing ? rename(look) : onApply(look))}
-                title={editing ? 'Rename' : `Recall "${look.name}"`}
-                className="relative overflow-hidden transition-all active:scale-93 w-full"
-                style={{
-                  height: LOOK_TILE,
-                  borderRadius: 14,
-                  background: '#0a0a12',
-                  border: active ? '2.5px solid #fff' : '2.5px solid transparent'
-                }}
-              >
-                {params ? (
-                  <MiniGridPreview
-                    source={gracePaintPattern()}
-                    speed={speed}
-                    attack={easing.attack}
-                    alpha={easing.alpha}
-                    params={{ ...params }}
-                    size={LOOK_TILE}
-                    isPattern
-                    fixtures={fixtures}
-                  />
-                ) : null}
-                <span
-                  className="absolute bottom-1 left-0 right-0 text-center text-white font-semibold truncate px-1"
-                  style={{ fontSize: 9, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}
-                >
-                  {look.name}
-                </span>
-              </button>
-              {editing ? (
-                <button
-                  onClick={() => remove(look)}
-                  className="absolute -top-1 -right-1 rounded-full text-white text-xs font-bold flex items-center justify-center"
-                  style={{ width: 20, height: 20, background: '#d44', border: '1.5px solid #0a0a12' }}
-                  title="Delete look"
-                >
-                  ×
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-        {looks.length ? (
-          <button
-            onClick={() => setEditing((e) => !e)}
-            className="self-center shrink-0 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
-            style={{
-              background: editing ? '#2563eb' : '#1a1a25',
-              color: editing ? '#fff' : '#888898',
-              border: '1px solid ' + (editing ? '#3b82f6' : '#2a2a35')
-            }}
-          >
-            {editing ? 'Done' : 'Edit'}
-          </button>
-        ) : null}
-      </div>
-    </ControlGroup>
-  );
-}
-
 /**
  * GracePaint: Paint's wheel on the left, and on the right the two layers the
  * pattern keeps apart — the colour of the unpainted panes (a gradient and how
@@ -303,7 +173,6 @@ function LooksStrip({
  */
 export function GracePaintTab({
   controls,
-  looks,
   hue,
   sat,
   bright,
@@ -316,7 +185,6 @@ export function GracePaintTab({
   compact = false
 }: {
   controls: GracePaintControls;
-  looks: Look[];
   hue: number;
   sat: number;
   bright: number;
@@ -330,7 +198,7 @@ export function GracePaintTab({
   compact?: boolean;
 }) {
   const [colourTab, setColourTab] = useState<ColourTab>('gradients');
-  const { params, running, update, fill, clearPaint, setGradient, applyLook, saveLook, renameLook, deleteLook } = controls;
+  const { params, running, update, fill, clearPaint, setGradient } = controls;
   const painted = hasPaint(params.paint);
   const radii = fixtures?.map((f) => f.radius) ?? [];
   const activePair = PAIRS.find((p) => radii.length > 0 && ringPaint(radii, p).every((v, k) => v === params.paint[k]));
@@ -341,17 +209,6 @@ export function GracePaintTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <LooksStrip
-        looks={looks}
-        current={previewParams}
-        speed={animSpeed}
-        easing={easing}
-        fixtures={fixtures}
-        onSave={saveLook}
-        onApply={applyLook}
-        onRename={renameLook}
-        onDelete={deleteLook}
-      />
       <div className="flex gap-1 px-2 flex-wrap items-center">
         {COLOUR_TABS.map((t) => (
           <button
