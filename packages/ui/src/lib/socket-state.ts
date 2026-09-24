@@ -36,12 +36,20 @@ export interface Settings {
   animation: string | null;
 }
 
+/** The pattern the brain is running (its source + live `ctx.p`), or inactive. */
+export interface PatternState {
+  active: boolean;
+  code: string | null;
+  params: Record<string, unknown>;
+}
+
 export interface SocketSnapshot {
   grid: CannonColor[];
   orientation: Orientation;
   playlistState: PlaylistState | null;
   settings: Settings | null;
   pool: PoolState | null;
+  pattern: PatternState | null;
   epoch: number;
   lastMessageAt: number;
 }
@@ -57,6 +65,7 @@ export function createSocketSnapshot(now = 0): SocketSnapshot {
     playlistState: null,
     settings: null,
     pool: null,
+    pattern: null,
     epoch: 0,
     lastMessageAt: now
   };
@@ -131,6 +140,16 @@ export function applySocketMessage(
         sources: message.sources as PoolState['sources'],
         spiral: (message.spiral as PoolState['spiral']) ?? { cx: 0.5, cy: 0.5, omega: 0 },
         current: Array.isArray(message.current) ? (message.current as number[]) : (snapshot.pool?.current ?? [])
+      },
+      lastMessageAt: now
+    };
+  case 'pattern_state':
+    return {
+      ...snapshot,
+      pattern: {
+        active: !!message.active,
+        code: typeof message.code === 'string' ? message.code : null,
+        params: message.params && typeof message.params === 'object' ? (message.params as Record<string, unknown>) : {}
       },
       lastMessageAt: now
     };

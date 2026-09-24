@@ -51,6 +51,19 @@ describe('ServerPatternEngine params', () => {
     expect(g[0].b).toBe(2);
   });
 
+  it('reports the loaded code and live params, cleared by stop', () => {
+    const engine = new ServerPatternEngine(LAYOUT);
+    expect(engine.code).toBeNull();
+    expect(engine.currentParams).toEqual({});
+    engine.load(PARAM_PATTERN, { level: 80 });
+    engine.setParam('hue', 120);
+    expect(engine.code).toBe(PARAM_PATTERN);
+    expect(engine.currentParams).toEqual({ hue: 120, level: 80 });
+    engine.stop();
+    expect(engine.code).toBeNull();
+    expect(engine.currentParams).toEqual({});
+  });
+
   it('setParam is a no-op with nothing loaded', () => {
     const engine = new ServerPatternEngine(LAYOUT);
     expect(() => engine.setParam('x', 1)).not.toThrow();

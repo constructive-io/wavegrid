@@ -48,6 +48,7 @@ export class ServerPatternEngine {
   private layout: Layout;
   private _speed: number = 1.0;
   private params: Record<string, unknown> = {};
+  private _code: string | null = null;
 
   constructor(layout: Layout) {
     this.layout = layout;
@@ -67,6 +68,7 @@ export class ServerPatternEngine {
       const result = this.evaluate(code);
       if (result && typeof result === 'object' && typeof (result as Record<string, unknown>).render === 'function') {
         this.pattern = result as unknown as PatternObj;
+        this._code = code;
         this._patternTime = 0;
         this._lastTickMs = Date.now();
         this.params = {};
@@ -208,7 +210,18 @@ export class ServerPatternEngine {
    */
   stop(): void {
     this.pattern = null;
+    this._code = null;
     this.params = {};
+  }
+
+  /** Source of the loaded pattern, or null when none is running. */
+  get code(): string | null {
+    return this.pattern ? this._code : null;
+  }
+
+  /** Copy of the current `ctx.p`, so late-joining UIs can pick up where the pattern is. */
+  get currentParams(): Record<string, unknown> {
+    return { ...this.params };
   }
 
   /**

@@ -47,7 +47,7 @@ type TrailFadeEntry = {
   duration: number;
 };
 
-const tabs: { key: GridMode; label: string }[] = [
+const allTabs: { key: GridMode; label: string }[] = [
   { key: 'paint', label: 'Paint' },
   { key: 'pool', label: 'Pool' },
   { key: 'gradient', label: 'Gradient' },
@@ -65,6 +65,11 @@ const tabs: { key: GridMode; label: string }[] = [
   { key: 'audio', label: 'Audio' },
   { key: 'video', label: 'Video' }
 ];
+
+// Tabs shown in the bar. The rest stay wired up (ToolContent, GridMode) and
+// come back by adding their key here.
+const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient', 'grace', 'gracepaint'];
+const tabs = allTabs.filter((t) => SHOWN_TABS.includes(t.key));
 
 /* ---------- Tool content (no tabs, just the active tool) ---------- */
 
@@ -288,7 +293,6 @@ function ToolContent({
           onSat={setSat}
           onBright={setBright}
           animSpeed={animSpeed}
-          onAnimSpeed={onAnimSpeed}
           easing={easing}
           fixtures={fixtures}
           compact={isPhone}
@@ -546,7 +550,7 @@ export default function Home() {
   const [configRev, setConfigRev] = useState(0);
   const config = useConfig(configRev);
   const { user, token, checked, endedSession, lastUser, login, logout, sessionEnded } = useAuth();
-  const { connection, grid, orientation, playlistState, settings, pool, epoch, send } = useSocket(
+  const { connection, grid, orientation, playlistState, settings, pool, pattern, epoch, send } = useSocket(
     config?.simulatorUrl ?? null,
     token,
     useCallback(() => setConfigRev((n) => n + 1), [])
@@ -740,7 +744,7 @@ export default function Home() {
     []
   );
 
-  const gracePaint = useGracePaint(NUM_CANNONS, send, activePattern, handlePatternSelect);
+  const gracePaint = useGracePaint(NUM_CANNONS, send, pattern, handlePatternSelect);
 
   const handleCannon = useCallback(
     (index: number, h: number, s: number, b: number) => {

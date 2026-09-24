@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ANIMS, type Choice, FLOWS, gracePaintPattern, hasPaint, ringPaint } from '@/lib/grace-paint';
+import { ANIMS, type Choice, FLOWS, gracePaintPattern, hasPaint, ringPaint, SPINS } from '@/lib/grace-paint';
 import { type Gradient, gradientCss, GRADIENTS, pairGradient, PAIRS, type RingPair } from '@/lib/grace-rings';
 import type { GracePaintControls } from '@/lib/use-grace-paint';
 
@@ -150,7 +150,6 @@ export function GracePaintTab({
   onSat,
   onBright,
   animSpeed,
-  onAnimSpeed,
   easing,
   fixtures,
   compact = false
@@ -162,8 +161,8 @@ export function GracePaintTab({
   onHue: (h: number) => void;
   onSat: (s: number) => void;
   onBright: (b: number) => void;
+  /** The header speed multiplier, so previews run at the receiver's rate. */
   animSpeed: number;
-  onAnimSpeed: (v: number) => void;
   easing: PreviewEasing;
   fixtures?: PreviewFixture[];
   compact?: boolean;
@@ -181,53 +180,7 @@ export function GracePaintTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3 px-2">
-        <span
-          className="text-xs font-medium shrink-0"
-          style={{ color: '#888898', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}
-        >
-          Speed
-        </span>
-        <input
-          type="range"
-          className="flex-1"
-          style={{ minWidth: 120, height: 28 }}
-          min={0}
-          max={1000}
-          value={Math.round(Math.log(animSpeed / 0.001) / Math.log(5.0 / 0.001) * 1000)}
-          onChange={(e) => {
-            const t = parseInt(e.target.value, 10) / 1000;
-            onAnimSpeed(0.001 * Math.pow(5.0 / 0.001, t));
-          }}
-        />
-        <span className="text-xs font-mono shrink-0" style={{ color: '#888898', minWidth: 36, textAlign: 'right' }}>
-          {animSpeed < 0.1 ? animSpeed.toFixed(3) : animSpeed < 1 ? animSpeed.toFixed(2) : animSpeed.toFixed(1)}x
-        </span>
-        <button
-          onClick={() => setShowPreview(!showPreview)}
-          className="px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
-          style={{
-            background: showPreview ? '#2563eb' : '#1a1a25',
-            color: showPreview ? '#fff' : '#888898',
-            border: '1px solid ' + (showPreview ? '#3b82f6' : '#2a2a35')
-          }}
-          title={showPreview ? 'Hide previews' : 'Show animated previews'}
-        >
-          Preview
-        </button>
-        {!running ? (
-          <button
-            onClick={start}
-            className="px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
-            style={{ background: '#1a1a25', color: '#fff', border: '1px solid #2a2a35' }}
-            title="Start GracePaint with the current colours and animation"
-          >
-            Start
-          </button>
-        ) : null}
-      </div>
-
-      <div className="flex gap-1 px-2">
+      <div className="flex gap-1 px-2 flex-wrap items-center">
         {COLOUR_TABS.map((t) => (
           <button
             key={t.key}
@@ -242,16 +195,40 @@ export function GracePaintTab({
             {t.label}
           </button>
         ))}
-        {painted ? (
+        <div className="ml-auto flex gap-1">
+          {painted ? (
+            <button
+              onClick={clearPaint}
+              className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+              style={{ background: '#1a1a25', color: '#888898', border: '1px solid #2a2a35' }}
+              title="Let every pane follow the gradient again"
+            >
+              Clear paint
+            </button>
+          ) : null}
           <button
-            onClick={clearPaint}
-            className="ml-auto px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-            style={{ background: '#1a1a25', color: '#888898', border: '1px solid #2a2a35' }}
-            title="Let every pane follow the gradient again"
+            onClick={() => setShowPreview(!showPreview)}
+            className="px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
+            style={{
+              background: showPreview ? '#2563eb' : '#1a1a25',
+              color: showPreview ? '#fff' : '#888898',
+              border: '1px solid ' + (showPreview ? '#3b82f6' : '#2a2a35')
+            }}
+            title={showPreview ? 'Hide previews' : 'Show animated previews'}
           >
-            Clear paint
+            Preview
           </button>
-        ) : null}
+          {!running ? (
+            <button
+              onClick={start}
+              className="px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
+              style={{ background: '#1a1a25', color: '#fff', border: '1px solid #2a2a35' }}
+              title="Start GracePaint with the current colours and animation"
+            >
+              Start
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {colourTab === 'gradients' && (
@@ -277,8 +254,15 @@ export function GracePaintTab({
                 <Pill key={f.key} label={f.name} active={params.flow === f.key} onClick={() => update('flow', f.key)} title={f.hint} />
               ))}
             </div>
+          </ControlGroup>
+          <ControlGroup label="Rotation Speed">
+            <div className="flex gap-2 flex-wrap">
+              {SPINS.map((s) => (
+                <Pill key={s.key} label={s.name} active={params.spin === s.key} onClick={() => update('spin', s.key)} />
+              ))}
+            </div>
             <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
-              One lap about a minute at 1× — the Speed slider scales it
+              Medium is one lap a minute; the main Speed slider scales everything
             </div>
           </ControlGroup>
         </ControlGrid>
@@ -326,25 +310,6 @@ export function GracePaintTab({
           </ControlGroup>
         </ColorPicker>
       )}
-
-      <ControlGrid minCellWidth={220}>
-        <ControlGroup label="Brightness">
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              className="flex-1"
-              style={{ minWidth: 120, height: 28 }}
-              min={0}
-              max={100}
-              value={params.level}
-              onChange={(e) => update('level', Number(e.target.value))}
-            />
-            <span className="text-xs font-mono shrink-0" style={{ color: '#888898', minWidth: 36, textAlign: 'right' }}>
-              {params.level}%
-            </span>
-          </div>
-        </ControlGroup>
-      </ControlGrid>
 
       <ControlGroup label="Animation">
         <div className="flex gap-2.5 flex-wrap overflow-y-auto" style={{ maxHeight: showPreview ? 340 : undefined }}>

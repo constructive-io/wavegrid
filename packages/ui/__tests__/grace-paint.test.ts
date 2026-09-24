@@ -12,6 +12,7 @@ import {
   ringPaint
 } from '../src/lib/grace-paint';
 import { GRADIENTS, PAIRS } from '../src/lib/grace-rings';
+import { isGracePaintRunning, paramsFromPattern } from '../src/lib/use-grace-paint';
 
 interface Cell {
   h: number;
@@ -76,6 +77,15 @@ describe('GracePaint params', () => {
 
   it('paintPane grows the array when the layout has more panes than the paint', () => {
     expect(paintPane([], 2, 90, 50)).toEqual([-1, 0, -1, 0, 90, 50]);
+  });
+
+  it('spin 0 holds the gradient still; spin 2 moves it twice as far', () => {
+    const still = player(GRACE, { spin: 0 });
+    expect(still.at(0)[0].h).toBeCloseTo(still.at(20)[0].h, 5);
+    const one = player(GRACE, { spin: 1 });
+    const two = player(GRACE, { spin: 2 });
+    expect(two.at(5)[0].h).toBeCloseTo(one.at(10)[0].h, 5);
+    expect(two.at(5)[0].h).not.toBeCloseTo(one.at(5)[0].h, 1);
   });
 
   it('ringPaint gives the outer ring one colour and the inner ring + centre the other', () => {
@@ -179,6 +189,17 @@ describe('Collapse — whole rings', () => {
   });
 });
 
+describe('Unwind', () => {
+  const p = player(GRACE, { anim: 'unwind' });
+
+  it('centre never dims, even when both rings are fully drained', () => {
+    for (let t = 0; t < CYCLE; t += 0.5) expect(p.at(t)[CENTRE[0]].b).toBeCloseTo(100);
+    const drained = p.at(CYCLE * 0.47);
+    expect(mean(drained, OUTER)).toBeLessThan(2);
+    expect(mean(drained, MIDDLE)).toBeLessThan(2);
+  });
+});
+
 describe('Collapse Panes — one pane at a time', () => {
   const p = player(GRACE, { anim: 'collapsePanes' });
   const beat = CYCLE / 6;
@@ -220,5 +241,26 @@ describe('Collapse Panes — one pane at a time', () => {
     const centre = GRACE28.fixtures.filter(f => f.radius <= 0.45).map(f => f.index);
     expect(centre).toHaveLength(4);
     for (const i of centre) expect(p28.at(beat * 2.5)[i].b).toBeCloseTo(100);
+  });
+});
+
+describe('the brain decides whether GracePaint is running', () => {
+  const live = {
+    active: true,
+    code: gracePaintPattern(),
+    params: { ...defaultParams(25, GRADIENTS[0]), anim: 'collapse', spin: 0.5 }
+  };
+
+  it('recognises its own pattern and adopts the live params (so a tap keeps the running animation)', () => {
+    expect(isGracePaintRunning(live)).toBe(true);
+    expect(paramsFromPattern(live)?.anim).toBe('collapse');
+    expect(paramsFromPattern(live)?.spin).toBe(0.5);
+  });
+
+  it('is not running when nothing, another pattern, or a stopped GracePaint is reported', () => {
+    expect(isGracePaintRunning(null)).toBe(false);
+    expect(isGracePaintRunning({ active: true, code: '({ render() {} })', params: {} })).toBe(false);
+    expect(isGracePaintRunning({ ...live, active: false })).toBe(false);
+    expect(paramsFromPattern({ ...live, params: { anim: 'x' } })).toBeNull();
   });
 });

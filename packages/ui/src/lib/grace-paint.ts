@@ -27,7 +27,7 @@ export const ANIMS: Choice[] = [
   { key: 'ringBreathe', name: 'Ring Breathe', hint: 'Each ring breathes in its own time' },
   { key: 'collapse', name: 'Collapse', hint: 'Outer ring fades, then middle; centre stays; they return in reverse' },
   { key: 'collapsePanes', name: 'Collapse Panes', hint: 'Same, but each ring goes and returns one pane at a time' },
-  { key: 'unwind', name: 'Unwind', hint: 'One pane at a time from outer to centre and back, in a spiral' },
+  { key: 'unwind', name: 'Unwind', hint: 'One pane at a time from outer ring in, then back out; centre stays on' },
   { key: 'droplet', name: 'Droplet', hint: 'Light ripples from the centre outward' },
   { key: 'sink', name: 'Sink', hint: 'Light ripples inward toward the centre' },
   { key: 'beacon', name: 'Beacon', hint: 'Centre pulses; a wave of light follows it out' },
@@ -65,7 +65,16 @@ export interface GracePaintParams {
   paint: number[];
   /** Brightness ceiling 0..100. */
   level: number;
+  /** Gradient rotation rate: multiplier on the flow's clock (0 = still, 1 = one lap a minute). */
+  spin: number;
 }
+
+export const SPINS: { key: number; name: string }[] = [
+  { key: 0, name: 'Still' },
+  { key: 0.5, name: 'Slow' },
+  { key: 1, name: 'Medium' },
+  { key: 2, name: 'Fast' }
+];
 
 export function emptyPaint(count: number): number[] {
   const out = new Array<number>(count * 2);
@@ -82,7 +91,8 @@ export function defaultParams(count: number, gradient: Gradient): GracePaintPara
     flow: 'wheel',
     stops: gradient.stops.map(([h, s]) => [h, s] as [number, number]),
     paint: emptyPaint(count),
-    level: 100
+    level: 100,
+    spin: 1
   };
 }
 
@@ -222,19 +232,20 @@ var ANIMS = {
     return collapsePanesLevel(ring(ctx, i), fract(t / CYCLE), slots[i], counts[i]);
   },
   unwind: function(ctx, i, t) {
-    // One path: outer ring clockwise, then middle ring clockwise, then the
-    // centre. Light drains along it one pane at a time, then refills from the
-    // outside again.
+    // One path: outer ring clockwise, then middle ring clockwise. Light drains
+    // along it one pane at a time down to the centre (which stays on), then
+    // refills from the outside again.
     var r = ring(ctx, i);
-    var order = r === 1 ? slots[i] : r === 0 ? counts[i] + slots[i] : 2 * counts[i];
+    if (r === -1) return 1;
+    var order = r === 1 ? slots[i] : counts[i] + slots[i];
     var total = 0;
     for (var k = 0; k < ctx.count; k++) if (ring(ctx, k) !== -1) total = Math.max(total, counts[k]);
-    total = total * 2 + 1;
+    total = total * 2;
     var x = fract(t / CYCLE);
     var w = 0.45 / total;
     var off = 1 - rise(x, order * w, w);
     var on = rise(x, 0.5 + order * w, w);
-    return r === -1 ? Math.max(0.35, off + on) : clamp01(off + on);
+    return clamp01(off + on);
   },
   droplet: function(ctx, i, t) {
     var d = fract(t / 8) - (rad(ctx, i) * 0.7);
@@ -330,10 +341,12 @@ return {
     var anim = ANIMS[p.anim] || ANIMS.still;
     var flow = FLOWS[p.flow] || FLOWS.wheel;
     var level = p.level === undefined ? 100 : p.level;
+    var spin = p.spin === undefined ? 1 : p.spin;
     var t = ctx.t;
+    var ft = t * spin;
     for (var i = 0; i < ctx.count; i++) {
       var h = paint[i * 2];
-      var c = (h === undefined || h < 0) ? grad(stops, flow(ctx, i, t)) : [h, paint[i * 2 + 1]];
+      var c = (h === undefined || h < 0) ? grad(stops, flow(ctx, i, ft)) : [h, paint[i * 2 + 1]];
       var b = clamp01(anim(ctx, i, t)) * level;
       ctx.set(i, c[0], c[1], b < 0 ? 0 : (b > 100 ? 100 : b));
     }

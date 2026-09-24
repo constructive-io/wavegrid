@@ -453,6 +453,25 @@ function broadcastCommand(cmd: Record<string, unknown>) {
   fanout(wss.clients, payload, dropClient);
 }
 
+// What UIs need to keep in step with the running pattern (e.g. GracePaint on a
+// freshly opened iPad must update it rather than restart it with defaults).
+function patternStatePayload(): string {
+  return JSON.stringify({
+    type: 'pattern_state',
+    active: patternEngine.active,
+    code: patternEngine.code,
+    params: patternEngine.currentParams
+  });
+}
+
+let lastPatternState = '';
+function broadcastPatternStateIfChanged() {
+  const payload = patternStatePayload();
+  if (payload === lastPatternState) return;
+  lastPatternState = payload;
+  fanout(wss.clients, payload, dropClient);
+}
+
 function broadcastPlaylistState() {
   const payload = JSON.stringify({
     type: 'playlist_state',
@@ -736,6 +755,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     sendToClient(ws, JSON.stringify({ type: 'command', action: 'setShift', vx: shiftVx, vy: shiftVy }));
   }
   sendToClient(ws, poolPayload());
+  sendToClient(ws, patternStatePayload());
 
   ws.on('message', (raw) => {
     try {
@@ -788,6 +808,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         return;
       }
       handleMessage(msg, ws);
+      broadcastPatternStateIfChanged();
     } catch {
       // ignore malformed messages
     }
