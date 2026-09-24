@@ -71,7 +71,7 @@ const allTabs: { key: GridMode; label: string }[] = [
 
 // Tabs shown in the bar. The rest stay wired up (ToolContent, GridMode) and
 // come back by adding their key here.
-const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient', 'grace', 'gracepaint', 'looks', 'audio'];
+const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient', 'grace', 'gracepaint', 'looks'];
 const tabs = allTabs.filter((t) => SHOWN_TABS.includes(t.key));
 
 /* ---------- Tool content (no tabs, just the active tool) ---------- */
