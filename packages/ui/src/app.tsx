@@ -15,6 +15,7 @@ import { GradientBar, useGradient } from '@/components/gradient-tab';
 import type { GridMode } from '@/components/grid-display';
 import { GridDisplay } from '@/components/grid-display';
 import { LoginScreen } from '@/components/login-screen';
+import { LooksTab } from '@/components/looks-tab';
 import type { PreviewFixture } from '@/components/mini-grid-preview';
 import { useMotion } from '@/components/motion-tab';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
@@ -58,6 +59,7 @@ const allTabs: { key: GridMode; label: string }[] = [
   { key: 'usa', label: 'USA' },
   { key: 'grace', label: 'Grace' },
   { key: 'gracepaint', label: 'GracePaint' },
+  { key: 'looks', label: 'Looks' },
   { key: 'patterns', label: 'Patterns' },
   { key: 'sequences', label: 'Sequences' },
   { key: 'playlist', label: 'Playlist' },
@@ -69,7 +71,7 @@ const allTabs: { key: GridMode; label: string }[] = [
 
 // Tabs shown in the bar. The rest stay wired up (ToolContent, GridMode) and
 // come back by adding their key here.
-const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient', 'grace', 'gracepaint', 'audio'];
+const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient', 'grace', 'gracepaint', 'looks', 'audio'];
 const tabs = allTabs.filter((t) => SHOWN_TABS.includes(t.key));
 
 /* ---------- Tool content (no tabs, just the active tool) ---------- */
@@ -288,7 +290,6 @@ function ToolContent({
       {tab === 'gracepaint' && (
         <GracePaintTab
           controls={gracePaint}
-          looks={looks}
           hue={hue}
           sat={sat}
           bright={bright}
@@ -299,6 +300,20 @@ function ToolContent({
           easing={easing}
           fixtures={fixtures}
           compact={isPhone}
+        />
+      )}
+
+      {tab === 'looks' && (
+        <LooksTab
+          looks={looks}
+          current={gracePaint.params}
+          speed={animSpeed}
+          easing={easing}
+          fixtures={fixtures}
+          onSave={gracePaint.saveLook}
+          onApply={gracePaint.applyLook}
+          onRename={gracePaint.renameLook}
+          onDelete={gracePaint.deleteLook}
         />
       )}
 

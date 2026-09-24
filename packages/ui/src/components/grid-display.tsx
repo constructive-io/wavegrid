@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import type { CannonColor, Orientation } from '@/lib/use-socket';
 
-export type GridMode = 'paint' | 'pool' | 'gradient' | 'drops' | 'scenes' | 'animations' | 'audio' | 'video' | 'flags' | 'pride' | 'usa' | 'grace' | 'gracepaint' | 'patterns' | 'playlist' | 'sequences';
+export type GridMode = 'paint' | 'pool' | 'gradient' | 'drops' | 'scenes' | 'animations' | 'audio' | 'video' | 'flags' | 'pride' | 'usa' | 'grace' | 'gracepaint' | 'looks' | 'patterns' | 'playlist' | 'sequences';
 
 export interface FixturePos {
   u: number;
