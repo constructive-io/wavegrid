@@ -99,10 +99,10 @@ describe('GracePaint params', () => {
 
 describe('GracePaint pattern — colour and brightness are separate layers', () => {
   it('painted panes keep their colour while the animation moves the brightness', () => {
-    const p = player(GRACE, { anim: 'breathe' });
+    const p = player(GRACE, { anim: 'collapse' });
     p.set('paint', paintPane(emptyPaint(25), 3, 120, 80));
     const a = p.at(0);
-    const b = p.at(2.25);
+    const b = p.at(CYCLE / 4);
     expect(a[3].h).toBe(120);
     expect(a[3].s).toBe(80);
     expect(b[3].h).toBe(120);
@@ -186,6 +186,45 @@ describe('Collapse — whole rings', () => {
     const allBack = p.at(beat * 5.5);
     expect(mean(allBack, OUTER)).toBeGreaterThan(98);
     expect(mean(allBack, MIDDLE)).toBeGreaterThan(98);
+  });
+});
+
+describe('every animation reads on the lasers', () => {
+  const HOLD_ANIMS = ['still', 'breathe', 'ringBreathe', 'twinkle'];
+
+  it('never leaves the whole window dark, and always-lit animations stay in the 80–100 band', () => {
+    for (const a of ANIMS) {
+      const p = player(GRACE, { anim: a.key });
+      for (let t = 0; t < 120; t += 0.25) {
+        const cells = p.at(t);
+        expect(Math.max(...cells.map(c => c.b))).toBeGreaterThanOrEqual(80);
+        if (HOLD_ANIMS.includes(a.key)) for (const c of cells) expect(c.b).toBeGreaterThanOrEqual(80 - 1e-6);
+      }
+    }
+  });
+
+  it('spends little time in the dim middle: panes are mostly clearly on or clearly off', () => {
+    for (const a of ANIMS) {
+      const p = player(GRACE, { anim: a.key });
+      let dim = 0;
+      let n = 0;
+      for (let t = 0; t < 120; t += 0.25) {
+        for (const c of p.at(t)) {
+          n++;
+          if (c.b > 10 && c.b < 80) dim++;
+        }
+      }
+      expect(dim / n).toBeLessThan(0.4);
+    }
+  });
+
+  it('comet: the centre stays on and the head is fully bright', () => {
+    const p = player(GRACE, { anim: 'comet' });
+    for (let t = 0; t < 28; t += 0.5) {
+      const cells = p.at(t);
+      expect(cells[CENTRE[0]].b).toBe(100);
+      expect(Math.max(...OUTER.map(i => cells[i].b))).toBeGreaterThan(95);
+    }
   });
 });
 
