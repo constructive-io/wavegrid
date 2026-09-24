@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { createGraceAudio, type GraceAudioOptions, type GraceAudioOutput, type GraceAudioState, quantiseShift, stepGraceAudio } from './grace-audio';
 import { applyGain, createRoomGain, RAW_MIC_CONSTRAINTS, type RoomGain, spectrumPeak, updateRoomGain } from './room-gain';
 import type { CannonColor } from './use-socket';
 
@@ -12,7 +13,8 @@ export type AudioMode =
   | 'fireworks'
   | 'rain'
   | 'matrix'
-  | 'confetti';
+  | 'confetti'
+  | 'grace';
 export type BlendMode = 'replace' | 'multiply' | 'additive' | 'brighten';
 export type AudioPalette = 'civic' | 'ocean' | 'sunset' | 'fire' | 'forest' | 'pride' | 'night';
 
@@ -85,7 +87,9 @@ export interface AudioEngine {
   sensitivity: number;
   sineSpread: boolean;
   loop: boolean;
+  grace: GraceAudioOptions;
   setMode: (m: AudioMode) => void;
+  setGrace: (g: Partial<GraceAudioOptions>) => void;
   setBlend: (b: BlendMode) => void;
   setPalette: (p: AudioPalette) => void;
   setSensitivity: (s: number) => void;
@@ -164,7 +168,9 @@ export function useAudio(
   gridColumns: number,
   _grid: CannonColor[],
   send: (msg: Record<string, unknown>) => void,
-  fade: number = 50
+  fade: number = 50,
+  /** Grace Audio sink: colour offsets for the running GracePaint pattern and gradient steps. */
+  onGrace?: (out: GraceAudioOutput) => void
 ): AudioEngine {
   const [audioState, setAudioState] = useState<AudioEngineState>({
     playing: false,
@@ -183,6 +189,10 @@ export function useAudio(
   const [sensitivity, setSensitivity] = useState(70);
   const [sineSpread, setSineSpread] = useState(true);
   const [loop, setLoop] = useState(true);
+  const [grace, setGraceState] = useState<GraceAudioOptions>({ drift: true, beats: true });
+  const setGrace = useCallback((g: Partial<GraceAudioOptions>) => setGraceState((prev) => ({ ...prev, ...g })), []);
+  const graceRef = useRef<GraceAudioState>(createGraceAudio());
+  const graceSentRef = useRef({ hue: 0, sat: 0 });
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -223,6 +233,8 @@ export function useAudio(
   const sineSpreadRef = useRef(sineSpread);
   const fadeRef = useRef(fade);
   const loopRef = useRef(loop);
+  const graceOptsRef = useRef(grace);
+  const onGraceRef = useRef(onGrace);
   const numCannonsRef = useRef(numCannons);
   const gridColumnsRef = useRef(gridColumns);
 
@@ -234,10 +246,23 @@ export function useAudio(
   useEffect(() => { sineSpreadRef.current = sineSpread; }, [sineSpread]);
   useEffect(() => { fadeRef.current = fade; }, [fade]);
   useEffect(() => { loopRef.current = loop; }, [loop]);
+  useEffect(() => { graceOptsRef.current = grace; }, [grace]);
+  useEffect(() => { onGraceRef.current = onGrace; }, [onGrace]);
   useEffect(() => { numCannonsRef.current = numCannons; }, [numCannons]);
   useEffect(() => { gridColumnsRef.current = gridColumns; }, [gridColumns]);
 
+  // Grace Audio owns two live params on the pattern; leaving the mode (or
+  // going silent) must hand the colours back untouched.
+  const resetGraceShift = useCallback(() => {
+    graceRef.current = createGraceAudio();
+    if (graceSentRef.current.hue !== 0 || graceSentRef.current.sat !== 0) {
+      graceSentRef.current = { hue: 0, sat: 0 };
+      onGraceRef.current?.({ hueShift: 0, satShift: 0, step: false });
+    }
+  }, []);
+
   const resetVisualState = useCallback(() => {
+    resetGraceShift();
     dropsRef.current = [];
     sparksRef.current = [];
     rainRef.current = [];
@@ -247,7 +272,7 @@ export function useAudio(
     featureRef.current.beatPulse = 0;
     featureRef.current.lastFrameAt = 0;
     dropOriginRef.current.lastSpawnAt = 0;
-  }, []);
+  }, [resetGraceShift]);
 
   const setAudioMode = useCallback((nextMode: AudioMode) => {
     resetVisualState();
@@ -377,6 +402,25 @@ export function useAudio(
     const midLevel = smooth(clamp(midEnergy * (0.85 + sens * 1.8)));
     const highLevel = smooth(clamp(highEnergy * (0.85 + sens * 2.5)));
     const beatTime = featureState.beatCount + beatPhase;
+
+    if (m === 'grace') {
+      const out = stepGraceAudio(
+        graceRef.current,
+        { low: lowLevel, mid: midLevel, high: highLevel, beat: isBeat, lowRatio },
+        dt,
+        graceOptsRef.current
+      );
+      const hue = quantiseShift(out.hueShift, 1);
+      const sat = quantiseShift(out.satShift, 1);
+      const sent = graceSentRef.current;
+      if (hue !== sent.hue || sat !== sent.sat || out.step) {
+        graceSentRef.current = { hue, sat };
+        onGraceRef.current?.({ hueShift: hue, satShift: sat, step: out.step });
+      }
+      if (analyserRef.current) animFrameRef.current = requestAnimationFrame(processFrame);
+      else animFrameRef.current = 0;
+      return;
+    }
     const cx = (gc - 1) / 2;
     const cy = (rows - 1) / 2;
 
@@ -889,7 +933,9 @@ export function useAudio(
     sensitivity,
     sineSpread,
     loop,
+    grace,
     setMode: setAudioMode,
+    setGrace,
     setBlend: setAudioBlend,
     setPalette: setAudioPalette,
     setSensitivity,
