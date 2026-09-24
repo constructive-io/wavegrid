@@ -9,14 +9,14 @@ import { ColorWheel } from '@/components/color-wheel';
 import { ControlGrid, ControlGroup } from '@/components/control-grid';
 import { DropsControls, useDrops } from '@/components/drops-tab';
 import { FlagsTab, useFlagAnimation } from '@/components/flags-tab';
-import { GraceTab } from '@/components/grace-tab';
+import { GracePaintTab } from '@/components/grace-paint-tab';
+import { GraceTab, type PreviewEasing } from '@/components/grace-tab';
 import { GradientBar, useGradient } from '@/components/gradient-tab';
 import type { GridMode } from '@/components/grid-display';
 import { GridDisplay } from '@/components/grid-display';
 import { LoginScreen } from '@/components/login-screen';
 import type { PreviewFixture } from '@/components/mini-grid-preview';
 import { useMotion } from '@/components/motion-tab';
-import { NovaTab } from '@/components/nova-tab';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
 import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
@@ -31,6 +31,7 @@ import { VideoTab } from '@/components/video-tab';
 import { useAudio } from '@/lib/use-audio';
 import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
+import { type GracePaintControls, useGracePaint } from '@/lib/use-grace-paint';
 import { useIsPhone } from '@/lib/use-media-query';
 import { type PlaylistState, useSocket } from '@/lib/use-socket';
 
@@ -54,8 +55,8 @@ const tabs: { key: GridMode; label: string }[] = [
   { key: 'animations', label: 'Anim' },
   { key: 'pride', label: 'Pride' },
   { key: 'usa', label: 'USA' },
-  { key: 'nova', label: 'Nova' },
   { key: 'grace', label: 'Grace' },
+  { key: 'gracepaint', label: 'GracePaint' },
   { key: 'patterns', label: 'Patterns' },
   { key: 'sequences', label: 'Sequences' },
   { key: 'playlist', label: 'Playlist' },
@@ -82,7 +83,8 @@ function ToolContent({
   onShift,
   numCannons, gridColumns, fixtures, layout,
   activePattern, onPatternSelect,
-  playlistState
+  playlistState,
+  easing, gracePaint
 }: {
   tab: GridMode;
   hue: number; sat: number; bright: number; brushSize: number; softEdge: boolean; trailFade: boolean;
@@ -116,6 +118,8 @@ function ToolContent({
   activePattern: string | null;
   onPatternSelect: (id: string) => void;
   playlistState: PlaylistState | null;
+  easing: PreviewEasing;
+  gracePaint: GracePaintControls;
 }) {
   return (
     <>
@@ -262,18 +266,6 @@ function ToolContent({
         />
       )}
 
-      {tab === 'nova' && (
-        <NovaTab
-          send={send}
-          activePattern={activePattern}
-          onPatternSelect={onPatternSelect}
-          animSpeed={animSpeed}
-          onAnimSpeed={onAnimSpeed}
-          numCannons={numCannons}
-          gridColumns={gridColumns}
-        />
-      )}
-
       {tab === 'grace' && (
         <GraceTab
           send={send}
@@ -281,7 +273,25 @@ function ToolContent({
           onPatternSelect={onPatternSelect}
           animSpeed={animSpeed}
           onAnimSpeed={onAnimSpeed}
+          easing={easing}
           fixtures={fixtures}
+        />
+      )}
+
+      {tab === 'gracepaint' && (
+        <GracePaintTab
+          controls={gracePaint}
+          hue={hue}
+          sat={sat}
+          bright={bright}
+          onHue={setHue}
+          onSat={setSat}
+          onBright={setBright}
+          animSpeed={animSpeed}
+          onAnimSpeed={onAnimSpeed}
+          easing={easing}
+          fixtures={fixtures}
+          compact={isPhone}
         />
       )}
 
@@ -721,14 +731,29 @@ export default function Home() {
     if (!trailFade) clearTrailFadeTimers();
   }, [clearTrailFadeTimers, trailFade]);
 
+  const handlePatternSelect = useCallback(
+    (id: string) => {
+      setActivePattern(id);
+      setActiveAnim(null);
+      setActiveScene(null);
+    },
+    []
+  );
+
+  const gracePaint = useGracePaint(NUM_CANNONS, send, activePattern, handlePatternSelect);
+
   const handleCannon = useCallback(
     (index: number, h: number, s: number, b: number) => {
+      if (tab === 'gracepaint') {
+        gracePaint.paint(index, h, s);
+        return;
+      }
       send({ type: 'cannon', index, h, s, b });
       if (trailFade && b > 0) {
         scheduleTrailFade(index, h, s, b);
       }
     },
-    [scheduleTrailFade, send, trailFade]
+    [gracePaint, scheduleTrailFade, send, tab, trailFade]
   );
 
   const flags = useFlagAnimation(send);
@@ -751,15 +776,6 @@ export default function Home() {
       send({ type: 'animation', name });
     },
     [send]
-  );
-
-  const handlePatternSelect = useCallback(
-    (id: string) => {
-      setActivePattern(id);
-      setActiveAnim(null);
-      setActiveScene(null);
-    },
-    []
   );
 
   const handleAnimSpeed = useCallback(
@@ -903,6 +919,12 @@ export default function Home() {
     }
   }, [isPhone, send, sheetSnap, tab]);
 
+  // The same numbers the header sliders send the receiver (see handleAttack / handleSmoothness).
+  const previewEasing: PreviewEasing = {
+    attack: 0.05 + (attack / 100) * 0.95,
+    alpha: Math.pow(10, -2.7 * (smoothness / 100))
+  };
+
   const toolContentProps = {
     hue, sat, bright, brushSize, softEdge, trailFade,
     setHue, setSat, setBright, setBrushSize, setSoftEdge, setTrailFade,
@@ -923,7 +945,9 @@ export default function Home() {
     layout: LAYOUT,
     activePattern,
     onPatternSelect: handlePatternSelect,
-    playlistState
+    playlistState,
+    easing: previewEasing,
+    gracePaint
   };
 
   /* ---------- Loading gates (after all hooks, to respect Rules of Hooks) ---------- */

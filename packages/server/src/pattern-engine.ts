@@ -17,7 +17,8 @@ interface HSBColor {
 interface PatternObj {
   render: (ctx: PatternCtx) => void;
   init?: (ctx: PatternCtx) => void;
-  meta?: { name?: string };
+  onParam?: (name: string, value: unknown, ctx: PatternCtx) => void;
+  meta?: { name?: string; params?: Record<string, { default: unknown }> };
 }
 
 interface PatternCtx {
@@ -26,6 +27,7 @@ interface PatternCtx {
   count: number;
   cols: number;
   rows: number;
+  p: Record<string, unknown>;
   set: (idx: number, h: number, s: number, b: number) => void;
   get: (idx: number) => [number, number, number];
   fill: (h: number, s: number, b: number) => void;
@@ -45,6 +47,7 @@ export class ServerPatternEngine {
   private rows: number;
   private layout: Layout;
   private _speed: number = 1.0;
+  private params: Record<string, unknown> = {};
 
   constructor(layout: Layout) {
     this.layout = layout;
@@ -59,13 +62,17 @@ export class ServerPatternEngine {
   /**
    * Load a pattern from code string. Returns true if successful.
    */
-  load(code: string): boolean {
+  load(code: string, initialParams: Record<string, unknown> = {}): boolean {
     try {
       const result = this.evaluate(code);
       if (result && typeof result === 'object' && typeof (result as Record<string, unknown>).render === 'function') {
         this.pattern = result as unknown as PatternObj;
         this._patternTime = 0;
         this._lastTickMs = Date.now();
+        this.params = {};
+        const declared = this.pattern.meta?.params ?? {};
+        for (const k of Object.keys(declared)) this.params[k] = declared[k].default;
+        Object.assign(this.params, initialParams);
         if (this.pattern.init) {
           const ctx = this.makeCtx(new Array(this.gridSize).fill(null).map(() => ({ h: 0, s: 0, b: 0 })));
           try { this.pattern.init(ctx); } catch { /* ignore init errors */ }
@@ -186,11 +193,22 @@ export class ServerPatternEngine {
     return `(function(){\n${declCode}\nreturn {${propCode}};\n})()`;
   }
 
+  /** Same as the receiver's setPatternParam: update `ctx.p` and tell the pattern. */
+  setParam(name: string, value: unknown): void {
+    if (!this.pattern) return;
+    this.params[name] = value;
+    if (this.pattern.onParam) {
+      const ctx = this.makeCtx(new Array(this.gridSize).fill(null).map(() => ({ h: 0, s: 0, b: 0 })), false);
+      try { this.pattern.onParam(name, value, ctx); } catch { /* ignore onParam errors */ }
+    }
+  }
+
   /**
    * Stop the current pattern.
    */
   stop(): void {
     this.pattern = null;
+    this.params = {};
   }
 
   /**
@@ -218,11 +236,13 @@ export class ServerPatternEngine {
     }
   }
 
-  private makeCtx(grid: HSBColor[]): PatternCtx {
+  private makeCtx(grid: HSBColor[], advance = true): PatternCtx {
     const now = Date.now();
-    const wallDt = (now - this._lastTickMs) / 1000;
-    this._lastTickMs = now;
-    this._patternTime += wallDt * this._speed;
+    if (advance) {
+      const wallDt = (now - this._lastTickMs) / 1000;
+      this._lastTickMs = now;
+      this._patternTime += wallDt * this._speed;
+    }
     const elapsed = this._patternTime;
     const cols = this.cols;
     const rows = this.rows;
@@ -235,6 +255,7 @@ export class ServerPatternEngine {
       count,
       cols,
       rows,
+      p: this.params,
       set(idx: number, h: number, s: number, b: number) {
         if (idx >= 0 && idx < count) {
           const hh = Number.isFinite(h) ? ((h % 360) + 360) % 360 : 0;

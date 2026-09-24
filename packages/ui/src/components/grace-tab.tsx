@@ -17,6 +17,12 @@ import {
 import { ControlGrid, ControlGroup } from './control-grid';
 import { MiniGridPreview, type PreviewFixture } from './mini-grid-preview';
 
+/** The receiver's easing, as the previews need it (see MiniGridPreview). */
+export interface PreviewEasing {
+  attack: number;
+  alpha: number;
+}
+
 const STILL_PREFIX = 'grace-still';
 const MOTION_PREFIX = 'grace-motion';
 const GRADIENT_PREFIX = 'grace-gradient';
@@ -78,6 +84,7 @@ function LookTile({
   onClick,
   showPreview,
   speed,
+  easing,
   fixtures
 }: {
   look: Look;
@@ -86,6 +93,7 @@ function LookTile({
   onClick: () => void;
   showPreview: boolean;
   speed: number;
+  easing: PreviewEasing;
   fixtures?: PreviewFixture[];
 }) {
   const tileSize = showPreview ? 96 : 72;
@@ -102,7 +110,15 @@ function LookTile({
       }}
     >
       {showPreview ? (
-        <MiniGridPreview source={look.code} speed={speed} size={tileSize} isPattern fixtures={fixtures} />
+        <MiniGridPreview
+          source={look.code}
+          speed={speed}
+          attack={easing.attack}
+          alpha={easing.alpha}
+          size={tileSize}
+          isPattern
+          fixtures={fixtures}
+        />
       ) : null}
       <span
         className="absolute bottom-1 left-0 right-0 text-center text-white font-semibold"
@@ -125,6 +141,7 @@ export function GraceTab({
   onPatternSelect,
   animSpeed,
   onAnimSpeed,
+  easing,
   fixtures
 }: {
   send: (msg: Record<string, unknown>) => void;
@@ -132,6 +149,7 @@ export function GraceTab({
   onPatternSelect: (id: string) => void;
   animSpeed: number;
   onAnimSpeed: (v: number) => void;
+  easing: PreviewEasing;
   fixtures?: PreviewFixture[];
 }) {
   const [showPreview, setShowPreview] = useState(true);
@@ -178,6 +196,7 @@ export function GraceTab({
             onClick={() => handleSelect(prefix, l)}
             showPreview={showPreview}
             speed={animSpeed}
+            easing={easing}
             fixtures={fixtures}
           />
         ))}

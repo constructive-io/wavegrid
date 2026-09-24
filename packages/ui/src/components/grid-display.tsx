@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import type { CannonColor, Orientation } from '@/lib/use-socket';
 
-export type GridMode = 'paint' | 'pool' | 'gradient' | 'drops' | 'scenes' | 'animations' | 'audio' | 'video' | 'flags' | 'pride' | 'usa' | 'nova' | 'grace' | 'patterns' | 'playlist' | 'sequences';
+export type GridMode = 'paint' | 'pool' | 'gradient' | 'drops' | 'scenes' | 'animations' | 'audio' | 'video' | 'flags' | 'pride' | 'usa' | 'grace' | 'gracepaint' | 'patterns' | 'playlist' | 'sequences';
 
 export interface FixturePos {
   u: number;
@@ -358,7 +358,7 @@ export function GridDisplay({
       return;
     }
 
-    if (idx >= 0 && mode === 'paint') {
+    if (idx >= 0 && (mode === 'paint' || mode === 'gracepaint')) {
       const affected = getAffectedCannons(idx);
       for (const a of affected) {
         onCannon(a.idx, currentHue, currentSat, currentBright * a.falloff);
@@ -384,7 +384,7 @@ export function GridDisplay({
       return;
     }
 
-    if (mode === 'paint') {
+    if (mode === 'paint' || mode === 'gracepaint') {
       const affected = getAffectedCannons(idx);
       for (const a of affected) {
         onCannon(a.idx, currentHue, currentSat, currentBright * a.falloff);
