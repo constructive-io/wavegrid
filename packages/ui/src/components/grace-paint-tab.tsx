@@ -330,7 +330,7 @@ export function GracePaintTab({
   compact?: boolean;
 }) {
   const [colourTab, setColourTab] = useState<ColourTab>('gradients');
-  const { params, running, start, update, fill, clearPaint, setGradient, applyLook, saveLook, renameLook, deleteLook } = controls;
+  const { params, running, update, fill, clearPaint, setGradient, applyLook, saveLook, renameLook, deleteLook } = controls;
   const painted = hasPaint(params.paint);
   const radii = fixtures?.map((f) => f.radius) ?? [];
   const activePair = PAIRS.find((p) => radii.length > 0 && ringPaint(radii, p).every((v, k) => v === params.paint[k]));
@@ -377,16 +377,6 @@ export function GracePaintTab({
               title="Let every pane follow the gradient again"
             >
               Clear paint
-            </button>
-          ) : null}
-          {!running ? (
-            <button
-              onClick={start}
-              className="px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
-              style={{ background: '#1a1a25', color: '#fff', border: '1px solid #2a2a35' }}
-              title="Start GracePaint with the current colours and animation"
-            >
-              Start
             </button>
           ) : null}
         </div>
