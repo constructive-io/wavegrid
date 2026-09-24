@@ -34,7 +34,7 @@ import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
 import { type GracePaintControls, useGracePaint } from '@/lib/use-grace-paint';
 import { useIsPhone } from '@/lib/use-media-query';
-import { type PlaylistState, useSocket } from '@/lib/use-socket';
+import { type Look, type PlaylistState, useSocket } from '@/lib/use-socket';
 
 // Stands in only until /api/config answers, and matches useConfig's own fallback.
 const FALLBACK_LAYOUT = presets['grid-7x7']();
@@ -69,7 +69,7 @@ const allTabs: { key: GridMode; label: string }[] = [
 
 // Tabs shown in the bar. The rest stay wired up (ToolContent, GridMode) and
 // come back by adding their key here.
-const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient', 'grace', 'gracepaint'];
+const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient', 'grace', 'gracepaint', 'audio'];
 const tabs = allTabs.filter((t) => SHOWN_TABS.includes(t.key));
 
 /* ---------- Tool content (no tabs, just the active tool) ---------- */
@@ -90,7 +90,7 @@ function ToolContent({
   numCannons, gridColumns, fixtures, layout,
   activePattern, onPatternSelect,
   playlistState,
-  easing, gracePaint
+  easing, gracePaint, looks
 }: {
   tab: GridMode;
   hue: number; sat: number; bright: number; brushSize: number; softEdge: boolean; trailFade: boolean;
@@ -126,6 +126,7 @@ function ToolContent({
   playlistState: PlaylistState | null;
   easing: PreviewEasing;
   gracePaint: GracePaintControls;
+  looks: Look[];
 }) {
   return (
     <>
@@ -287,6 +288,7 @@ function ToolContent({
       {tab === 'gracepaint' && (
         <GracePaintTab
           controls={gracePaint}
+          looks={looks}
           hue={hue}
           sat={sat}
           bright={bright}
@@ -551,7 +553,7 @@ export default function Home() {
   const [configRev, setConfigRev] = useState(0);
   const config = useConfig(configRev);
   const { user, token, checked, endedSession, lastUser, login, logout, sessionEnded } = useAuth();
-  const { connection, grid, orientation, playlistState, settings, pool, pattern, epoch, send } = useSocket(
+  const { connection, grid, orientation, playlistState, settings, pool, pattern, looks, epoch, send } = useSocket(
     config?.simulatorUrl ?? null,
     token,
     useCallback(() => setConfigRev((n) => n + 1), [])
@@ -961,7 +963,8 @@ export default function Home() {
     onPatternSelect: handlePatternSelect,
     playlistState,
     easing: previewEasing,
-    gracePaint
+    gracePaint,
+    looks
   };
 
   /* ---------- Loading gates (after all hooks, to respect Rules of Hooks) ---------- */

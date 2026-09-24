@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createGraceAudio, type GraceAudioOptions, type GraceAudioOutput, type GraceAudioState, quantiseShift, stepGraceAudio } from './grace-audio';
+import { applyGain, createRoomGain, RAW_MIC_CONSTRAINTS, type RoomGain, spectrumPeak, updateRoomGain } from './room-gain';
 import type { CannonColor } from './use-socket';
 
 export type AudioMode =
@@ -55,6 +56,8 @@ interface GalaxyStar {
 }
 
 interface AudioFeatureState {
+  room: RoomGain;
+  roomGain: number;
   energyAvg: number;
   lowAvg: number;
   midAvg: number;
@@ -209,6 +212,8 @@ export function useAudio(
   const dropOriginRef = useRef({ position: 0, lastSpawnAt: 0 });
   const smoothedLayerRef = useRef<Array<{ h: number; s: number; b: number }> | null>(null);
   const featureRef = useRef<AudioFeatureState>({
+    room: createRoomGain(),
+    roomGain: 1,
     energyAvg: 0.08,
     lowAvg: 0.08,
     midAvg: 0.08,
@@ -290,6 +295,16 @@ export function useAudio(
     const dataArray = new Uint8Array(bufLen);
     analyser?.getByteFrequencyData(dataArray);
 
+    const now = performance.now() / 1000;
+    const featureState = featureRef.current;
+    const dt = featureState.lastFrameAt ? Math.min(0.08, now - featureState.lastFrameAt) : 1 / 60;
+    featureState.lastFrameAt = now;
+
+    if (analyser) {
+      featureState.roomGain = updateRoomGain(featureState.room, spectrumPeak(dataArray), dt);
+      applyGain(dataArray, featureState.roomGain);
+    }
+
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -311,11 +326,6 @@ export function useAudio(
         }
       }
     }
-
-    const now = performance.now() / 1000;
-    const featureState = featureRef.current;
-    const dt = featureState.lastFrameAt ? Math.min(0.08, now - featureState.lastFrameAt) : 1 / 60;
-    featureState.lastFrameAt = now;
 
     const sens = sensitivityRef.current / 100;
     const nc = numCannonsRef.current;
@@ -865,12 +875,16 @@ export function useAudio(
     const ctx = audioContextRef.current;
     if (ctx.state === 'suspended') await ctx.resume();
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia(RAW_MIC_CONSTRAINTS);
     micStreamRef.current = stream;
+    featureRef.current.room = createRoomGain();
 
     const source = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 256;
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.7;
+    analyser.minDecibels = -90;
+    analyser.maxDecibels = -20;
     source.connect(analyser);
     // Don't connect to destination — avoid feedback loop
     micSourceRef.current = source;

@@ -63,11 +63,27 @@ export function AudioTab({ audio }: AudioTabProps) {
     <ControlGrid minCellWidth={260}>
       {/* Source + transport */}
       <ControlGroup label="Source">
+        {/* Mic input — the default source: the raw room signal, auto-levelled */}
+        <button
+          onClick={audio.state.micActive ? () => audio.stopMic() : audio.startMic}
+          className="w-full px-4 py-4 rounded-xl text-base font-semibold transition-all"
+          style={{
+            background: audio.state.micActive ? 'rgba(221,68,68,0.2)' : 'rgba(74,124,255,0.2)',
+            color: audio.state.micActive ? '#d44' : '#4a7cff',
+            border: `1px solid ${audio.state.micActive ? 'rgba(221,68,68,0.4)' : 'rgba(74,124,255,0.4)'}`
+          }}
+        >
+          {audio.state.micActive ? '⏹ Stop Mic' : '🎤 Live Mic'}
+        </button>
+        <p className="text-xs" style={{ color: 'rgba(136,136,152,0.6)' }}>
+          Raw microphone, no voice processing; levels calibrate to the room in a few seconds.
+        </p>
+
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all"
+          className="border border-dashed rounded-lg p-2 text-center cursor-pointer transition-all"
           style={{
             borderColor: audio.state.fileName ? '#4a4' : '#1a1a25',
             background: audio.state.fileName ? 'rgba(68,170,68,0.05)' : 'transparent'
@@ -89,25 +105,9 @@ export function AudioTab({ audio }: AudioTabProps) {
               </p>
             </div>
           ) : (
-            <div>
-              <p className="text-sm" style={{ color: '#888898' }}>Drop audio file here</p>
-              <p className="text-xs mt-0.5" style={{ color: 'rgba(136,136,152,0.5)' }}>MP3, WAV, OGG, FLAC</p>
-            </div>
+            <p className="text-xs" style={{ color: 'rgba(136,136,152,0.5)' }}>or drop an audio file (MP3, WAV, OGG, FLAC)</p>
           )}
         </div>
-
-        {/* Mic input */}
-        <button
-          onClick={audio.state.micActive ? () => audio.stopMic() : audio.startMic}
-          className="w-full px-4 py-3 rounded-lg text-sm font-medium transition-all"
-          style={{
-            background: audio.state.micActive ? 'rgba(221,68,68,0.2)' : 'rgba(74,124,255,0.1)',
-            color: audio.state.micActive ? '#d44' : '#888898',
-            border: `1px solid ${audio.state.micActive ? 'rgba(221,68,68,0.4)' : '#1a1a25'}`
-          }}
-        >
-          {audio.state.micActive ? '⏹ Stop Mic' : '🎤 Live Mic'}
-        </button>
 
         {/* Transport */}
         {audio.state.fileName && (
