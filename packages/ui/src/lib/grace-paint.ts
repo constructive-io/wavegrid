@@ -22,9 +22,7 @@ export interface Choice {
 
 /** Brightness choreographies. All slow; the header speed slider scales them. */
 export const ANIMS: Choice[] = [
-  { key: 'still', name: 'Still', hint: 'Everything on, no motion' },
-  { key: 'breathe', name: 'Breathe', hint: 'The whole window swells and settles' },
-  { key: 'ringBreathe', name: 'Ring Breathe', hint: 'Each ring breathes in its own time' },
+  { key: 'still', name: 'Solid', hint: 'Every pane fully on: colour only, no brightness motion' },
   { key: 'collapse', name: 'Collapse', hint: 'Outer ring fades, then middle; centre stays; they return in reverse' },
   { key: 'collapsePanes', name: 'Collapse Panes', hint: 'Same, but each ring goes and returns one pane at a time' },
   { key: 'unwind', name: 'Unwind', hint: 'One pane at a time from outer ring in, then back out; centre stays on' },
@@ -38,10 +36,12 @@ export const ANIMS: Choice[] = [
   { key: 'spokes', name: 'Spokes', hint: 'Three slow spokes turn across both rings' },
   { key: 'sweep', name: 'Sweep', hint: 'Half the window lit, the dividing line turning' },
   { key: 'pendulum', name: 'Pendulum', hint: 'A band of light swings side to side like a bell' },
-  { key: 'twinkle', name: 'Twinkle', hint: 'Each pane glimmers gently on its own' },
   { key: 'vortex', name: 'Vortex', hint: 'Rings turn opposite ways with the centre breathing' },
   { key: 'rainfall', name: 'Rainfall', hint: 'Panes fall dark one by one, then refill' },
-  { key: 'halo', name: 'Halo', hint: 'Only one ring lit at a time, handed inward and out again' }
+  { key: 'halo', name: 'Halo', hint: 'Only one ring lit at a time, handed inward and out again' },
+  { key: 'breathe', name: 'Breathe', hint: 'The whole window dips deep and swells back, mostly bright' },
+  { key: 'ringBreathe', name: 'Ring Breathe', hint: 'Each ring breathes in its own time' },
+  { key: 'twinkle', name: 'Twinkle', hint: 'Each pane dips and recovers on its own' }
 ];
 
 /** How the gradient moves across the unpainted panes. */
@@ -225,16 +225,18 @@ function collapsePanesLevel(r, x, s, n) {
 // with the crossings kept short.
 var PRESENT = 0.8;
 function lit(v) { return PRESENT + (1 - PRESENT) * clamp01(v); }
+// A deep dip that spends most of its time bright: 1 at v = 0, 0.2 at v = 1.
+function dip(v) { v = clamp01(v); return 1 - 0.8 * v * v * v * v; }
 // 0..1 -> mostly 0 or 1 with a short crossing around the middle.
 function crisp(v) { return ss((v - 0.3) / 0.4); }
 
 var ANIMS = {
   still: function() { return 1; },
-  breathe: function(ctx, i, t) { return lit(0.5 + 0.5 * Math.sin(t * TAU / 9)); },
+  breathe: function(ctx, i, t) { return dip(0.5 + 0.5 * Math.sin(t * TAU / 9)); },
   ringBreathe: function(ctx, i, t) {
     var r = ring(ctx, i);
     var ph = r === 1 ? 0 : r === 0 ? TAU / 3 : 2 * TAU / 3;
-    return lit(0.5 + 0.5 * Math.sin(t * TAU / 11 + ph));
+    return dip(0.5 + 0.5 * Math.sin(t * TAU / 11 + ph));
   },
   collapse: function(ctx, i, t) { return collapseLevel(ring(ctx, i), fract(t / CYCLE)); },
   collapsePanes: function(ctx, i, t) {
@@ -324,7 +326,7 @@ var ANIMS = {
   twinkle: function(ctx, i, t) {
     var p = pos(ctx, i);
     var g = Math.sin(t * 0.9 + p * 13 + rad(ctx, i) * 7) * 0.6 + Math.sin(t * 0.55 + p * 29) * 0.4;
-    return lit(0.5 + 0.5 * g);
+    return dip(0.5 + 0.5 * g);
   },
   vortex: function(ctx, i, t) {
     var r = ring(ctx, i);
