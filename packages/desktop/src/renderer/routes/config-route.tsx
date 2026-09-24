@@ -85,6 +85,7 @@ function Field({
 
 interface ConfigRouteProps {
   project: string | null;
+  presets: string[];
   config: EditableConfig | null;
   loading: boolean;
   onSave: (config: EditableConfig) => Promise<void>;
@@ -94,7 +95,7 @@ interface ConfigRouteProps {
 /** Config editor for one project — tabbed over layout / network / receiver. Binds
  *  to the flattened EditableConfig; save folds edits back into the stored config
  *  (osc, sync, shard, debug preserved by main). Mirrors `wavegrid config set`. */
-export function ConfigRoute({ project, config, loading, onSave, busy }: ConfigRouteProps) {
+export function ConfigRoute({ project, presets, config, loading, onSave, busy }: ConfigRouteProps) {
   const [draft, setDraft] = React.useState<EditableConfig | null>(config);
   const [saved, setSaved] = React.useState(false);
 
@@ -124,6 +125,10 @@ export function ConfigRoute({ project, config, loading, onSave, busy }: ConfigRo
   }
 
   const shape = shapeOf(draft.layout);
+  const currentPreset = draft.layout.preset ?? '';
+  const presetOptions = (
+    currentPreset && !presets.includes(currentPreset) ? [...presets, currentPreset] : presets
+  ).map((p) => ({ value: p, label: p }));
   const set = (patch: Partial<EditableConfig>) => {
     setDraft({ ...draft, ...patch });
     setSaved(false);
@@ -202,7 +207,7 @@ export function ConfigRoute({ project, config, loading, onSave, busy }: ConfigRo
             <Choice<Shape>
               value={shape}
               onChange={(next) => {
-                if (next === 'preset') setLayout({ preset: draft.layout.preset ?? '' });
+                if (next === 'preset') setLayout({ preset: draft.layout.preset ?? presets[0] ?? '' });
                 else if (next === 'grid')
                   setLayout({ kind: 'grid', cols: draft.layout.cols ?? 7, rows: draft.layout.rows ?? 7 });
                 else if (next === 'rings')
@@ -226,12 +231,14 @@ export function ConfigRoute({ project, config, loading, onSave, busy }: ConfigRo
             />
           </div>
           {shape === 'preset' && (
-            <Field
-              id='cfg-preset'
-              label='Preset id'
-              value={draft.layout.preset ?? ''}
-              onChange={(v) => setLayout({ preset: v })}
-            />
+            <div className='flex flex-col gap-1.5'>
+              <Label>Preset</Label>
+              <Choice<string>
+                value={currentPreset}
+                onChange={(v) => setLayout({ preset: v })}
+                options={presetOptions}
+              />
+            </div>
           )}
           {shape === 'grid' && (
             <div className='flex gap-4'>

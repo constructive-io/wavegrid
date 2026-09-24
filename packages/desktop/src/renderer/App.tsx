@@ -444,6 +444,7 @@ export function App() {
       {route === 'config' && (
         <ConfigRoute
           project={editingProject}
+          presets={presets}
           config={config}
           loading={configLoading}
           onSave={onSaveConfig}
