@@ -162,8 +162,14 @@ export function useGracePaint(
   );
 
   /** Save what is on the window right now as a Look on the brain. */
+  // After a Stop the pattern is gone, so the look keeps the colours but not a
+  // brightness animation nobody is seeing: it saves as Solid.
   const saveLook = useCallback(
-    (name: string) => send({ type: 'saveLook', name, params: paramsRef.current }),
+    (name: string) => {
+      const p = paramsRef.current;
+      const params = runningRef.current ? p : { ...p, anim: 'still' };
+      send({ type: 'saveLook', name, params });
+    },
     [send]
   );
   const renameLook = useCallback((id: string, name: string) => send({ type: 'renameLook', id, name }), [send]);
