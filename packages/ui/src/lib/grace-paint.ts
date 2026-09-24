@@ -94,6 +94,21 @@ export function paintPane(paint: number[], index: number, hue: number, sat: numb
   return next;
 }
 
+/**
+ * Paint every pane by ring: outer panes take `pair.outer`, the middle ring
+ * `pair.inner`, and the centre `pair.inner` too (the centre is always on, so it
+ * reads as the heart of the inner colour). Uses the same radius split as the
+ * pattern itself.
+ */
+export function ringPaint(radii: number[], pair: { outer: [number, number]; inner: [number, number] }): number[] {
+  let next = emptyPaint(radii.length);
+  radii.forEach((r, i) => {
+    const c = r >= 0.8 ? pair.outer : pair.inner;
+    next = paintPane(next, i, c[0], c[1]);
+  });
+  return next;
+}
+
 /** True when at least one pane holds a painted colour. */
 export function hasPaint(paint: number[]): boolean {
   for (let i = 0; i < paint.length; i += 2) if (paint[i] >= 0) return true;

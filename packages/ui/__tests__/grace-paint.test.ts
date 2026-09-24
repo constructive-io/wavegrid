@@ -8,9 +8,10 @@ import {
   type GracePaintParams,
   gracePaintPattern,
   hasPaint,
-  paintPane
+  paintPane,
+  ringPaint
 } from '../src/lib/grace-paint';
-import { GRADIENTS } from '../src/lib/grace-rings';
+import { GRADIENTS, PAIRS } from '../src/lib/grace-rings';
 
 interface Cell {
   h: number;
@@ -75,6 +76,14 @@ describe('GracePaint params', () => {
 
   it('paintPane grows the array when the layout has more panes than the paint', () => {
     expect(paintPane([], 2, 90, 50)).toEqual([-1, 0, -1, 0, 90, 50]);
+  });
+
+  it('ringPaint gives the outer ring one colour and the inner ring + centre the other', () => {
+    const pair = PAIRS.find(p => p.name === 'Chapel')!;
+    const paint = ringPaint(GRACE.fixtures.map(f => f.radius), pair);
+    expect(paint).toHaveLength(50);
+    for (const i of OUTER) expect([paint[i * 2], paint[i * 2 + 1]]).toEqual(pair.outer);
+    for (const i of [...MIDDLE, ...CENTRE]) expect([paint[i * 2], paint[i * 2 + 1]]).toEqual(pair.inner);
   });
 });
 

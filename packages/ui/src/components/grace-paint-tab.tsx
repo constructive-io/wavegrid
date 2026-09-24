@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-import { ANIMS, type Choice, FLOWS, gracePaintPattern, hasPaint } from '@/lib/grace-paint';
-import { type Gradient, gradientCss, GRADIENTS } from '@/lib/grace-rings';
+import { ANIMS, type Choice, FLOWS, gracePaintPattern, hasPaint, ringPaint } from '@/lib/grace-paint';
+import { type Gradient, gradientCss, GRADIENTS, pairGradient, PAIRS, type RingPair } from '@/lib/grace-rings';
 import type { GracePaintControls } from '@/lib/use-grace-paint';
 
 import { ColorPicker, QuickColors } from './color-wheel';
@@ -21,6 +21,37 @@ function Pill({ label, active, onClick, title }: { label: string; active: boolea
       style={{ ...(active ? PILL_ACTIVE : PILL_IDLE), height: 36, padding: '0 12px', borderRadius: 10, fontSize: 13, fontWeight: 600 }}
     >
       {label}
+    </button>
+  );
+}
+
+type ColourTab = 'gradients' | 'rings' | 'paint';
+const COLOUR_TABS: { key: ColourTab; label: string }[] = [
+  { key: 'gradients', label: 'Gradients' },
+  { key: 'rings', label: 'Ring Colours' },
+  { key: 'paint', label: 'Paint' }
+];
+
+function PairSwatch({ pair, active, onClick }: { pair: RingPair; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={`${pair.name} — outer / inner`}
+      className="relative overflow-hidden transition-all active:scale-93"
+      style={{
+        width: 56,
+        height: 56,
+        borderRadius: 14,
+        background: pairGradient(pair),
+        border: active ? '2.5px solid #fff' : '2.5px solid transparent'
+      }}
+    >
+      <span
+        className="absolute bottom-0.5 left-0 right-0 text-center font-semibold"
+        style={{ fontSize: 9, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.9)', letterSpacing: '0.02em' }}
+      >
+        {pair.name}
+      </span>
     </button>
   );
 }
@@ -138,8 +169,11 @@ export function GracePaintTab({
   compact?: boolean;
 }) {
   const [showPreview, setShowPreview] = useState(true);
+  const [colourTab, setColourTab] = useState<ColourTab>('gradients');
   const { params, running, start, update, fill, clearPaint } = controls;
   const painted = hasPaint(params.paint);
+  const radii = fixtures?.map((f) => f.radius) ?? [];
+  const activePair = PAIRS.find((p) => radii.length > 0 && ringPaint(radii, p).every((v, k) => v === params.paint[k]));
   const activeGradient = GRADIENTS.find(
     (g) => g.stops.length === params.stops.length && g.stops.every(([h, s], k) => params.stops[k][0] === h && params.stops[k][1] === s)
   );
@@ -193,67 +227,107 @@ export function GracePaintTab({
         ) : null}
       </div>
 
-      <ColorPicker
-        hue={hue}
-        saturation={sat}
-        brightness={bright}
-        onHueChange={onHue}
-        onSatChange={onSat}
-        onBrightChange={onBright}
-        compact={compact}
-      >
-        <ControlGroup label="Paint">
-          <QuickColors
-            hue={hue}
-            saturation={sat}
-            brightness={bright}
-            onHueChange={onHue}
-            onSatChange={onSat}
-            onBrightChange={onBright}
-          />
-          <div className="flex gap-2 pt-1">
-            <Pill label="Fill all" active={false} onClick={() => fill(hue, sat)} title="Paint every pane this colour" />
-            <Pill
-              label={painted ? 'Clear paint' : 'Nothing painted'}
-              active={false}
-              onClick={clearPaint}
-              title="Let every pane follow the gradient again"
-            />
+      <div className="flex gap-1 px-2">
+        {COLOUR_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setColourTab(t.key)}
+            className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            style={{
+              background: colourTab === t.key ? '#2563eb' : '#1a1a25',
+              color: colourTab === t.key ? '#fff' : '#888898',
+              border: '1px solid ' + (colourTab === t.key ? '#3b82f6' : '#2a2a35')
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+        {painted ? (
+          <button
+            onClick={clearPaint}
+            className="ml-auto px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            style={{ background: '#1a1a25', color: '#888898', border: '1px solid #2a2a35' }}
+            title="Let every pane follow the gradient again"
+          >
+            Clear paint
+          </button>
+        ) : null}
+      </div>
+
+      {colourTab === 'gradients' && (
+        <ControlGrid minCellWidth={220}>
+          <ControlGroup label={`Gradient — ${activeGradient?.name ?? 'Custom'}`}>
+            <div className="flex gap-2 flex-wrap">
+              {GRADIENTS.map((g) => (
+                <GradientSwatch
+                  key={g.name}
+                  gradient={g}
+                  active={g === activeGradient}
+                  onClick={() => update('stops', g.stops.map(([h, s]) => [h, s] as [number, number]))}
+                />
+              ))}
+            </div>
+            <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
+              {painted ? 'Shows on the panes that are not painted' : 'Colour of every pane until you paint one'}
+            </div>
+          </ControlGroup>
+          <ControlGroup label="Rotation">
+            <div className="flex gap-2 flex-wrap">
+              {FLOWS.map((f) => (
+                <Pill key={f.key} label={f.name} active={params.flow === f.key} onClick={() => update('flow', f.key)} title={f.hint} />
+              ))}
+            </div>
+            <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
+              One lap about a minute at 1× — the Speed slider scales it
+            </div>
+          </ControlGroup>
+        </ControlGrid>
+      )}
+
+      {colourTab === 'rings' && (
+        <ControlGroup label={`Ring Colours — ${activePair?.name ?? (painted ? 'Custom' : 'Gradient')}`}>
+          <div className="flex gap-2.5 flex-wrap">
+            {PAIRS.map((p) => (
+              <PairSwatch key={p.name} pair={p} active={p === activePair} onClick={() => update('paint', ringPaint(radii, p))} />
+            ))}
           </div>
-          <p className="text-sm" style={{ color: 'rgba(136,136,152,0.5)' }}>
-            Touch a pane to give it this colour. Painted panes keep their colour;
-            the rest follow the gradient. Brightness comes from the animation
-            either way, so paint while it plays.
-          </p>
+          <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
+            Paints the outer ring one colour and the inner ring and centre the other. Clear paint to go back to the gradient.
+          </div>
         </ControlGroup>
-      </ColorPicker>
+      )}
+
+      {colourTab === 'paint' && (
+        <ColorPicker
+          hue={hue}
+          saturation={sat}
+          brightness={bright}
+          onHueChange={onHue}
+          onSatChange={onSat}
+          onBrightChange={onBright}
+          compact={compact}
+        >
+          <ControlGroup label="Paint">
+            <QuickColors
+              hue={hue}
+              saturation={sat}
+              brightness={bright}
+              onHueChange={onHue}
+              onSatChange={onSat}
+              onBrightChange={onBright}
+            />
+            <div className="flex gap-2 pt-1">
+              <Pill label="Fill all" active={false} onClick={() => fill(hue, sat)} title="Paint every pane this colour" />
+            </div>
+            <p className="text-sm" style={{ color: 'rgba(136,136,152,0.5)' }}>
+              Touch a pane to give it this colour. Painted panes keep it; the rest
+              follow the gradient. Brightness comes from the animation either way.
+            </p>
+          </ControlGroup>
+        </ColorPicker>
+      )}
 
       <ControlGrid minCellWidth={220}>
-        <ControlGroup label={`Gradient — ${activeGradient?.name ?? 'Custom'}`}>
-          <div className="flex gap-2 flex-wrap">
-            {GRADIENTS.map((g) => (
-              <GradientSwatch
-                key={g.name}
-                gradient={g}
-                active={g === activeGradient}
-                onClick={() => update('stops', g.stops.map(([h, s]) => [h, s] as [number, number]))}
-              />
-            ))}
-          </div>
-          <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
-            Colour of the unpainted panes
-          </div>
-        </ControlGroup>
-        <ControlGroup label="Gradient Motion">
-          <div className="flex gap-2 flex-wrap">
-            {FLOWS.map((f) => (
-              <Pill key={f.key} label={f.name} active={params.flow === f.key} onClick={() => update('flow', f.key)} title={f.hint} />
-            ))}
-          </div>
-          <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
-            One lap about a minute at 1×
-          </div>
-        </ControlGroup>
         <ControlGroup label="Brightness">
           <div className="flex items-center gap-3">
             <input
