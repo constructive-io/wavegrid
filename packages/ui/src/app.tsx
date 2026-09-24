@@ -28,6 +28,7 @@ import { ShiftDial } from '@/components/shift-dial';
 import { StatusDot } from '@/components/status-dot';
 import { UsaTab } from '@/components/usa-tab';
 import { VideoTab } from '@/components/video-tab';
+import type { GraceAudioOutput } from '@/lib/grace-audio';
 import { useAudio } from '@/lib/use-audio';
 import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
@@ -675,7 +676,15 @@ export default function Home() {
 
   const gridData = grid.length > 0 ? grid : Array.from({ length: NUM_CANNONS }, () => ({ h: 220, s: 90, b: 80 }));
 
-  const audio = useAudio(NUM_CANNONS, GRID_COLUMNS, gridData, send, smoothness);
+  // Grace Audio steers GracePaint's colour; the pattern hook is created below.
+  const gracePaintRef = useRef<GracePaintControls | null>(null);
+  const onGraceAudio = useCallback((out: GraceAudioOutput) => {
+    const gp = gracePaintRef.current;
+    if (!gp) return;
+    gp.setColourShift(out.hueShift, out.satShift);
+    if (out.step) gp.nextGradient();
+  }, []);
+  const audio = useAudio(NUM_CANNONS, GRID_COLUMNS, gridData, send, smoothness, onGraceAudio);
   const { addDrop } = useDrops(NUM_CANNONS, GRID_COLUMNS, dropsConfig, send);
   const motion = useMotion(hue, sat, bright, send);
   const gradient = useGradient();
@@ -745,6 +754,7 @@ export default function Home() {
   );
 
   const gracePaint = useGracePaint(NUM_CANNONS, send, pattern, handlePatternSelect);
+  gracePaintRef.current = gracePaint;
 
   const handleCannon = useCallback(
     (index: number, h: number, s: number, b: number) => {

@@ -9,6 +9,7 @@ interface AudioTabProps {
 }
 
 const modes: { key: AudioMode; label: string }[] = [
+  { key: 'grace', label: 'Grace' },
   { key: 'plasma', label: 'Plasma' },
   { key: 'galaxy', label: 'Galaxy' },
   { key: 'fireworks', label: 'Fireworks' },
@@ -188,6 +189,34 @@ export function AudioTab({ audio }: AudioTabProps) {
             ))}
           </div>
         </div>
+
+        {audio.mode === 'grace' ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs" style={{ color: 'rgba(136,136,152,0.7)' }}>
+              Grace steers the colour of the running GracePaint look; brightness stays with its animation.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { key: 'drift', label: 'Colour drift', desc: 'Bass turns the hue, mids lift the saturation — slowly' },
+                { key: 'beats', label: 'Gradient on beats', desc: 'A strong beat moves to the next gradient (at most every few seconds)' }
+              ] as { key: 'drift' | 'beats'; label: string; desc: string }[]).map((o) => (
+                <button
+                  key={o.key}
+                  onClick={() => audio.setGrace({ [o.key]: !audio.grace[o.key] })}
+                  title={o.desc}
+                  className="px-4 py-2.5 rounded-2xl text-sm font-medium transition-all"
+                  style={{
+                    background: audio.grace[o.key] ? 'rgba(74,124,255,0.15)' : '#12121a',
+                    color: audio.grace[o.key] ? '#4a7cff' : '#888898',
+                    border: `1px solid ${audio.grace[o.key] ? '#4a7cff' : '#1a1a25'}`
+                  }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Blend */}
         <div>

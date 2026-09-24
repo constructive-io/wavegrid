@@ -130,7 +130,30 @@ export function useGracePaint(
     [count, send, start]
   );
 
-  return { params, running, start, update, paint, fill, clearPaint, setGradient };
+  /**
+   * Live colour offsets from Grace Audio. Not part of the params (never saved,
+   * never adopted from the brain); only sent while the pattern runs.
+   */
+  const setColourShift = useCallback(
+    (hueShift: number, satShift: number) => {
+      if (!runningRef.current) return;
+      send({ type: 'setPatternParam', name: 'hueShift', value: hueShift });
+      send({ type: 'setPatternParam', name: 'satShift', value: satShift });
+    },
+    [send]
+  );
+
+  /** The gradient after the current one in the list (a Grace Audio beat step). */
+  const nextGradient = useCallback(() => {
+    const cur = paramsRef.current.stops;
+    const idx = GRADIENTS.findIndex(
+      (g) => g.stops.length === cur.length && g.stops.every(([h, s], k) => cur[k][0] === h && cur[k][1] === s)
+    );
+    const g = GRADIENTS[(idx + 1) % GRADIENTS.length];
+    setGradient(g.stops.map(([h, s]) => [h, s] as [number, number]));
+  }, [setGradient]);
+
+  return { params, running, start, update, paint, fill, clearPaint, setGradient, setColourShift, nextGradient };
 }
 
 export type GracePaintControls = ReturnType<typeof useGracePaint>;

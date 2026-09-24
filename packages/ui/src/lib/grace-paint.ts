@@ -362,13 +362,18 @@ return {
     var flow = FLOWS[p.flow] || FLOWS.wheel;
     var level = p.level === undefined ? 100 : p.level;
     var spin = p.spin === undefined ? 1 : p.spin;
+    // Live colour offsets (Grace Audio): hue in degrees, saturation in points.
+    var hueShift = p.hueShift || 0;
+    var satShift = p.satShift || 0;
     var t = ctx.t;
     var ft = t * spin;
     for (var i = 0; i < ctx.count; i++) {
       var h = paint[i * 2];
       var c = (h === undefined || h < 0) ? grad(stops, flow(ctx, i, ft)) : [h, paint[i * 2 + 1]];
+      var hh = ((c[0] + hueShift) % 360 + 360) % 360;
+      var s = c[1] + satShift;
       var b = clamp01(anim(ctx, i, t)) * level;
-      ctx.set(i, c[0], c[1], b < 0 ? 0 : (b > 100 ? 100 : b));
+      ctx.set(i, hh, s < 0 ? 0 : (s > 100 ? 100 : s), b < 0 ? 0 : (b > 100 ? 100 : b));
     }
   },
   meta: { name: 'grace-paint' }
