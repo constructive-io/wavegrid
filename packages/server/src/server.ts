@@ -1041,16 +1041,18 @@ function handleMessage(msg: any, ws?: WebSocket) {
       currentAnimation = null;
       cancelPlaylistIfActive();
       deactivatePool();
-      patternEngine.load(msg.code);
+      const params = msg.params && typeof msg.params === 'object' ? (msg.params as Record<string, unknown>) : {};
+      patternEngine.load(msg.code, params);
       broadcastCommand({
         action: 'evalPattern',
         code: msg.code,
-        params: msg.params || {}
+        params
       });
     }
     break;
   case 'setPatternParam':
     if (typeof msg.name === 'string') {
+      patternEngine.setParam(msg.name, msg.value);
       broadcastCommand({
         action: 'setPatternParam',
         name: msg.name,

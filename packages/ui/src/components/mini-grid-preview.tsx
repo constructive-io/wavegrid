@@ -9,6 +9,17 @@ interface MiniGridPreviewProps {
   source: string;
   /** Animation speed multiplier (default 1) */
   speed?: number;
+  /**
+   * The receiver's own easing, so the tile shows what the lasers will do and
+   * not just what the pattern asks for: `attack` is how far each frame's
+   * target moves toward the pattern's colour (0..1, 1 = instant), `alpha` is
+   * the low-pass filter the output then follows toward that target (the Fade
+   * slider). Both default to instant.
+   */
+  attack?: number;
+  alpha?: number;
+  /** Pattern parameters exposed as `ctx.p`. */
+  params?: Record<string, unknown>;
   /** Canvas size in px (square) */
   size?: number;
   /** Whether this is a full pattern expression (IIFE) vs a render body */
@@ -102,12 +113,54 @@ function fixtureGeometry(fixtures: PreviewFixture[]): Dot[] {
   }));
 }
 
-export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = false, ring, fixtures }: MiniGridPreviewProps) {
+/** One step of the receiver's easing: target chases the pattern by `attack`, output chases the target by `alpha`. */
+export function easeCell(
+  cell: { h: number; s: number; b: number; th: number; ts: number; tb: number },
+  h: number,
+  s: number,
+  b: number,
+  attack: number,
+  alpha: number
+): void {
+  if (attack >= 1) {
+    cell.th = h; cell.ts = s; cell.tb = b;
+  } else {
+    cell.th = (cell.th + hueDelta(cell.th, h) * attack + 360) % 360;
+    cell.ts += (s - cell.ts) * attack;
+    cell.tb += (b - cell.tb) * attack;
+  }
+  if (alpha >= 1) {
+    cell.h = cell.th; cell.s = cell.ts; cell.b = cell.tb;
+    return;
+  }
+  const dh = hueDelta(cell.h, cell.th);
+  const ds = cell.ts - cell.s;
+  const db = cell.tb - cell.b;
+  if (Math.abs(dh) > 0.3 || Math.abs(ds) > 0.3 || Math.abs(db) > 0.3) {
+    cell.h = (cell.h + dh * alpha + 360) % 360;
+    cell.s += ds * alpha;
+    cell.b += db * alpha;
+  } else {
+    cell.h = cell.th; cell.s = cell.ts; cell.b = cell.tb;
+  }
+}
+
+function hueDelta(from: number, to: number): number {
+  return ((to - from + 540) % 360) - 180;
+}
+
+export function MiniGridPreview({
+  source, speed = 1, size = 72, isPattern = false, ring, fixtures, attack = 1, alpha = 1, params
+}: MiniGridPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const frameRef = useRef(0);
   const startRef = useRef(0);
   const renderFnRef = useRef<((ctx: Record<string, unknown>) => void) | null>(null);
+  const easingRef = useRef({ attack, alpha });
+  easingRef.current = { attack, alpha };
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
 
   useEffect(() => {
     renderFnRef.current = buildRenderFn(source, isPattern);
@@ -134,8 +187,13 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
     const height = canvas.height;
     const cellW = width / COLS;
     const cellH = height / ROWS;
+    // What the pattern asked for this frame; `out` is what the lasers would show.
     const buf: { h: number; s: number; b: number }[] = new Array(count);
-    for (let i = 0; i < count; i++) buf[i] = { h: 0, s: 0, b: 0 };
+    const out: { h: number; s: number; b: number; th: number; ts: number; tb: number }[] = new Array(count);
+    for (let i = 0; i < count; i++) {
+      buf[i] = { h: 0, s: 0, b: 0 };
+      out[i] = { h: 0, s: 0, b: 0, th: 0, ts: 0, tb: 0 };
+    }
 
     function tick() {
       const renderFn = renderFnRef.current;
@@ -154,6 +212,8 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
         rows,
         t: elapsed * speed,
         frame: frame * speed,
+        dt: speed / 60,
+        p: paramsRef.current ?? {},
         set(i: number, h: number, s: number, b: number) {
           if (i >= 0 && i < count) {
             buf[i].h = h || 0;
@@ -220,6 +280,9 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
         // pattern error — leave buffer as-is
       }
 
+      const { attack: atk, alpha: al } = easingRef.current;
+      for (let i = 0; i < count; i++) easeCell(out[i], buf[i].h, buf[i].s, buf[i].b, atk, al);
+
       if (geo) {
         // Ring of glowing dots on black.
         ctx2d!.fillStyle = '#0a0a12';
@@ -233,7 +296,7 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
           const p = geo[i];
           const px = cx + p.x * ringR;
           const py = cy + p.y * ringR;
-          const [r, g, b] = hsbToRgb(buf[i].h, buf[i].s, buf[i].b);
+          const [r, g, b] = hsbToRgb(out[i].h, out[i].s, out[i].b);
           ctx2d!.beginPath();
           ctx2d!.arc(px, py, dotR, 0, Math.PI * 2);
           ctx2d!.fillStyle = `rgb(${r},${g},${b})`;
@@ -246,7 +309,7 @@ export function MiniGridPreview({ source, speed = 1, size = 72, isPattern = fals
         for (let i = 0; i < count; i++) {
           const col = i % COLS;
           const row = Math.floor(i / COLS);
-          const [r, g, b] = hsbToRgb(buf[i].h, buf[i].s, buf[i].b);
+          const [r, g, b] = hsbToRgb(out[i].h, out[i].s, out[i].b);
           ctx2d!.fillStyle = `rgb(${r},${g},${b})`;
           ctx2d!.fillRect(col * cellW, row * cellH, cellW, cellH);
         }
