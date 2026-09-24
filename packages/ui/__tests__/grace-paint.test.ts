@@ -190,17 +190,36 @@ describe('Collapse — whole rings', () => {
 });
 
 describe('every animation reads on the lasers', () => {
-  const HOLD_ANIMS = ['still', 'breathe', 'ringBreathe', 'twinkle'];
+  const BREATHERS = ['breathe', 'ringBreathe', 'twinkle'];
 
-  it('never leaves the whole window dark, and always-lit animations stay in the 80–100 band', () => {
+  it('never leaves the whole window dark (Breathe is the one that dips everything, on purpose)', () => {
     for (const a of ANIMS) {
+      if (a.key === 'breathe') continue;
       const p = player(GRACE, { anim: a.key });
       for (let t = 0; t < 120; t += 0.25) {
         const cells = p.at(t);
         expect(Math.max(...cells.map(c => c.b))).toBeGreaterThanOrEqual(80);
-        if (HOLD_ANIMS.includes(a.key)) for (const c of cells) expect(c.b).toBeGreaterThanOrEqual(80 - 1e-6);
       }
     }
+  });
+
+  it('breathers dip deep (to ~20) but spend most of their time bright', () => {
+    for (const key of BREATHERS) {
+      const p = player(GRACE, { anim: key });
+      let min = 100;
+      let bright = 0;
+      let n = 0;
+      for (let t = 0; t < 120; t += 0.25) {
+        for (const c of p.at(t)) {
+          n++;
+          min = Math.min(min, c.b);
+          if (c.b >= 80) bright++;
+        }
+      }
+      expect(min).toBeLessThan(25);
+      expect(bright / n).toBeGreaterThan(0.6);
+    }
+    expect(ANIMS.slice(-3).map(a => a.key)).toEqual(BREATHERS);
   });
 
   it('spends little time in the dim middle: panes are mostly clearly on or clearly off', () => {

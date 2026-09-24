@@ -26,6 +26,40 @@ function Pill({ label, active, onClick, title }: { label: string; active: boolea
 }
 
 type ColourTab = 'gradients' | 'rings' | 'paint';
+
+/** Small glyphs so the three colour sources read at a glance. */
+function ColourTabIcon({ tab }: { tab: ColourTab }) {
+  const size = 16;
+  if (tab === 'gradients') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden>
+        <defs>
+          <linearGradient id="gp-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#ff5a5a" />
+            <stop offset="0.5" stopColor="#ffd35a" />
+            <stop offset="1" stopColor="#5a8cff" />
+          </linearGradient>
+        </defs>
+        <circle cx="8" cy="8" r="6.5" fill="url(#gp-grad)" />
+      </svg>
+    );
+  }
+  if (tab === 'rings') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden>
+        <circle cx="8" cy="8" r="6.5" fill="none" stroke="#ff7a3d" strokeWidth="2.2" />
+        <circle cx="8" cy="8" r="2.6" fill="#3d9bff" />
+      </svg>
+    );
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden>
+      <path d="M2.5 13.5c0-2.2 1.3-3.3 3.2-3.3l1.4 1.4c0 1.9-1.1 3.2-3.3 3.2-.6 0-1-.4-1.3-1.3z" fill="#e8e8f0" />
+      <path d="M6.3 9.6l5.6-5.6a1.3 1.3 0 0 1 1.8 1.8L8.1 11.4z" fill="#a88bff" />
+    </svg>
+  );
+}
+
 const COLOUR_TABS: { key: ColourTab; label: string }[] = [
   { key: 'gradients', label: 'Gradients' },
   { key: 'rings', label: 'Ring Colours' },
@@ -84,7 +118,6 @@ function AnimTile({
   anim,
   active,
   onClick,
-  showPreview,
   speed,
   easing,
   params,
@@ -93,13 +126,12 @@ function AnimTile({
   anim: Choice;
   active: boolean;
   onClick: () => void;
-  showPreview: boolean;
   speed: number;
   easing: PreviewEasing;
   params: Record<string, unknown>;
   fixtures?: PreviewFixture[];
 }) {
-  const tileSize = showPreview ? 96 : 72;
+  const tileSize = 96;
   return (
     <button
       onClick={onClick}
@@ -113,18 +145,16 @@ function AnimTile({
         border: active ? '2.5px solid #fff' : '2.5px solid transparent'
       }}
     >
-      {showPreview ? (
-        <MiniGridPreview
-          source={gracePaintPattern()}
-          speed={speed}
-          attack={easing.attack}
-          alpha={easing.alpha}
-          params={params}
-          size={tileSize}
-          isPattern
-          fixtures={fixtures}
-        />
-      ) : null}
+      <MiniGridPreview
+        source={gracePaintPattern()}
+        speed={speed}
+        attack={easing.attack}
+        alpha={easing.alpha}
+        params={params}
+        size={tileSize}
+        isPattern
+        fixtures={fixtures}
+      />
       <span
         className="absolute bottom-1 left-0 right-0 text-center text-white font-semibold"
         style={{ fontSize: 9, textShadow: '0 1px 4px rgba(0,0,0,0.8)', letterSpacing: '0.02em' }}
@@ -167,7 +197,6 @@ export function GracePaintTab({
   fixtures?: PreviewFixture[];
   compact?: boolean;
 }) {
-  const [showPreview, setShowPreview] = useState(true);
   const [colourTab, setColourTab] = useState<ColourTab>('gradients');
   const { params, running, start, update, fill, clearPaint, setGradient } = controls;
   const painted = hasPaint(params.paint);
@@ -185,13 +214,14 @@ export function GracePaintTab({
           <button
             key={t.key}
             onClick={() => setColourTab(t.key)}
-            className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
             style={{
               background: colourTab === t.key ? '#2563eb' : '#1a1a25',
               color: colourTab === t.key ? '#fff' : '#888898',
               border: '1px solid ' + (colourTab === t.key ? '#3b82f6' : '#2a2a35')
             }}
           >
+            <ColourTabIcon tab={t.key} />
             {t.label}
           </button>
         ))}
@@ -206,18 +236,6 @@ export function GracePaintTab({
               Clear paint
             </button>
           ) : null}
-          <button
-            onClick={() => setShowPreview(!showPreview)}
-            className="px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
-            style={{
-              background: showPreview ? '#2563eb' : '#1a1a25',
-              color: showPreview ? '#fff' : '#888898',
-              border: '1px solid ' + (showPreview ? '#3b82f6' : '#2a2a35')
-            }}
-            title={showPreview ? 'Hide previews' : 'Show animated previews'}
-          >
-            Preview
-          </button>
           {!running ? (
             <button
               onClick={start}
@@ -312,14 +330,13 @@ export function GracePaintTab({
       )}
 
       <ControlGroup label="Animation">
-        <div className="flex gap-2.5 flex-wrap overflow-y-auto" style={{ maxHeight: showPreview ? 340 : undefined }}>
+        <div className="flex gap-2.5 flex-wrap overflow-y-auto" style={{ maxHeight: 340 }}>
           {ANIMS.map((a) => (
             <AnimTile
               key={a.key}
               anim={a}
               active={running && params.anim === a.key}
               onClick={() => update('anim', a.key)}
-              showPreview={showPreview}
               speed={animSpeed}
               easing={easing}
               params={{ ...previewParams, anim: a.key }}
