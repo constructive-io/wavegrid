@@ -17,8 +17,8 @@ const SECTIONS: { key: Section; label: string }[] = [{ key: 'looks', label: 'Loo
 /**
  * Looks tab: GracePaint states saved on the brain (every iPad sees the same
  * list). Tap to recall — it takes over the window on top of whatever animation
- * is running; Save snapshots what is on the window now; Edit exposes
- * rename/delete.
+ * is running; Save snapshots what is on the window now as "Look N"; Edit
+ * exposes inline rename (tap the tile) and delete (×).
  */
 export function LooksTab({
   looks,
@@ -43,20 +43,22 @@ export function LooksTab({
 }) {
   const [section, setSection] = useState<Section>('looks');
   const [editing, setEditing] = useState(false);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const count = fixtures?.length ?? 0;
   const currentJson = JSON.stringify(current);
-  const save = () => {
-    const name = window.prompt('Name this look', `Look ${looks.length + 1}`);
-    if (name === null) return;
-    onSave(name);
+  // No window.prompt/confirm: Electron's embedded UI has no prompt() at all, so
+  // Save names the look itself and renaming happens inline in Edit mode.
+  const save = () => onSave(`Look ${looks.length + 1}`);
+  const commitRename = () => {
+    if (!renaming) return;
+    const name = renaming.name.trim();
+    const look = looks.find((l) => l.id === renaming.id);
+    if (look && name && name !== look.name) onRename(look.id, name);
+    setRenaming(null);
   };
-  const rename = (look: Look) => {
-    const name = window.prompt('Rename look', look.name);
-    if (name === null || !name.trim() || name.trim() === look.name) return;
-    onRename(look.id, name.trim());
-  };
-  const remove = (look: Look) => {
-    if (window.confirm(`Delete "${look.name}"?`)) onDelete(look.id);
+  const toggleEditing = () => {
+    setRenaming(null);
+    setEditing((e) => !e);
   };
   return (
     <div className="flex flex-col gap-4">
@@ -101,7 +103,9 @@ export function LooksTab({
               return (
                 <div key={look.id} className="relative shrink-0" style={{ width: LOOK_TILE }}>
                   <button
-                    onClick={() => (editing ? rename(look) : onApply(look))}
+                    onClick={() =>
+                      editing ? setRenaming({ id: look.id, name: look.name }) : onApply(look)
+                    }
                     title={editing ? 'Rename' : `Recall "${look.name}"`}
                     className="relative overflow-hidden transition-all active:scale-93 w-full"
                     style={{
@@ -123,16 +127,34 @@ export function LooksTab({
                         fixtures={fixtures}
                       />
                     ) : null}
-                    <span
-                      className="absolute bottom-1 left-0 right-0 text-center text-white font-semibold truncate px-1"
-                      style={{ fontSize: 11, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}
-                    >
-                      {look.name}
-                    </span>
+                    {renaming?.id !== look.id ? (
+                      <span
+                        className="absolute bottom-1 left-0 right-0 text-center text-white font-semibold truncate px-1"
+                        style={{ fontSize: 11, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}
+                      >
+                        {look.name}
+                      </span>
+                    ) : null}
                   </button>
+                  {renaming?.id === look.id ? (
+                    <input
+                      autoFocus
+                      value={renaming.name}
+                      maxLength={32}
+                      onChange={(e) => setRenaming({ id: look.id, name: e.target.value })}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename();
+                        if (e.key === 'Escape') setRenaming(null);
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      className="absolute bottom-1 left-1 right-1 rounded text-center text-white font-semibold outline-none"
+                      style={{ fontSize: 11, background: '#1a1a25', border: '1px solid #3b82f6', padding: '2px 4px' }}
+                    />
+                  ) : null}
                   {editing ? (
                     <button
-                      onClick={() => remove(look)}
+                      onClick={() => onDelete(look.id)}
                       className="absolute -top-1 -right-1 rounded-full text-white text-xs font-bold flex items-center justify-center"
                       style={{ width: 20, height: 20, background: '#d44', border: '1.5px solid #0a0a12' }}
                       title="Delete look"
@@ -150,7 +172,7 @@ export function LooksTab({
             ) : null}
             {looks.length ? (
               <button
-                onClick={() => setEditing((e) => !e)}
+                onClick={toggleEditing}
                 className="self-center shrink-0 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
                 style={{
                   background: editing ? '#2563eb' : '#1a1a25',
