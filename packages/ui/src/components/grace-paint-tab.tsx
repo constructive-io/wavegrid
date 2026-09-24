@@ -170,7 +170,7 @@ export function GracePaintTab({
 }) {
   const [showPreview, setShowPreview] = useState(true);
   const [colourTab, setColourTab] = useState<ColourTab>('gradients');
-  const { params, running, start, update, fill, clearPaint } = controls;
+  const { params, running, start, update, fill, clearPaint, setGradient } = controls;
   const painted = hasPaint(params.paint);
   const radii = fixtures?.map((f) => f.radius) ?? [];
   const activePair = PAIRS.find((p) => radii.length > 0 && ringPaint(radii, p).every((v, k) => v === params.paint[k]));
@@ -262,13 +262,13 @@ export function GracePaintTab({
                 <GradientSwatch
                   key={g.name}
                   gradient={g}
-                  active={g === activeGradient}
-                  onClick={() => update('stops', g.stops.map(([h, s]) => [h, s] as [number, number]))}
+                  active={g === activeGradient && !painted}
+                  onClick={() => setGradient(g.stops.map(([h, s]) => [h, s] as [number, number]))}
                 />
               ))}
             </div>
             <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
-              {painted ? 'Shows on the panes that are not painted' : 'Colour of every pane until you paint one'}
+              Takes over the whole window; paint on top of it afterwards
             </div>
           </ControlGroup>
           <ControlGroup label="Rotation">
@@ -292,7 +292,7 @@ export function GracePaintTab({
             ))}
           </div>
           <div className="pt-1" style={{ fontSize: 10, color: '#888898' }}>
-            Paints the outer ring one colour and the inner ring and centre the other. Clear paint to go back to the gradient.
+            Paints the outer ring one colour and the inner ring and centre the other.
           </div>
         </ControlGroup>
       )}
