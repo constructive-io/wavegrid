@@ -41,6 +41,8 @@ export function useSocket(
     if (!token || !url) return;
 
     let disposed = false;
+    /** Bumped per socket so a slow verdict from an old one can't overwrite a newer state. */
+    let generation = 0;
     let attempts = 0;
     let retry: ReturnType<typeof setTimeout> | null = null;
     let watchdog: ReturnType<typeof setInterval> | null = null;
@@ -53,6 +55,7 @@ export function useSocket(
     };
 
     const connect = () => {
+      generation += 1;
       const wsUrl = new URL(url);
       wsUrl.searchParams.set('token', token);
       const ws = new WebSocket(wsUrl.toString());
@@ -72,9 +75,12 @@ export function useSocket(
         if (wsRef.current === ws) wsRef.current = null;
         if (disposed) return;
         attempts += 1;
-        setConnection({ state: 'down', cause: 'unknown', detail: '', code: e.code, attempts });
+        const gen = generation;
+        setConnection({ state: 'down', cause: 'unknown', detail: '', code: e.code, attempts, token });
         void diagnoseConnection(probe, e.code, token).then(({ cause, detail }) => {
-          if (!disposed) setConnection({ state: 'down', cause, detail, code: e.code, attempts });
+          if (!disposed && gen === generation) {
+            setConnection({ state: 'down', cause, detail, code: e.code, attempts, token });
+          }
         });
         // A revoked session can only reconnect into the same rejection, so stop
         // hammering the brain and let the app hand back the login screen.

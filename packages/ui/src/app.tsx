@@ -631,11 +631,18 @@ export default function Home() {
 
   // A token the server no longer accepts can only reconnect into the same
   // error, so stop retrying against it and hand the operator the login screen.
+  // Only a verdict reached with *this* token counts: right after signing in,
+  // the last verdict still belongs to the expired one.
   useEffect(() => {
-    if (token && connection.state === 'down' && connection.cause === 'sessionExpired') {
+    if (
+      token &&
+      connection.state === 'down' &&
+      connection.cause === 'sessionExpired' &&
+      connection.token === token
+    ) {
       sessionEnded();
     }
-  }, [token, connection.state, connection.cause, sessionEnded]);
+  }, [token, connection.state, connection.cause, connection.token, sessionEnded]);
 
   // Sync slider state from server on initial connect
   const settingsSyncedRef = useRef(false);
