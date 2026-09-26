@@ -72,9 +72,9 @@ export function useSocket(
         if (wsRef.current === ws) wsRef.current = null;
         if (disposed) return;
         attempts += 1;
-        setConnection({ state: 'down', cause: 'unknown', detail: '', code: e.code, attempts });
+        setConnection({ state: 'down', cause: 'unknown', detail: '', code: e.code, attempts, token });
         void diagnoseConnection(probe, e.code, token).then(({ cause, detail }) => {
-          if (!disposed) setConnection({ state: 'down', cause, detail, code: e.code, attempts });
+          if (!disposed) setConnection({ state: 'down', cause, detail, code: e.code, attempts, token });
         });
         // A revoked session can only reconnect into the same rejection, so stop
         // hammering the brain and let the app hand back the login screen.

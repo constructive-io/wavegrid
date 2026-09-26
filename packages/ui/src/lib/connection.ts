@@ -25,6 +25,8 @@ export interface ConnectionInfo {
   code: number | null;
   /** Failed connect attempts since the last successful open. */
   attempts: number;
+  /** The token this verdict was reached with; a fresh login makes it stale. */
+  token?: string | null;
 }
 
 /** The brain closes a socket with this code when its session was revoked. */
