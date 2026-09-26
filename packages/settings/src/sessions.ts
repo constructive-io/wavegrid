@@ -27,7 +27,7 @@ export interface Session {
 
 const FILE_MODE = 0o600;
 /** Default session lifetime: short so revocation bites on refresh. */
-export const DEFAULT_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days: a session outlasts a whole run of shows
+export const DEFAULT_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function sessionsFile(paths: StorePaths, project: string): string {
   return path.join(projectDir(paths, project), 'sessions.json');
