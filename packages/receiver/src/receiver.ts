@@ -14,6 +14,7 @@
 
 import { setTarget } from '@wavegrid/animations';
 import { type Layout, presets } from '@wavegrid/layout';
+import type { ProjectorControl } from '@wavegrid/osc';
 
 import { ConsoleOutput, InputAdapter, OutputAdapter, WebSocketInput } from './adapters';
 import { AnimationState, applyPaint, createDefaultAnimationState, handleCommand, remapGridForOutput, tickCommandMode } from './command-engine';
@@ -169,6 +170,24 @@ export class Receiver {
       // Config-only commands: update state but do NOT create the grid.
       // The receiver must produce zero output until a visual command arrives.
       if (cmd.action === 'keepalive') return;
+      // Projector controls bypass the HSB grid entirely: re-base global
+      // indices to this shard and hand them to the output adapters.
+      if (cmd.action === 'projector') {
+        const start = this.config.shard?.start ?? 0;
+        const end = this.config.shard?.end ?? Number.POSITIVE_INFINITY;
+        const local: Record<number, ProjectorControl> = {};
+        for (const [key, control] of Object.entries(cmd.controls ?? {})) {
+          const idx = Number(key);
+          if (idx < start || idx > end) continue;
+          local[idx - start] = control;
+        }
+        if (Object.keys(local).length > 0) this.config.output.sendProjector?.(local);
+        return;
+      }
+      if (cmd.action === 'projector_cue') {
+        if (cmd.command) this.config.output.sendCue?.(cmd.command);
+        return;
+      }
       if (cmd.action === 'setSmoothness') {
         this.config.alpha = Math.max(0.01, Math.min(1, cmd.value));
         return;

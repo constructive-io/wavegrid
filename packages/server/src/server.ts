@@ -24,6 +24,7 @@ import { createHttpApp, lanVisitors, resolveUiDir } from './http-app';
 import { fanout, fanoutLossy, type LivenessState,selectRevokedSockets, sweepLiveness, WS_CLOSE_SESSION_REVOKED, WS_REASON_SESSION_REVOKED } from './hub';
 import type { JwtPayload } from './jwt';
 import { verifyJwt } from './jwt';
+import { LookStore } from './looks';
 import { ServerPatternEngine } from './pattern-engine';
 import { compilePlaylist, type PlaylistDef, type PlaylistStep } from './playlist-compiler';
 import type {
@@ -36,7 +37,6 @@ import type {
   SyncUpdateMessage,
   SystemStatus
 } from './protocol';
-import { LookStore } from './looks';
 import { applyScene, scenes } from './scenes';
 
 export interface ServerHandle {
@@ -894,6 +894,24 @@ function handleMessage(msg: any, ws?: WebSocket) {
     scheduleSave();
     break;
   }
+  case 'projector': {
+    // Dormant projector API: logical indices, projectors only (docs/command-api.md).
+    const indices: unknown[] = Array.isArray(msg.indices) ? msg.indices : [];
+    const controls: Record<number, unknown> = {};
+    for (const raw of indices) {
+      const idx = Number(raw);
+      if (layout.fixtures[idx]?.kind === 'projector' && msg.control && typeof msg.control === 'object') {
+        controls[idx] = msg.control;
+      }
+    }
+    if (Object.keys(controls).length > 0) broadcastCommand({ action: 'projector', controls });
+    break;
+  }
+  case 'projector_cue':
+    if (msg.command && typeof msg.command === 'object') {
+      broadcastCommand({ action: 'projector_cue', command: msg.command });
+    }
+    break;
   case 'master_brightness':
     setAllTargets(grid, undefined, undefined, msg.value * 100, currentAttack);
     broadcastCommand({ action: 'setBrightness', value: msg.value * 100 });

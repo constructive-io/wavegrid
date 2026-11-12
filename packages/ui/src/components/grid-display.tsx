@@ -7,6 +7,8 @@ export type GridMode = 'paint' | 'pool' | 'gradient' | 'drops' | 'scenes' | 'ani
 export interface FixturePos {
   u: number;
   v: number;
+  /** Projectors draw as rounded squares so they read apart from cannon orbs. */
+  kind?: 'cannon' | 'projector';
 }
 
 interface GridDisplayProps {
@@ -214,7 +216,11 @@ export function GridDisplay({
         orbGrad.addColorStop(1, hslStr(c.h, c.s, lightness * 0.6));
       }
       ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      if (fixtures?.[i]?.kind === 'projector') {
+        ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.35);
+      } else {
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      }
       ctx.fillStyle = orbGrad;
       ctx.fill();
 
@@ -264,7 +270,7 @@ export function GridDisplay({
 
       ctx.restore();
     }
-  }, [grid, motionPath, computeGeom]);
+  }, [grid, motionPath, computeGeom, fixtures]);
 
   const cannonAtXY = useCallback((clientX: number, clientY: number): number => {
     const canvas = canvasRef.current;

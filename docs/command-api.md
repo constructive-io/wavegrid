@@ -50,6 +50,17 @@ Paint individual cells or multi-select. HSB values: `h` = 0-360, `s` = 0-100, `b
 
 Global brightness cap (0-100).
 
+### Projector controls (dormant — no UI yet)
+
+```json
+{"action": "projector", "indices": [1, 3], "control": {"size": 60, "rotoz": 45, "anispeed": 120, "fx": [3, -1, -1, -1]}}
+{"action": "projector_cue", "command": {"cueDown": {"page": 0, "cue": 2}}}
+{"action": "projector_cue", "command": {"stopZone": 1}}
+{"action": "projector_cue", "command": {"stopAllNow": true}}
+```
+
+Projector-only live controls for fixtures whose layout `kind` is `projector` (e.g. the interleaved 12×2 preset). `indices` are **logical** indices; the server drops any that are not projectors, and a receiver's routed output drops any route that is not `kind: "projector"`, so a cannon can never be resized or moved by this path. Fields map 1:1 onto BEYOND zone livecontrol functions with Pangolin's documented ranges: `size`/`sizex`/`sizey` −400..400, `zoom` 0..100, `posx`/`posy` −32768..32768, `anglez` ±2880, `rotoz` ±1440 °/s, `anispeed` 0..400, `scanrate` 10..200, `visiblepoints` 0..100, `fx` four slots −1 (stop)..47. `projector_cue` is show-level (`/beyond/general/CueDown|StopZone|StopAllNow`). Colour and brightness are **not** here — projectors take HSB through `cannon`/`selection`/scenes like every other fixture. Laser-emission enable/disable is deliberately not exposed.
+
 ### Smoothness (Fade)
 
 ```json

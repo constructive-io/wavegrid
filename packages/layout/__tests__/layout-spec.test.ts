@@ -50,3 +50,19 @@ describe('resolveLayout precedence', () => {
     expect(layout.count).toBe(25);
   });
 });
+
+describe('interleaved shorthand', () => {
+  it('parses interleaved:<cols>x<rows> and resolves the preset', () => {
+    expect(parseLayoutSpec('interleaved:12x2')).toEqual({ kind: 'interleaved', cols: 12, rows: 2 });
+    expect(parseLayoutSpec('interleaved-12x2')).toEqual({ preset: 'interleaved-12x2' });
+    const layout = resolveLayout({ preset: 'interleaved-12x2' });
+    expect(layout.count).toBe(24);
+    expect(layout.fixtures.filter(f => f.kind === 'projector')).toHaveLength(12);
+  });
+
+  it('resolves an interleaved spec with stagger and first', () => {
+    const layout = resolveLayout({ kind: 'interleaved', cols: 2, rows: 1, stagger: 0.5, first: 'projector' });
+    expect(layout.fixtures[0].kind).toBe('projector');
+    expect(layout.fixtures[0].y - layout.fixtures[1].y).toBeCloseTo(0.5);
+  });
+});

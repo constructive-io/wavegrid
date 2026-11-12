@@ -29,6 +29,11 @@ export function buildLayoutSpec(choice: LayoutChoice): LayoutSpec {
       throw new Error('A grid layout needs both columns and rows.');
     }
     spec = { kind: 'grid', cols: choice.cols, rows: choice.rows };
+  } else if (choice.kind === 'interleaved') {
+    if (choice.cols == null || choice.rows == null) {
+      throw new Error('An interleaved layout needs both columns and rows.');
+    }
+    spec = { kind: 'interleaved', cols: choice.cols, rows: choice.rows };
   } else if (choice.kind === 'ring' || choice.kind === 'filledRing') {
     if (choice.count == null) {
       throw new Error(`A ${choice.kind} layout needs a cannon count.`);

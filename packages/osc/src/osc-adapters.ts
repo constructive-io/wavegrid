@@ -29,16 +29,79 @@ export interface CannonState {
   b: number; // brightness 0–100
 }
 
-/** Generic output adapter interface. */
+/** Cannon (single static beam) or projector (scanning head playing a BEYOND cue). */
+export type FixtureKind = 'cannon' | 'projector';
+
+/**
+ * Projector-only live controls, one BEYOND zone livecontrol function each.
+ * Ranges are Pangolin's documented ones (wiki `beyond:osc_commands`); values
+ * are clamped on encode. Colour and brightness are NOT here — they ride the
+ * ordinary HSB grid like a cannon's.
+ */
+export interface ProjectorControl {
+  /** -400..400, all axes. */
+  size?: number;
+  sizex?: number;
+  sizey?: number;
+  /** 0..100 */
+  zoom?: number;
+  /** -32768..32768 (16-bit output coordinates). */
+  posx?: number;
+  posy?: number;
+  /** Degrees, -2880..2880 (8 turns). */
+  anglez?: number;
+  /** Degrees per second, -1440..1440 (4 turns/s). */
+  rotoz?: number;
+  /** 0..400, 100 = authored speed. */
+  anispeed?: number;
+  /** 10..200, 100 = authored rate. */
+  scanrate?: number;
+  /** 0..100 */
+  visiblepoints?: number;
+  /** Effect slots 1–4: -1 stops, 0..47 picks an effect. */
+  fx?: [number, number, number, number];
+}
+
+/** Show-level BEYOND commands (`/beyond/general/...`, integer arguments). */
+export type ProjectorCueCommand =
+  | { cueDown: { page: number; cue: number } }
+  | { stopZone: number }
+  | { stopAllNow: true };
+
+/**
+ * Generic output adapter interface. `sendProjector`/`sendCue` are optional:
+ * only BEYOND-backed adapters can honour them, and the HSB `send` path is
+ * untouched by their presence.
+ */
 export interface OutputAdapter {
   send(grid: CannonState[]): void;
+  /** Projector-only controls keyed by logical index. Non-projectors are ignored. */
+  sendProjector?(controls: Record<number, ProjectorControl>): void;
+  sendCue?(command: ProjectorCueCommand): void;
   close(): void;
 }
 
-/** A single OSC message: address + one or more float arguments. */
+/** A single OSC message: address + one or more arguments (floats unless `ints`). */
 export interface OscMessage {
   address: string;
   value: number | number[];
+  /** Send the arguments as OSC int32 instead of float32 (PangoScript gateway commands). */
+  ints?: boolean;
+}
+
+/** Send an OSC message with explicit int typing. */
+function sendInts(client: Client, address: string, value: number | number[]): void {
+  const msg = new Message(address);
+  const values = Array.isArray(value) ? value : [value];
+  for (const v of values) {
+    msg.append({ type: 'integer', value: Math.round(v) });
+  }
+  client.send(msg);
+}
+
+function sendOsc(client: Client, msg: OscMessage): void {
+  if (msg.ints) sendInts(client, msg.address, msg.value);
+  else sendFloats(client, msg.address, msg.value);
 }
 
 /** Send an OSC message with explicit float typing (single or multi-value). */
@@ -117,6 +180,64 @@ export function encodeBeyondMessages(
   return messages;
 }
 
+const PROJECTOR_RANGES: Record<Exclude<keyof ProjectorControl, 'fx'>, [number, number]> = {
+  size: [-400, 400],
+  sizex: [-400, 400],
+  sizey: [-400, 400],
+  zoom: [0, 100],
+  posx: [-32768, 32768],
+  posy: [-32768, 32768],
+  anglez: [-2880, 2880],
+  rotoz: [-1440, 1440],
+  anispeed: [0, 400],
+  scanrate: [10, 200],
+  visiblepoints: [0, 100]
+};
+
+function clamp(v: number, [lo, hi]: [number, number]): number {
+  if (!Number.isFinite(v)) return lo;
+  return Math.min(hi, Math.max(lo, v));
+}
+
+/**
+ * Encode projector controls into BEYOND zone livecontrol messages. Only
+ * indices present in `projectorMap` are emitted; the caller decides which
+ * indices are projectors (see `RoutedOscOutput`).
+ */
+export function encodeBeyondProjectorMessages(
+  controls: Record<number, ProjectorControl>,
+  projectorMap: Record<number, number>
+): OscMessage[] {
+  const messages: OscMessage[] = [];
+  for (const [key, control] of Object.entries(controls)) {
+    const zone = projectorMap[Number(key)];
+    if (zone === undefined || !control) continue;
+    const prefix = `/beyond/zone/${zone}/livecontrol`;
+    for (const name of Object.keys(PROJECTOR_RANGES) as Array<keyof typeof PROJECTOR_RANGES>) {
+      const v = control[name];
+      if (v === undefined) continue;
+      messages.push({ address: `${prefix}/${name}`, value: clamp(v, PROJECTOR_RANGES[name]) });
+    }
+    if (control.fx) {
+      control.fx.slice(0, 4).forEach((v, i) => {
+        messages.push({ address: `${prefix}/fx${i + 1}`, value: clamp(Math.round(v), [-1, 47]) });
+      });
+    }
+  }
+  return messages;
+}
+
+/** Encode a show-level command into its `/beyond/general/...` message. */
+export function encodeBeyondCueMessage(command: ProjectorCueCommand): OscMessage {
+  if ('cueDown' in command) {
+    return { address: '/beyond/general/CueDown', value: [command.cueDown.page, command.cueDown.cue], ints: true };
+  }
+  if ('stopZone' in command) {
+    return { address: '/beyond/general/StopZone', value: [command.stopZone, 0], ints: true };
+  }
+  return { address: '/beyond/general/StopAllNow', value: [], ints: true };
+}
+
 export class BeyondOscOutput implements OutputAdapter {
   private client: Client | null = null;
   private config: BeyondOscConfig;
@@ -159,6 +280,22 @@ export class BeyondOscOutput implements OutputAdapter {
     for (const msg of messages) {
       sendFloats(this.client, msg.address, msg.value);
     }
+  }
+
+  sendProjector(controls: Record<number, ProjectorControl>): void {
+    if (!this.client) return;
+    const messages = encodeBeyondProjectorMessages(controls, this.config.projectorMap);
+    if (DEBUG_OSC && messages.length) {
+      console.log(`  [OSC→BEYOND] projector | ${messages.length} msgs to ${this.config.host}:${this.config.port}`);
+    }
+    for (const msg of messages) sendOsc(this.client, msg);
+  }
+
+  sendCue(command: ProjectorCueCommand): void {
+    if (!this.client) return;
+    const msg = encodeBeyondCueMessage(command);
+    if (DEBUG_OSC) console.log(`  [OSC→BEYOND] ${msg.address} ${Array.isArray(msg.value) ? msg.value.join(' ') : msg.value}`);
+    sendOsc(this.client, msg);
   }
 
   close(): void {
@@ -301,6 +438,8 @@ export interface CannonRoute {
   label?: string;
   /** BEYOND projector list index (required when target type is 'beyond'). */
   projectorIndex?: number;
+  /** Cannon (default) or projector. Only projectors receive `sendProjector` controls. */
+  kind?: FixtureKind;
   /** FB4 5-digit serial (required when target type is 'fb4'). */
   fb4Serial?: string;
   /** If true, this cannon is intentionally disabled in software. */
@@ -328,6 +467,8 @@ export function createRoutedOutput(config: RoutingConfig): RoutedOscOutput {
 
 export class RoutedOscOutput implements OutputAdapter {
   private adapters: Map<string, BeyondOscOutput | FB4OscOutput> = new Map();
+  private beyondAdapters: BeyondOscOutput[] = [];
+  private projectorIndices = new Set<number>();
   private frameCount = 0;
   private sendInterval: number;
 
@@ -342,6 +483,7 @@ export class RoutedOscOutput implements OutputAdapter {
       if (cannon.safeDisabled) continue;
       const target = config.targets[cannon.target];
       if (!target) continue;
+      if (cannon.kind === 'projector') this.projectorIndices.add(cannon.logical);
 
       if (target.type === 'beyond' && cannon.projectorIndex !== undefined) {
         if (!beyondMaps[cannon.target]) beyondMaps[cannon.target] = {};
@@ -354,12 +496,14 @@ export class RoutedOscOutput implements OutputAdapter {
 
     for (const [name, projectorMap] of Object.entries(beyondMaps)) {
       const target = config.targets[name];
-      this.adapters.set(name, new BeyondOscOutput({
+      const adapter = new BeyondOscOutput({
         host: target.host,
         port: target.port,
         projectorMap,
         sendEveryNFrames: 1
-      }));
+      });
+      this.adapters.set(name, adapter);
+      this.beyondAdapters.push(adapter);
     }
 
     for (const [name, serialMap] of Object.entries(fb4Maps)) {
@@ -389,11 +533,32 @@ export class RoutedOscOutput implements OutputAdapter {
     }
   }
 
+  /** Projector controls go only to BEYOND adapters, and only for `kind: 'projector'` routes. */
+  sendProjector(controls: Record<number, ProjectorControl>): void {
+    const filtered: Record<number, ProjectorControl> = {};
+    for (const [key, control] of Object.entries(controls)) {
+      const idx = Number(key);
+      if (this.projectorIndices.has(idx)) filtered[idx] = control;
+    }
+    if (Object.keys(filtered).length === 0) return;
+    for (const adapter of this.beyondAdapters) adapter.sendProjector(filtered);
+  }
+
+  sendCue(command: ProjectorCueCommand): void {
+    for (const adapter of this.beyondAdapters) adapter.sendCue(command);
+  }
+
+  /** Logical indices routed as projectors. */
+  get projectorLogicals(): number[] {
+    return [...this.projectorIndices].sort((a, b) => a - b);
+  }
+
   close(): void {
     for (const adapter of this.adapters.values()) {
       adapter.close();
     }
     this.adapters.clear();
+    this.beyondAdapters = [];
   }
 
   /** Returns the list of active target names for inspection. */

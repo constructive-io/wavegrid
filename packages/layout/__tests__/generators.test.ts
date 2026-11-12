@@ -1,4 +1,4 @@
-import { annulusLayout, filledRingLayout, gridLayout, ringLayout, ringsLayout } from '../src/generators';
+import { annulusLayout, filledRingLayout, gridLayout, interleavedLayout, ringLayout, ringsLayout } from '../src/generators';
 
 describe('gridLayout', () => {
   it('creates a row-major grid with correct count and grid coords', () => {
@@ -182,5 +182,46 @@ describe('annulusLayout', () => {
     expect(() => annulusLayout({ count: 0 })).toThrow(/count >= 1/);
     expect(() => annulusLayout({ count: 10, innerRadius: 1 })).toThrow(/innerRadius/);
     expect(() => annulusLayout({ count: 10, innerRadius: -0.1 })).toThrow(/innerRadius/);
+  });
+});
+
+describe('interleavedLayout', () => {
+  it('alternates cannon / projector along each row, 12 of each for 12x2', () => {
+    const layout = interleavedLayout({ cols: 12, rows: 2 });
+    expect(layout.count).toBe(24);
+    expect(layout.topology).toBe('grid');
+    expect(layout.hasGridCoords).toBe(true);
+    expect(layout.fixtures.filter(f => f.kind === 'cannon')).toHaveLength(12);
+    expect(layout.fixtures.filter(f => f.kind === 'projector')).toHaveLength(12);
+    layout.fixtures.forEach((f, i) => {
+      expect(f.index).toBe(i);
+      expect(f.kind).toBe(f.col % 2 === 0 ? 'cannon' : 'projector');
+      expect(f.row).toBe(Math.floor(i / 12));
+      expect(f.col).toBe(i % 12);
+    });
+  });
+
+  it('drops projectors below their row by the stagger, keeping the same column x', () => {
+    const layout = interleavedLayout({ cols: 4, rows: 1, stagger: 0.35 });
+    const cannon = layout.fixtures[0];
+    const projector = layout.fixtures[1];
+    expect(projector.y - cannon.y).toBeCloseTo(0.35);
+    expect(projector.x - cannon.x).toBeCloseTo(1);
+    expect(projector.v).toBeGreaterThan(cannon.v);
+  });
+
+  it('can start each row with a projector', () => {
+    const layout = interleavedLayout({ cols: 3, rows: 1, first: 'projector' });
+    expect(layout.fixtures.map(f => f.kind)).toEqual(['projector', 'cannon', 'projector']);
+  });
+
+  it('plain layouts default every fixture to cannon', () => {
+    expect(gridLayout({ cols: 2, rows: 2 }).fixtures.every(f => f.kind === 'cannon')).toBe(true);
+    expect(ringLayout({ count: 3 }).fixtures.every(f => f.kind === 'cannon')).toBe(true);
+  });
+
+  it('rejects a bad stagger', () => {
+    expect(() => interleavedLayout({ cols: 2, rows: 1, stagger: 1 })).toThrow();
+    expect(() => interleavedLayout({ cols: 2, rows: 1, stagger: -0.1 })).toThrow();
   });
 });

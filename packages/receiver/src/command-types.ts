@@ -6,6 +6,8 @@
  * animations locally at 60fps.
  */
 
+import type { ProjectorControl, ProjectorCueCommand } from '@wavegrid/osc';
+
 export interface SetAnimationCommand {
   type: 'command';
   action: 'setAnimation';
@@ -100,7 +102,23 @@ export interface SetOrientationCommand {
   flipV: boolean;
 }
 
+/** Projector-only live controls (see docs/command-api.md), keyed by GLOBAL logical index. */
+export interface ProjectorCommand {
+  type: 'command';
+  action: 'projector';
+  controls: Record<number, ProjectorControl>;
+}
+
+/** Show-level BEYOND cue command. */
+export interface ProjectorCueRelayCommand {
+  type: 'command';
+  action: 'projector_cue';
+  command: ProjectorCueCommand;
+}
+
 export type CommandMessage =
+  | ProjectorCommand
+  | ProjectorCueRelayCommand
   | SetAnimationCommand
   | SetSceneCommand
   | PaintCommand
