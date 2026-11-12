@@ -111,7 +111,7 @@ export function gridLayout({ cols, rows, id, name }: GridParams): Layout {
 export interface InterleavedParams {
   cols: number;
   rows: number;
-  /** Vertical offset of the projectors below their row, in cells. Default 0.35. */
+  /** Vertical offset of the projectors below their row, in cells. Default 0.15. */
   stagger?: number;
   /** Kind of the first fixture in each row. Default cannon. */
   first?: FixtureKind;
@@ -126,7 +126,7 @@ export interface InterleavedParams {
  * interleaved. Indices stay row-major and `row`/`col` are the plain grid's, so
  * grid animations, shift and the brush behave exactly as on a `grid`.
  */
-export function interleavedLayout({ cols, rows, stagger = 0.35, first = 'cannon', id, name }: InterleavedParams): Layout {
+export function interleavedLayout({ cols, rows, stagger = 0.15, first = 'cannon', id, name }: InterleavedParams): Layout {
   if (cols < 1 || rows < 1) throw new Error('interleavedLayout requires cols >= 1 and rows >= 1');
   if (!Number.isFinite(stagger) || stagger < 0 || stagger >= 1) {
     throw new Error(`interleavedLayout stagger must be 0 <= stagger < 1, got ${String(stagger)}`);

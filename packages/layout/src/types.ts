@@ -105,7 +105,7 @@ export interface LayoutSpec {
   rings?: RingSpec[];
   /** annulus: radius of the hole in the middle, 0..1 (0 = solid disc). */
   innerRadius?: number;
-  /** interleaved: how far projectors sit below the cannon row, in cells (default 0.35). */
+  /** interleaved: how far projectors sit below the cannon row, in cells (default 0.15). */
   stagger?: number;
   /** interleaved: kind of the first fixture in each row (default cannon). */
   first?: FixtureKind;
