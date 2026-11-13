@@ -7,7 +7,7 @@ import type { LayoutSpec, RingSpec } from './types';
  *
  *   grid-7x7          a built-in preset id
  *   grid:7x7          cols × rows
- *   interleaved:12x2  cols × rows, cannon / projector alternating along each row
+ *   interleaved:12x2  cols × rows, a cannon row then a projector row shifted half a cell
  *   ring:6            one ring of 6
  *   filled:25         disc masked out of a grid (keeps row/col)
  *   annulus:25        concentric rings with a hole in the middle

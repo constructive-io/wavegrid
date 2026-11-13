@@ -8,7 +8,7 @@ import { Layout, LayoutSpec } from './types';
 export const presets: Record<string, () => Layout> = {
   'grid-7x7': () => gridLayout({ cols: 7, rows: 7, id: 'grid-7x7', name: '7×7 grid (49)' }),
   'grid-7x2': () => gridLayout({ cols: 7, rows: 2, id: 'grid-7x2', name: '7×2 grid (14)' }),
-  /** Two rows of twelve, cannon / projector alternating: 12 of each, 24 total. */
+  /** Palace of Fine Arts: a row of 12 cannons over a row of 12 projectors shifted half a step (zipper). */
   'interleaved-12x2': () => interleavedLayout({ cols: 12, rows: 2, id: 'interleaved-12x2' }),
   'ring-6': () => ringLayout({ count: 6, id: 'ring-6', name: '6-cannon ring' }),
   nova: () => ringLayout({ count: 6, id: 'nova', name: 'Nova (6-laser ring)' }),

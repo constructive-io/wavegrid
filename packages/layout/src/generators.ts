@@ -111,35 +111,39 @@ export function gridLayout({ cols, rows, id, name }: GridParams): Layout {
 export interface InterleavedParams {
   cols: number;
   rows: number;
-  /** Vertical offset of the projectors below their row, in cells. Default 0.15. */
+  /** Horizontal shift of every odd row to the right, in cells. Default 0.5 (zipper). */
   stagger?: number;
-  /** Kind of the first fixture in each row. Default cannon. */
+  /** Kind of the fixtures on even rows (row 0 = top). Odd rows are the other kind. Default cannon. */
   first?: FixtureKind;
   id?: string;
   name?: string;
 }
 
 /**
- * A grid whose fixtures alternate cannon / projector along each row (even
- * columns one kind, odd columns the other). Projectors sit `stagger` cells
- * below the cannons so the two kinds read apart on every canvas while staying
- * interleaved. Indices stay row-major and `row`/`col` are the plain grid's, so
- * grid animations, shift and the brush behave exactly as on a `grid`.
+ * Rows of one kind each, alternating: row 0 all `first` (cannons), row 1 all
+ * the other kind (projectors), and so on. Every odd row is shifted `stagger`
+ * cells to the right, so with the default 0.5 each projector sits between two
+ * cannons and one finger can zigzag cannon → projector → cannon across the
+ * show. Indices stay row-major (cannons 0..cols-1, then projectors) and
+ * `row`/`col` are the plain grid's, so grid animations and the brush work.
  */
-export function interleavedLayout({ cols, rows, stagger = 0.15, first = 'cannon', id, name }: InterleavedParams): Layout {
+export function interleavedLayout({ cols, rows, stagger = 0.5, first = 'cannon', id, name }: InterleavedParams): Layout {
   if (cols < 1 || rows < 1) throw new Error('interleavedLayout requires cols >= 1 and rows >= 1');
   if (!Number.isFinite(stagger) || stagger < 0 || stagger >= 1) {
     throw new Error(`interleavedLayout stagger must be 0 <= stagger < 1, got ${String(stagger)}`);
   }
+  if (first !== 'cannon' && first !== 'projector') {
+    throw new Error(`interleavedLayout first must be "cannon" or "projector", got ${String(first)}`);
+  }
   const other: FixtureKind = first === 'cannon' ? 'projector' : 'cannon';
-  const cx = (cols - 1) / 2;
+  const cx = (cols - 1 + (rows > 1 ? stagger : 0)) / 2;
   const cy = (rows - 1) / 2;
   const raw: RawFixture[] = [];
   for (let r = 0; r < rows; r++) {
+    const kind = r % 2 === 0 ? first : other;
+    const shift = r % 2 === 1 ? stagger : 0;
     for (let c = 0; c < cols; c++) {
-      const kind = c % 2 === 0 ? first : other;
-      const drop = kind === 'projector' ? stagger : 0;
-      raw.push({ x: c - cx, y: r - cy + drop, row: r, col: c, label: `${r}:${c}`, kind });
+      raw.push({ x: c + shift - cx, y: r - cy, row: r, col: c, label: `${r}:${c}`, kind });
     }
   }
   const projectors = raw.filter(f => f.kind === 'projector').length;

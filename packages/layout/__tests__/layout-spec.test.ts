@@ -61,8 +61,9 @@ describe('interleaved shorthand', () => {
   });
 
   it('resolves an interleaved spec with stagger and first', () => {
-    const layout = resolveLayout({ kind: 'interleaved', cols: 2, rows: 1, stagger: 0.5, first: 'projector' });
+    const layout = resolveLayout({ kind: 'interleaved', cols: 2, rows: 2, stagger: 0.25, first: 'projector' });
     expect(layout.fixtures[0].kind).toBe('projector');
-    expect(layout.fixtures[0].y - layout.fixtures[1].y).toBeCloseTo(0.5);
+    expect(layout.fixtures[2].kind).toBe('cannon');
+    expect(layout.fixtures[2].x - layout.fixtures[0].x).toBeCloseTo(0.25);
   });
 });
