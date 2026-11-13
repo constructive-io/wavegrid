@@ -330,10 +330,14 @@ Repository skills in [`.agents/skills/`](.agents/skills/) document the canonical
 
 | Skill | What it covers |
 |---|---|
+| [`wavegrid-dev-build`](.agents/skills/wavegrid-dev-build/SKILL.md) | Build, lint, test and run from source; package map; the gotchas that make tests or the UI lie |
+| [`wavegrid-cloud-brain`](.agents/skills/wavegrid-cloud-brain/SKILL.md) | The brain on a public server (hipzap.com): systemd, nginx WebSocket proxy, deploying main, users and receiver keys |
+| [`wavegrid-projectors-beyond`](.agents/skills/wavegrid-projectors-beyond/SKILL.md) | Projector lasers through BEYOND: fixture kind, interleaved layout, routing and zones, Windows receiver, the Palace tab, safety |
 | [`wavegrid-simple-show`](.agents/skills/wavegrid-simple-show/SKILL.md) | The one-laptop golden path: install, create a project, add users, `start`, doctor, troubleshooting |
 | [`wavegrid-distributed-show`](.agents/skills/wavegrid-distributed-show/SKILL.md) | Multi-laptop shows: brain + sharded receivers, device identity & discovery, provisioning, export/import, config sync |
 | [`testing-wavegrid-command-mode`](.agents/skills/testing-wavegrid-command-mode/SKILL.md) | Testing command-mode changes end-to-end (unit + WS integration) |
 | [`wavegrid-js-patterns`](.agents/skills/wavegrid-js-patterns/SKILL.md) | Writing dynamic JS patterns for receivers via `evalPattern` |
+| [`testing-wavegrid-desktop-gui`](.agents/skills/testing-wavegrid-desktop-gui/SKILL.md) | GUI testing of the Electron desktop app on a headless box |
 
 The umbrella roadmap (one brain service, device identity/discovery, provisioning, export/import, sync) is tracked in [constructive-planning#1465](https://github.com/constructive-io/constructive-planning/issues/1465).
 
