@@ -761,6 +761,9 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     // Re-send compiled playlist to receiver on reconnect
     const compiled = compilePlaylist(activePlaylist);
     sendToClient(ws, JSON.stringify({ type: 'command', action: 'evalPattern', code: compiled, params: {} }));
+  } else if (patternEngine.active && patternEngine.code) {
+    // A receiver that reconnects mid-pattern picks it up where it is.
+    sendToClient(ws, JSON.stringify({ type: 'command', action: 'evalPattern', code: patternEngine.code, params: patternEngine.currentParams }));
   }
   if (shiftVx !== 0 || shiftVy !== 0) {
     sendToClient(ws, JSON.stringify({ type: 'command', action: 'setShift', vx: shiftVx, vy: shiftVy }));
@@ -879,7 +882,10 @@ function handleMessage(msg: any, ws?: WebSocket) {
     pool.release();
     break;
   case 'cannon': {
+    // A plain paint stroke takes the grid, as on the receiver (which drops its pattern on 'paint').
     currentAnimation = null;
+    cancelPlaylistIfActive();
+    patternEngine.stop();
     deactivatePool();
     const gi = mapUiToGrid(msg.index, GRID_COLUMNS, GRID_ROWS, orientation);
     setCannonTarget(

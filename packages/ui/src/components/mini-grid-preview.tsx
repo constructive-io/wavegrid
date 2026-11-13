@@ -20,8 +20,13 @@ interface MiniGridPreviewProps {
   alpha?: number;
   /** Pattern parameters exposed as `ctx.p`. */
   params?: Record<string, unknown>;
-  /** Canvas size in px (square) */
+  /** Canvas size in px (square, or the width when `height` is set) */
   size?: number;
+  /**
+   * Canvas height in px for a wide tile. With `fixtures`, the fixtures'
+   * bounding box is fitted to the canvas instead of a circle.
+   */
+  height?: number;
   /** Whether this is a full pattern expression (IIFE) vs a render body */
   isPattern?: boolean;
   /** Render as a ring of N fixtures (matching @wavegrid/layout ringLayout) instead of a 7×7 grid. */
@@ -40,6 +45,7 @@ export interface PreviewFixture {
   y: number;
   angle: number;
   radius: number;
+  kind?: 'cannon' | 'projector';
 }
 
 interface Dot {
@@ -150,7 +156,7 @@ function hueDelta(from: number, to: number): number {
 }
 
 export function MiniGridPreview({
-  source, speed = 1, size = 72, isPattern = false, ring, fixtures, attack = 1, alpha = 1, params
+  source, speed = 1, size = 72, height, isPattern = false, ring, fixtures, attack = 1, alpha = 1, params
 }: MiniGridPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
@@ -184,9 +190,9 @@ export function MiniGridPreview({
     frameRef.current = 0;
 
     const width = canvas.width;
-    const height = canvas.height;
+    const canvasH = canvas.height;
     const cellW = width / COLS;
-    const cellH = height / ROWS;
+    const cellH = canvasH / ROWS;
     // What the pattern asked for this frame; `out` is what the lasers would show.
     const buf: { h: number; s: number; b: number }[] = new Array(count);
     const out: { h: number; s: number; b: number; th: number; ts: number; tb: number }[] = new Array(count);
@@ -283,12 +289,40 @@ export function MiniGridPreview({
       const { attack: atk, alpha: al } = easingRef.current;
       for (let i = 0; i < count; i++) easeCell(out[i], buf[i].h, buf[i].s, buf[i].b, atk, al);
 
-      if (geo) {
+      if (geo && fixtures?.length && height) {
+        // Wide tile: the fixtures' bounding box fitted to the canvas.
+        ctx2d!.fillStyle = '#0a0a12';
+        ctx2d!.fillRect(0, 0, width, canvasH);
+        const xs = fixtures.map((f) => f.x);
+        const ys = fixtures.map((f) => f.y);
+        const x0 = Math.min(...xs);
+        const y0 = Math.min(...ys);
+        const spanX = Math.max(1e-6, Math.max(...xs) - x0);
+        const spanY = Math.max(...ys) - y0;
+        const pitch = Math.min((width * 0.9) / (spanX + 1), spanY > 0 ? (canvasH * 0.9) / (spanY + 1) : Infinity);
+        const ox = (width - spanX * pitch) / 2;
+        const oy = (canvasH - spanY * pitch) / 2;
+        const dotR = Math.max(1.5, pitch * 0.32);
+        for (let i = 0; i < count; i++) {
+          const f = fixtures[i];
+          const px = ox + (f.x - x0) * pitch;
+          const py = oy + (f.y - y0) * pitch;
+          const [r, g, b] = hsbToRgb(out[i].h, out[i].s, out[i].b);
+          ctx2d!.beginPath();
+          if (f.kind === 'projector') ctx2d!.rect(px - dotR, py - dotR, dotR * 2, dotR * 2);
+          else ctx2d!.arc(px, py, dotR, 0, Math.PI * 2);
+          ctx2d!.fillStyle = `rgb(${r},${g},${b})`;
+          ctx2d!.shadowColor = `rgb(${r},${g},${b})`;
+          ctx2d!.shadowBlur = dotR * 1.2;
+          ctx2d!.fill();
+        }
+        ctx2d!.shadowBlur = 0;
+      } else if (geo) {
         // Ring of glowing dots on black.
         ctx2d!.fillStyle = '#0a0a12';
-        ctx2d!.fillRect(0, 0, width, height);
+        ctx2d!.fillRect(0, 0, width, canvasH);
         const cx = width / 2;
-        const cy = height / 2;
+        const cy = canvasH / 2;
         const ringR = width * 0.36;
         // Dots have to shrink as fixtures multiply or a 25-cannon room is a blob.
         const dotR = Math.max(1.5, width * (count > 12 ? 0.05 : 0.11));
@@ -321,16 +355,16 @@ export function MiniGridPreview({
 
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [speed, size, ring, fixtures]);
+  }, [speed, size, height, ring, fixtures]);
 
   return (
     <canvas
       ref={canvasRef}
       width={size}
-      height={size}
+      height={height ?? size}
       style={{
         width: size,
-        height: size,
+        height: height ?? size,
         borderRadius: 8,
         imageRendering: 'pixelated'
       }}

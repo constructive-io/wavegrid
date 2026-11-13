@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import type { CannonColor, Orientation } from '@/lib/use-socket';
 
-export type GridMode = 'paint' | 'pool' | 'gradient' | 'drops' | 'scenes' | 'animations' | 'audio' | 'video' | 'flags' | 'pride' | 'usa' | 'grace' | 'gracepaint' | 'looks' | 'patterns' | 'playlist' | 'sequences';
+export type GridMode = 'paint' | 'pool' | 'gradient' | 'drops' | 'scenes' | 'animations' | 'audio' | 'video' | 'flags' | 'pride' | 'usa' | 'grace' | 'gracepaint' | 'palace' | 'looks' | 'patterns' | 'playlist' | 'sequences';
 
 export interface FixturePos {
   u: number;
@@ -444,7 +444,7 @@ export function GridDisplay({
       return;
     }
 
-    if (idx >= 0 && (mode === 'paint' || mode === 'gracepaint')) {
+    if (idx >= 0 && (mode === 'paint' || mode === 'gracepaint' || mode === 'palace')) {
       const affected = getAffectedCannons(idx);
       for (const a of affected) {
         onCannon(a.idx, currentHue, currentSat, currentBright * a.falloff);
@@ -470,7 +470,7 @@ export function GridDisplay({
       return;
     }
 
-    if (mode === 'paint' || mode === 'gracepaint') {
+    if (mode === 'paint' || mode === 'gracepaint' || mode === 'palace') {
       const affected = getAffectedCannons(idx);
       for (const a of affected) {
         onCannon(a.idx, currentHue, currentSat, currentBright * a.falloff);
