@@ -78,7 +78,7 @@ su - wavegrid -c "cd /opt/wavegrid && node packages/cli/dist/bin.js projects use
 … projects users add <name> --password <pw> --project <p>
 ```
 
-The first user in a project is `admin`; later ones are `operator` (they can drive the show but not manage users or keys). The CLI has no role flag. An admin changes a role in the desktop app's Users page, or with `POST /api/admin/users/<name>/role {"role":"admin"}` using an admin login token. Re-adding an existing user changes the password and keeps the role.
+The first user in a project is `admin`; later ones are `operator` (they can drive the show but not manage users or keys). The CLI has no role flag. An admin changes a role in the desktop app's user management, or with `POST /api/admin/users/<name>/role {"role":"admin"}` using an admin login token. Re-adding an existing user changes the password and keeps the role.
 
 Changing a password does not log out existing sessions (the JWTs stay valid). The project secrets are `jwtSecret` (signs UI logins) and `receiverKey` (what a receiver presents). Give a receiver the project with `projects export --out <p>.wgproj`, then `projects import <p>.wgproj --activate` and `projects config set receiver.server wss://<domain>` on the receiver. The bundle contains both secrets, so treat it like a password. Only a new `receiverKey` has to be copied back out to receivers.
 
