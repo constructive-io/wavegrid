@@ -38,7 +38,7 @@ export interface ProjectSummary {
  *  Mirrors the CLI's LayoutSpec. */
 export interface LayoutChoice {
   preset?: string;
-  kind?: 'grid' | 'ring' | 'filledRing' | 'annulus' | 'rings';
+  kind?: 'grid' | 'interleaved' | 'ring' | 'filledRing' | 'annulus' | 'rings';
   cols?: number;
   rows?: number;
   count?: number;
@@ -191,6 +191,8 @@ export interface FixtureRow {
   physical: number;
   /** Fixture label from the layout (e.g. "A1"). */
   label: string;
+  /** Cannon or projector (projectors draw as squares on the canvas). */
+  kind: 'cannon' | 'projector';
   /** Grid "row R, col C" or ring "…°" position, phrased for the topology. */
   position: string;
   /** Normalized canvas position within the bounding box, both in [0, 1]. */

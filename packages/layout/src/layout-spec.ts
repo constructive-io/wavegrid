@@ -7,6 +7,7 @@ import type { LayoutSpec, RingSpec } from './types';
  *
  *   grid-7x7          a built-in preset id
  *   grid:7x7          cols × rows
+ *   interleaved:12x2  cols × rows, cannon / projector alternating along each row
  *   ring:6            one ring of 6
  *   filled:25         disc masked out of a grid (keeps row/col)
  *   annulus:25        concentric rings with a hole in the middle
@@ -16,6 +17,7 @@ import type { LayoutSpec, RingSpec } from './types';
 export const LAYOUT_SPEC_FORMS = [
   '<preset>',
   'grid:<cols>x<rows>',
+  'interleaved:<cols>x<rows>',
   'ring:<count>',
   'filled:<count>',
   'annulus:<count>[@<innerRadius>]',
@@ -65,6 +67,11 @@ export function parseLayoutSpec(text: string): LayoutSpec {
     const [colsText, rowsText, ...extra] = rest.split(/x/i);
     if (rowsText == null || extra.length) throw new Error(`grid takes <cols>x<rows>, got "${rest}"`);
     return { kind: 'grid', cols: intOrThrow(colsText, 'cols'), rows: intOrThrow(rowsText, 'rows') };
+  }
+  case 'interleaved': {
+    const [colsText, rowsText, ...extra] = rest.split(/x/i);
+    if (rowsText == null || extra.length) throw new Error(`interleaved takes <cols>x<rows>, got "${rest}"`);
+    return { kind: 'interleaved', cols: intOrThrow(colsText, 'cols'), rows: intOrThrow(rowsText, 'rows') };
   }
   case 'ring':
     return { kind: 'ring', count: intOrThrow(rest, 'ring count') };

@@ -7,6 +7,7 @@
  * hardware/protocol later by instantiating the right adapter class.
  */
 
+import type { ProjectorControl, ProjectorCueCommand } from '@wavegrid/osc';
 import { EventEmitter } from 'events';
 
 import { CannonState } from './filter';
@@ -31,6 +32,10 @@ export type AddressMapping = (index: number) => string;
 export interface OutputAdapter {
   /** Called every tick (~60fps) with the full filtered grid state. */
   send(grid: CannonState[]): void;
+  /** Projector-only controls (BEYOND zone livecontrol), keyed by shard-local index. Optional. */
+  sendProjector?(controls: Record<number, ProjectorControl>): void;
+  /** Show-level BEYOND cue command. Optional. */
+  sendCue?(command: ProjectorCueCommand): void;
   /** Clean up resources (close sockets, etc). */
   close(): void;
 }
@@ -134,6 +139,14 @@ export class MultiOutput implements OutputAdapter {
 
   constructor(outputs: OutputAdapter[]) {
     this.outputs = outputs;
+  }
+
+  sendProjector(controls: Record<number, ProjectorControl>): void {
+    for (const out of this.outputs) out.sendProjector?.(controls);
+  }
+
+  sendCue(command: ProjectorCueCommand): void {
+    for (const out of this.outputs) out.sendCue?.(command);
   }
 
   send(grid: CannonState[]): void {

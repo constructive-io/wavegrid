@@ -7,6 +7,15 @@ export type GridMode = 'paint' | 'pool' | 'gradient' | 'drops' | 'scenes' | 'ani
 export interface FixturePos {
   u: number;
   v: number;
+  /**
+   * Centered world position in cells (from the layout). When present the
+   * canvas follows the layout's aspect ratio instead of stretching it to a
+   * square, so a wide 12×2 band stays one contiguous, finger-sized strip.
+   */
+  x?: number;
+  y?: number;
+  /** Projectors draw as rounded squares so they read apart from cannon orbs. */
+  kind?: 'cannon' | 'projector';
 }
 
 interface GridDisplayProps {
@@ -37,6 +46,43 @@ interface GridDisplayProps {
 // canonical look, so every layout draws dots at this fixed size regardless of
 // how many fixtures there are or how they're spaced.
 const REFERENCE_COLS = 7;
+
+/** World-space extent of a layout: spans, centre and nearest-neighbour distance (cells). */
+function worldSpan(fixtures: FixturePos[], count: number) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < count; i++) {
+    const x = fixtures[i].x as number;
+    const y = fixtures[i].y as number;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  let minD = Infinity;
+  for (let i = 0; i < count; i++) {
+    for (let j = i + 1; j < count; j++) {
+      const d = Math.hypot((fixtures[i].x as number) - (fixtures[j].x as number), (fixtures[i].y as number) - (fixtures[j].y as number));
+      if (d > 1e-6 && d < minD) minD = d;
+    }
+  }
+  if (!Number.isFinite(minD) || minD <= 0) minD = 1;
+  return { spanX: maxX - minX, spanY: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, minD };
+}
+
+/**
+ * Width:height the canvas should take for this layout — 1 (square) unless the
+ * fixtures carry world coordinates and the shape is clearly wider or taller
+ * than it is high (e.g. 12×2 → 12:2.15). Rings and square grids stay square.
+ */
+function layoutAspect(fixtures: FixturePos[] | undefined, count: number): number {
+  if (!fixtures || fixtures.length < count || count === 0) return 1;
+  if (!fixtures.every(f => f.x !== undefined && f.y !== undefined)) return 1;
+  const w = worldSpan(fixtures, count);
+  const aspect = (w.spanX + w.minD) / (w.spanY + w.minD);
+  if (!Number.isFinite(aspect) || aspect <= 0) return 1;
+  // Within ~15% of square: keep the classic square canvas.
+  return aspect > 1.15 || aspect < 1 / 1.15 ? aspect : 1;
+}
 
 function orientationToCss(o: Orientation): string {
   const parts: string[] = [];
@@ -99,8 +145,9 @@ export function GridDisplay({
   // Compute pixel positions for every cannon. When fixtures are provided we
   // place orbs at their true normalized positions (rings render as rings);
   // otherwise fall back to an evenly-spaced rectangular grid.
-  const computeGeom = useCallback((size: number) => {
+  const computeGeom = useCallback((width: number, height: number) => {
     const gridOffset = 10;
+    const size = Math.min(width, height);
     const drawArea = Math.max(0, size - 20);
     const count = grid.length;
     const centers: { x: number; y: number }[] = [];
@@ -109,6 +156,29 @@ export function GridDisplay({
     // dots must not grow/shrink with the arrangement (a sparse ring would
     // otherwise balloon). Positions still come from the layout's fixtures.
     const orbR = (drawArea / REFERENCE_COLS) * 0.34;
+
+    const world = fixtures && fixtures.length >= count && count > 0 && fixtures.every(f => f.x !== undefined && f.y !== undefined)
+      ? worldSpan(fixtures, count)
+      : null;
+    if (world) {
+      // Aspect-true: one scale for x and y, centred, sized so the longer axis
+      // fills the canvas with room for the orbs. A 12×2 band stays a band.
+      // Pixels per world cell: the longer axis fills the canvas, leaving one
+      // cell of margin so the end orbs and their glow are not clipped.
+      const areaW = Math.max(0, width - 20);
+      const areaH = Math.max(0, height - 20);
+      const cell = Math.min(areaW / (world.spanX + 1), areaH / (world.spanY + 1));
+      for (let i = 0; i < count; i++) {
+        centers.push({
+          x: width / 2 + ((fixtures[i].x as number) - world.cx) * cell,
+          y: height / 2 + ((fixtures[i].y as number) - world.cy) * cell
+        });
+      }
+      // Same orb-to-cell ratio as the classic 7×7 look, capped so staggered
+      // neighbours never overlap.
+      const pxCell = world.minD * cell;
+      return { centers, cellSize: pxCell, orbR: Math.min(cell * 0.34, pxCell * 0.42) };
+    }
 
     if (fixtures && fixtures.length >= count && count > 0) {
       // Nearest-neighbour spacing in normalized space → margin (so orbs don't
@@ -154,19 +224,30 @@ export function GridDisplay({
 
     const maxW = wrap.clientWidth;
     const maxH = wrap.clientHeight;
-    const size = Math.min(maxW, maxH);
+    const aspect = layoutAspect(fixtures, grid.length);
+    // Square for grids/rings (aspect 1); otherwise follow the layout so a
+    // wide band fills the width and stays contiguous.
+    let w = Math.min(maxW, maxH);
+    let h = w;
+    if (aspect > 1) {
+      w = Math.min(maxW, maxH * aspect);
+      h = w / aspect;
+    } else if (aspect < 1) {
+      h = Math.min(maxH, maxW / aspect);
+      w = h * aspect;
+    }
     const dpr = window.devicePixelRatio || 1;
 
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = size + 'px';
-    canvas.style.height = size + 'px';
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
 
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    sizeRef.current = { gridOffset: 10, canvasW: size, canvasH: size };
-  }, []);
+    sizeRef.current = { gridOffset: 10, canvasW: w, canvasH: h };
+  }, [fixtures, grid.length]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -177,7 +258,7 @@ export function GridDisplay({
     const { canvasW, canvasH } = sizeRef.current;
     ctx.clearRect(0, 0, canvasW, canvasH);
 
-    const geom = computeGeom(canvasW);
+    const geom = computeGeom(canvasW, canvasH);
     geomRef.current = geom;
     const { centers, cellSize, orbR } = geom;
     if (cellSize <= 0) return;
@@ -214,7 +295,11 @@ export function GridDisplay({
         orbGrad.addColorStop(1, hslStr(c.h, c.s, lightness * 0.6));
       }
       ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      if (fixtures?.[i]?.kind === 'projector') {
+        ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.35);
+      } else {
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      }
       ctx.fillStyle = orbGrad;
       ctx.fill();
 
@@ -264,37 +349,38 @@ export function GridDisplay({
 
       ctx.restore();
     }
-  }, [grid, motionPath, computeGeom]);
+  }, [grid, motionPath, computeGeom, fixtures]);
 
   const cannonAtXY = useCallback((clientX: number, clientY: number): number => {
     const canvas = canvasRef.current;
     if (!canvas) return -1;
     const rect = canvas.getBoundingClientRect();
-    const { canvasW } = sizeRef.current;
+    const { canvasW, canvasH } = sizeRef.current;
     const { centers, cellSize } = geomRef.current;
 
-    // Convert client coords to normalized canvas coords (0..canvasW)
+    // Convert client coords to canvas coords (0..canvasW, 0..canvasH)
     let x = (clientX - rect.left) * (canvasW / rect.width);
-    let y = (clientY - rect.top) * (canvasW / rect.height);
+    let y = (clientY - rect.top) * (canvasH / rect.height);
 
     // If viewFlip is active, undo the CSS transform on the coordinates.
     // CSS transform order (right-to-left): scaleY → scaleX → rotate(+θ)
     // Inverse (applied left-to-right): rotate(-θ) → scaleX → scaleY
     if (viewFlip) {
-      const half = canvasW / 2;
+      const halfW = canvasW / 2;
+      const halfH = canvasH / 2;
       // 1. Undo rotation: CSS applied rotate(-θ), so rotate by +θ
       if (viewFlip.rotation !== 0) {
         const rad = (viewFlip.rotation * Math.PI) / 180;
         const cos = Math.cos(rad);
         const sin = Math.sin(rad);
-        const dx = x - half;
-        const dy = y - half;
-        x = half + dx * cos + dy * sin;
-        y = half - dx * sin + dy * cos;
+        const dx = x - halfW;
+        const dy = y - halfH;
+        x = halfW + dx * cos + dy * sin;
+        y = halfH - dx * sin + dy * cos;
       }
       // 2. Undo flips (self-inverse)
       if (viewFlip.flipH) x = canvasW - x;
-      if (viewFlip.flipV) y = canvasW - y;
+      if (viewFlip.flipV) y = canvasH - y;
     }
 
     // Pick the nearest fixture within a cell radius.

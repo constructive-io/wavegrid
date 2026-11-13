@@ -1,4 +1,4 @@
-import { Fixture, Layout, RingSpec, Topology } from './types';
+import { Fixture, FixtureKind, Layout, RingSpec, Topology } from './types';
 
 interface RawFixture {
   x: number;
@@ -8,6 +8,7 @@ interface RawFixture {
   label: string;
   /** Explicit concentric ring index; derived from the radius when omitted. */
   ring?: number;
+  kind?: FixtureKind;
 }
 
 interface FinalizeMeta {
@@ -50,7 +51,8 @@ function finalize(raw: RawFixture[], meta: FinalizeMeta): Layout {
     ring: f.ring ?? Math.round(dists[i]),
     row: f.row,
     col: f.col,
-    label: f.label
+    label: f.label,
+    kind: f.kind ?? 'cannon'
   }));
 
   return {
@@ -98,6 +100,52 @@ export function gridLayout({ cols, rows, id, name }: GridParams): Layout {
   return finalize(raw, {
     id: id ?? `grid-${cols}x${rows}`,
     name: name ?? `${cols}×${rows} grid`,
+    topology: 'grid',
+    cols,
+    rows,
+    hasGridCoords: true,
+    perimeter: gridPerimeter(cols, rows)
+  });
+}
+
+export interface InterleavedParams {
+  cols: number;
+  rows: number;
+  /** Vertical offset of the projectors below their row, in cells. Default 0.15. */
+  stagger?: number;
+  /** Kind of the first fixture in each row. Default cannon. */
+  first?: FixtureKind;
+  id?: string;
+  name?: string;
+}
+
+/**
+ * A grid whose fixtures alternate cannon / projector along each row (even
+ * columns one kind, odd columns the other). Projectors sit `stagger` cells
+ * below the cannons so the two kinds read apart on every canvas while staying
+ * interleaved. Indices stay row-major and `row`/`col` are the plain grid's, so
+ * grid animations, shift and the brush behave exactly as on a `grid`.
+ */
+export function interleavedLayout({ cols, rows, stagger = 0.15, first = 'cannon', id, name }: InterleavedParams): Layout {
+  if (cols < 1 || rows < 1) throw new Error('interleavedLayout requires cols >= 1 and rows >= 1');
+  if (!Number.isFinite(stagger) || stagger < 0 || stagger >= 1) {
+    throw new Error(`interleavedLayout stagger must be 0 <= stagger < 1, got ${String(stagger)}`);
+  }
+  const other: FixtureKind = first === 'cannon' ? 'projector' : 'cannon';
+  const cx = (cols - 1) / 2;
+  const cy = (rows - 1) / 2;
+  const raw: RawFixture[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const kind = c % 2 === 0 ? first : other;
+      const drop = kind === 'projector' ? stagger : 0;
+      raw.push({ x: c - cx, y: r - cy + drop, row: r, col: c, label: `${r}:${c}`, kind });
+    }
+  }
+  const projectors = raw.filter(f => f.kind === 'projector').length;
+  return finalize(raw, {
+    id: id ?? `interleaved-${cols}x${rows}`,
+    name: name ?? `${cols}×${rows} interleaved (${raw.length - projectors} cannons + ${projectors} projectors)`,
     topology: 'grid',
     cols,
     rows,

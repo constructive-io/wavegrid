@@ -12,6 +12,13 @@ import type { UnifiedRouting } from './routing';
 export type Topology = 'grid' | 'ring' | 'filledRing' | 'rings';
 
 /**
+ * What hangs at a fixture. A `cannon` is a single static beam; a `projector`
+ * is a scanning head (e.g. Nu-Salt Model Z) that plays a BEYOND cue and takes
+ * the same HSB colour/brightness, plus projector-only controls later.
+ */
+export type FixtureKind = 'cannon' | 'projector';
+
+/**
  * One concentric ring of a `rings` layout. `radius` is 0..1 (1 = outermost);
  * `phase` rotates the ring in degrees so its fixtures can sit between the ones
  * outside it instead of lining up radially. A ring at radius 0 is the centre
@@ -48,6 +55,8 @@ export interface Fixture {
   col: number;
   /** Optional human-readable label (e.g. "A1"). */
   label: string;
+  /** Cannon (default) or projector. */
+  kind: FixtureKind;
 }
 
 export interface Layout {
@@ -79,7 +88,7 @@ export type RunMode = 'simple' | 'distributed';
  * Layout kinds a config can ask for. `annulus` is sugar: it distributes a
  * fixture count over concentric rings and resolves to a `rings` layout.
  */
-export type LayoutKind = Topology | 'annulus';
+export type LayoutKind = Topology | 'annulus' | 'interleaved';
 
 /** How a layout is described in a config file. */
 export interface LayoutSpec {
@@ -96,6 +105,10 @@ export interface LayoutSpec {
   rings?: RingSpec[];
   /** annulus: radius of the hole in the middle, 0..1 (0 = solid disc). */
   innerRadius?: number;
+  /** interleaved: how far projectors sit below the cannon row, in cells (default 0.15). */
+  stagger?: number;
+  /** interleaved: kind of the first fixture in each row (default cannon). */
+  first?: FixtureKind;
   /** Override the generated id/name. */
   id?: string;
   name?: string;

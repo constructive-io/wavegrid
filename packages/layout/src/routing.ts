@@ -21,7 +21,7 @@
  * `0…count-1`. Generation is a no-op you never have to think about.
  */
 
-import type { ShardConfig } from './types';
+import type { FixtureKind, ShardConfig } from './types';
 
 /** Where a cannon's OSC goes: a BEYOND PC or an FB4 box. */
 export interface RoutingTarget {
@@ -49,6 +49,12 @@ export interface UnifiedCannon {
   projectorIndex?: number;
   /** Intentionally dark in software (rig repair, permit limits). */
   safeDisabled?: boolean;
+  /**
+   * Cannon (default) or projector. Projectors must drive a `beyond` target:
+   * the FB4 OSC colour addresses are the box's persistent colour-balance
+   * settings, which on a calibrated projector would silently detune it.
+   */
+  kind?: FixtureKind;
 }
 
 /**
@@ -88,6 +94,7 @@ export interface DeviceCannon {
   fb4Serial?: string;
   projectorIndex?: number;
   safeDisabled?: boolean;
+  kind?: FixtureKind;
   /** The global index this came from — provenance, ignored by the runtime. */
   globalLogical: number;
 }
@@ -178,6 +185,15 @@ export function validateUnifiedRouting(spec: UnifiedRouting, globalCount: number
     if (!target) {
       problems.push(`Cannon ${cannon.logical} points at unknown target "${cannon.target}".`);
       continue;
+    }
+    if (cannon.kind !== undefined && cannon.kind !== 'cannon' && cannon.kind !== 'projector') {
+      problems.push(`Cannon ${cannon.logical} has unknown kind "${String(cannon.kind)}" (cannon | projector).`);
+    }
+    if (target.type === 'fb4' && cannon.kind === 'projector') {
+      problems.push(
+        `Projector ${cannon.logical} drives FB4 target "${cannon.target}" — FB4 OSC colour is a persistent ` +
+          'colour-balance setting, not live colour. Route projectors to a BEYOND target.'
+      );
     }
     if (target.type === 'fb4' && !cannon.fb4Serial && !cannon.safeDisabled) {
       problems.push(`Cannon ${cannon.logical} drives FB4 target "${cannon.target}" but has no fb4Serial.`);
@@ -395,7 +411,8 @@ export function generateDeviceRouting(
         ...(cannon.col !== undefined ? { col: cannon.col } : {}),
         ...(cannon.fb4Serial !== undefined ? { fb4Serial: cannon.fb4Serial } : {}),
         ...(projectorIndex !== undefined ? { projectorIndex } : {}),
-        ...(cannon.safeDisabled ? { safeDisabled: true } : {})
+        ...(cannon.safeDisabled ? { safeDisabled: true } : {}),
+        ...(cannon.kind !== undefined ? { kind: cannon.kind } : {})
       });
     }
 

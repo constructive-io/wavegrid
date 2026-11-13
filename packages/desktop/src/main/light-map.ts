@@ -100,6 +100,7 @@ export function buildLightMapView(args: {
       logical: fixture.index,
       physical,
       label: fixture.label,
+      kind: fixture.kind ?? 'cannon',
       position: describePosition(fixture),
       u: fixture.u,
       v: fixture.v,

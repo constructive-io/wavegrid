@@ -371,3 +371,41 @@ describe('unifiedRoutingForSingleTarget', () => {
     expect(validateUnifiedRouting(spec, 3)).toEqual([]);
   });
 });
+
+describe('fixture kind in routing', () => {
+  const targets = {
+    pc: { type: 'beyond' as const, host: '10.0.0.1', port: 8000 },
+    box: { type: 'fb4' as const, host: '10.0.0.2', port: 8000 }
+  };
+
+  it('carries kind through to the device-local config', () => {
+    const spec: UnifiedRouting = {
+      targets,
+      cannons: [
+        { logical: 0, target: 'pc', kind: 'cannon' },
+        { logical: 1, target: 'pc', kind: 'projector' },
+        { logical: 2, target: 'pc' }
+      ]
+    };
+    const { devices } = generateDeviceRouting(spec, [{ name: 'solo' }], 3);
+    expect(devices[0].cannons.map((c) => c.kind)).toEqual(['cannon', 'projector', undefined]);
+    expect(validateUnifiedRouting(spec, 3)).toEqual([]);
+  });
+
+  it('refuses a projector on an FB4 target', () => {
+    const spec: UnifiedRouting = {
+      targets,
+      cannons: [{ logical: 0, target: 'box', kind: 'projector', fb4Serial: '02356' }]
+    };
+    const problems = validateUnifiedRouting(spec, 1);
+    expect(problems.some((p) => /Projector 0 drives FB4 target "box"/.test(p))).toBe(true);
+  });
+
+  it('refuses an unknown kind', () => {
+    const spec = {
+      targets,
+      cannons: [{ logical: 0, target: 'pc', kind: 'disco' }]
+    } as unknown as UnifiedRouting;
+    expect(validateUnifiedRouting(spec, 1).some((p) => /unknown kind "disco"/.test(p))).toBe(true);
+  });
+});

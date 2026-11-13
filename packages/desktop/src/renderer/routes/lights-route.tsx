@@ -499,17 +499,33 @@ function MappingCanvas({
         const cy = pad + row.v * span;
         return (
           <g key={row.logical} className='cursor-pointer' onClick={() => onSelect(row.logical)}>
-            <circle
-              cx={cx}
-              cy={cy}
-              r={r}
-              className={cn(
-                'transition-colors',
-                conflict ? 'fill-destructive' : corrected ? 'fill-warning' : 'fill-muted-foreground/40',
-                isSel && 'stroke-primary'
-              )}
-              strokeWidth={isSel ? 1.2 : 0}
-            />
+            {row.kind === 'projector' ? (
+              <rect
+                x={cx - r}
+                y={cy - r}
+                width={r * 2}
+                height={r * 2}
+                rx={r * 0.35}
+                className={cn(
+                  'transition-colors',
+                  conflict ? 'fill-destructive' : corrected ? 'fill-warning' : 'fill-muted-foreground/40',
+                  isSel && 'stroke-primary'
+                )}
+                strokeWidth={isSel ? 1.2 : 0}
+              />
+            ) : (
+              <circle
+                cx={cx}
+                cy={cy}
+                r={r}
+                className={cn(
+                  'transition-colors',
+                  conflict ? 'fill-destructive' : corrected ? 'fill-warning' : 'fill-muted-foreground/40',
+                  isSel && 'stroke-primary'
+                )}
+                strokeWidth={isSel ? 1.2 : 0}
+              />
+            )}
             <text
               x={cx}
               y={cy + r * 0.35}

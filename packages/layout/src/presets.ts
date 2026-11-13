@@ -1,4 +1,4 @@
-import { annulusLayout, filledRingLayout, gridLayout, ringLayout, ringsLayout } from './generators';
+import { annulusLayout, filledRingLayout, gridLayout, interleavedLayout, ringLayout, ringsLayout } from './generators';
 import { Layout, LayoutSpec } from './types';
 
 /**
@@ -8,6 +8,8 @@ import { Layout, LayoutSpec } from './types';
 export const presets: Record<string, () => Layout> = {
   'grid-7x7': () => gridLayout({ cols: 7, rows: 7, id: 'grid-7x7', name: '7×7 grid (49)' }),
   'grid-7x2': () => gridLayout({ cols: 7, rows: 2, id: 'grid-7x2', name: '7×2 grid (14)' }),
+  /** Two rows of twelve, cannon / projector alternating: 12 of each, 24 total. */
+  'interleaved-12x2': () => interleavedLayout({ cols: 12, rows: 2, id: 'interleaved-12x2' }),
   'ring-6': () => ringLayout({ count: 6, id: 'ring-6', name: '6-cannon ring' }),
   nova: () => ringLayout({ count: 6, id: 'nova', name: 'Nova (6-laser ring)' }),
   /**
@@ -89,6 +91,18 @@ export function resolveLayout(spec: LayoutSpec): Layout {
   case 'rings':
     if (!spec.rings?.length) throw new Error('rings layout requires a non-empty "rings" list');
     return ringsLayout({ rings: spec.rings, id: spec.id, name: spec.name });
+  case 'interleaved':
+    if (spec.cols == null || spec.rows == null) {
+      throw new Error('interleaved layout requires "cols" and "rows"');
+    }
+    return interleavedLayout({
+      cols: spec.cols,
+      rows: spec.rows,
+      stagger: spec.stagger,
+      first: spec.first,
+      id: spec.id,
+      name: spec.name
+    });
   case 'annulus':
     if (spec.count == null) throw new Error('annulus layout requires "count"');
     return annulusLayout({ count: spec.count, innerRadius: spec.innerRadius, id: spec.id, name: spec.name });

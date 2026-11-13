@@ -12,16 +12,21 @@ export type {
   CannonRoute,
   CannonState,
   FB4OscConfig,
+  FixtureKind,
   OscMessage,
   OscTarget,
   OutputAdapter,
+  ProjectorControl,
+  ProjectorCueCommand,
   RoutingConfig
 } from './osc-adapters';
 export {
   BeyondOscOutput,
   createRoutedOutput,
   DEBUG_OSC,
+  encodeBeyondCueMessage,
   encodeBeyondMessages,
+  encodeBeyondProjectorMessages,
   encodeFB4Messages,
   FB4OscOutput,
   RoutedOscOutput} from './osc-adapters';

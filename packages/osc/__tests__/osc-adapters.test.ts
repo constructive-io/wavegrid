@@ -7,7 +7,10 @@ import {
   RoutingConfig,
   encodeBeyondMessages,
   encodeFB4Messages,
-  createRoutedOutput
+  createRoutedOutput,
+  encodeBeyondCueMessage,
+  encodeBeyondProjectorMessages,
+  RoutedOscOutput,
 } from '../src/osc-adapters';
 import { hsbToRgb255 } from '../src/color';
 
@@ -402,6 +405,61 @@ describe('RoutedOscOutput', () => {
     const routed = createRoutedOutput(config);
     expect(routed.targetNames).toHaveLength(0);
     routed.send(makeGrid());
+    routed.close();
+  });
+});
+
+describe('encodeBeyondProjectorMessages', () => {
+  it('emits one zone livecontrol message per control, clamped to documented ranges', () => {
+    const msgs = encodeBeyondProjectorMessages(
+      { 1: { size: 50, posx: 99999, rotoz: -30, anispeed: 500, fx: [3, -1, 60, 0] } },
+      { 1: 7 }
+    );
+    expect(msgs).toEqual([
+      { address: '/beyond/zone/7/livecontrol/size', value: 50 },
+      { address: '/beyond/zone/7/livecontrol/posx', value: 32768 },
+      { address: '/beyond/zone/7/livecontrol/rotoz', value: -30 },
+      { address: '/beyond/zone/7/livecontrol/anispeed', value: 400 },
+      { address: '/beyond/zone/7/livecontrol/fx1', value: 3 },
+      { address: '/beyond/zone/7/livecontrol/fx2', value: -1 },
+      { address: '/beyond/zone/7/livecontrol/fx3', value: 47 },
+      { address: '/beyond/zone/7/livecontrol/fx4', value: 0 }
+    ]);
+  });
+
+  it('skips indices with no zone mapping', () => {
+    expect(encodeBeyondProjectorMessages({ 5: { size: 10 } }, { 1: 0 })).toEqual([]);
+  });
+});
+
+describe('encodeBeyondCueMessage', () => {
+  it('encodes PangoScript gateway commands with integer arguments', () => {
+    expect(encodeBeyondCueMessage({ cueDown: { page: 2, cue: 5 } })).toEqual({
+      address: '/beyond/general/CueDown', value: [2, 5], ints: true
+    });
+    expect(encodeBeyondCueMessage({ stopZone: 3 })).toEqual({
+      address: '/beyond/general/StopZone', value: [3, 0], ints: true
+    });
+    expect(encodeBeyondCueMessage({ stopAllNow: true })).toEqual({
+      address: '/beyond/general/StopAllNow', value: [], ints: true
+    });
+  });
+});
+
+describe('RoutedOscOutput projector controls', () => {
+  it('only forwards controls for kind: projector routes', () => {
+    const routed = new RoutedOscOutput({
+      targets: { pc: { type: 'beyond', host: '127.0.0.1', port: 1 } },
+      cannons: [
+        { logical: 0, target: 'pc', projectorIndex: 0, kind: 'cannon' },
+        { logical: 1, target: 'pc', projectorIndex: 1, kind: 'projector' },
+        { logical: 2, target: 'pc', projectorIndex: 2 }
+      ]
+    });
+    expect(routed.projectorLogicals).toEqual([1]);
+    // Without connect() nothing is sent; this only checks the filter does not throw.
+    routed.sendProjector({ 0: { size: 10 }, 1: { size: 20 }, 2: { size: 30 } });
+    routed.sendCue({ stopAllNow: true });
     routed.close();
   });
 });
