@@ -71,7 +71,8 @@ const allTabs: { key: GridMode; label: string }[] = [
 
 // Tabs shown in the bar. The rest stay wired up (ToolContent, GridMode) and
 // come back by adding their key here.
-const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient', 'grace', 'gracepaint'];
+// Grace + GracePaint are built for the Grace Cathedral rings; hidden (code kept) for the Palace show.
+const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient'];
 const tabs = allTabs.filter((t) => SHOWN_TABS.includes(t.key));
 
 /* ---------- Tool content (no tabs, just the active tool) ---------- */

@@ -186,33 +186,34 @@ describe('annulusLayout', () => {
 });
 
 describe('interleavedLayout', () => {
-  it('alternates cannon / projector along each row, 12 of each for 12x2', () => {
+  it('puts all cannons on row 0 and all projectors on row 1 for 12x2', () => {
     const layout = interleavedLayout({ cols: 12, rows: 2 });
     expect(layout.count).toBe(24);
     expect(layout.topology).toBe('grid');
     expect(layout.hasGridCoords).toBe(true);
-    expect(layout.fixtures.filter(f => f.kind === 'cannon')).toHaveLength(12);
-    expect(layout.fixtures.filter(f => f.kind === 'projector')).toHaveLength(12);
     layout.fixtures.forEach((f, i) => {
       expect(f.index).toBe(i);
-      expect(f.kind).toBe(f.col % 2 === 0 ? 'cannon' : 'projector');
       expect(f.row).toBe(Math.floor(i / 12));
       expect(f.col).toBe(i % 12);
+      expect(f.kind).toBe(i < 12 ? 'cannon' : 'projector');
     });
   });
 
-  it('drops projectors below their row by the stagger, keeping the same column x', () => {
-    const layout = interleavedLayout({ cols: 4, rows: 1, stagger: 0.35 });
-    const cannon = layout.fixtures[0];
-    const projector = layout.fixtures[1];
-    expect(projector.y - cannon.y).toBeCloseTo(0.35);
-    expect(projector.x - cannon.x).toBeCloseTo(1);
-    expect(projector.v).toBeGreaterThan(cannon.v);
+  it('shifts the projector row half a cell right so each projector sits between two cannons', () => {
+    const { fixtures } = interleavedLayout({ cols: 12, rows: 2 });
+    for (let i = 0; i < 11; i++) {
+      const p = fixtures[12 + i];
+      expect(p.x).toBeCloseTo((fixtures[i].x + fixtures[i + 1].x) / 2);
+      expect(p.y - fixtures[i].y).toBeCloseTo(1);
+    }
+    const xs = fixtures.map(f => f.x);
+    expect(Math.min(...xs) + Math.max(...xs)).toBeCloseTo(0);
   });
 
-  it('can start each row with a projector', () => {
-    const layout = interleavedLayout({ cols: 3, rows: 1, first: 'projector' });
-    expect(layout.fixtures.map(f => f.kind)).toEqual(['projector', 'cannon', 'projector']);
+  it('honours stagger and first', () => {
+    const layout = interleavedLayout({ cols: 3, rows: 2, stagger: 0, first: 'projector' });
+    expect(layout.fixtures.map(f => f.kind)).toEqual(['projector', 'projector', 'projector', 'cannon', 'cannon', 'cannon']);
+    expect(layout.fixtures[3].x).toBeCloseTo(layout.fixtures[0].x);
   });
 
   it('plain layouts default every fixture to cannon', () => {
@@ -220,8 +221,9 @@ describe('interleavedLayout', () => {
     expect(ringLayout({ count: 3 }).fixtures.every(f => f.kind === 'cannon')).toBe(true);
   });
 
-  it('rejects a bad stagger', () => {
+  it('rejects a bad stagger or kind', () => {
     expect(() => interleavedLayout({ cols: 2, rows: 1, stagger: 1 })).toThrow();
     expect(() => interleavedLayout({ cols: 2, rows: 1, stagger: -0.1 })).toThrow();
+    expect(() => interleavedLayout({ cols: 2, rows: 1, first: 'disco' as never })).toThrow();
   });
 });

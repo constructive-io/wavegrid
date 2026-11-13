@@ -1,33 +1,37 @@
 {
   "targets": {
-    "pc1": { "type": "beyond", "host": "127.0.0.1", "port": 8000 }
+    "pc1": {
+      "type": "beyond",
+      "host": "127.0.0.1",
+      "port": 8000
+    }
   },
   "flushHz": 30,
   "zoneBase": 0,
   "cannons": [
-    { "logical": 0,  "target": "pc1", "kind": "cannon",    "label": "A1" },
-    { "logical": 1,  "target": "pc1", "kind": "projector", "label": "A2", "fb4Serial": "XE MODEL-Z-1" },
-    { "logical": 2,  "target": "pc1", "kind": "cannon",    "label": "A3" },
-    { "logical": 3,  "target": "pc1", "kind": "projector", "label": "A4", "fb4Serial": "XE MODEL-Z-2" },
-    { "logical": 4,  "target": "pc1", "kind": "cannon",    "label": "A5" },
-    { "logical": 5,  "target": "pc1", "kind": "projector", "label": "A6", "fb4Serial": "XE MODEL-Z-3" },
-    { "logical": 6,  "target": "pc1", "kind": "cannon",    "label": "A7" },
-    { "logical": 7,  "target": "pc1", "kind": "projector", "label": "A8", "fb4Serial": "XE MODEL-Z-4" },
-    { "logical": 8,  "target": "pc1", "kind": "cannon",    "label": "A9" },
-    { "logical": 9,  "target": "pc1", "kind": "projector", "label": "A10", "fb4Serial": "XE MODEL-Z-5" },
-    { "logical": 10, "target": "pc1", "kind": "cannon",    "label": "A11" },
-    { "logical": 11, "target": "pc1", "kind": "projector", "label": "A12", "fb4Serial": "XE MODEL-Z-6" },
-    { "logical": 12, "target": "pc1", "kind": "cannon",    "label": "B1" },
-    { "logical": 13, "target": "pc1", "kind": "projector", "label": "B2", "fb4Serial": "XE MODEL-Z-7" },
-    { "logical": 14, "target": "pc1", "kind": "cannon",    "label": "B3" },
-    { "logical": 15, "target": "pc1", "kind": "projector", "label": "B4", "fb4Serial": "XE MODEL-Z-8" },
-    { "logical": 16, "target": "pc1", "kind": "cannon",    "label": "B5" },
-    { "logical": 17, "target": "pc1", "kind": "projector", "label": "B6", "fb4Serial": "XE MODEL-Z-9" },
-    { "logical": 18, "target": "pc1", "kind": "cannon",    "label": "B7" },
-    { "logical": 19, "target": "pc1", "kind": "projector", "label": "B8", "fb4Serial": "XE MODEL-Z-10" },
-    { "logical": 20, "target": "pc1", "kind": "cannon",    "label": "B9" },
-    { "logical": 21, "target": "pc1", "kind": "projector", "label": "B10", "fb4Serial": "XE MODEL-Z-11" },
-    { "logical": 22, "target": "pc1", "kind": "cannon",    "label": "B11" },
-    { "logical": 23, "target": "pc1", "kind": "projector", "label": "B12", "fb4Serial": "XE MODEL-Z-12" }
+    {"logical": 0, "target": "pc1", "kind": "cannon", "label": "C1"},
+    {"logical": 1, "target": "pc1", "kind": "cannon", "label": "C2"},
+    {"logical": 2, "target": "pc1", "kind": "cannon", "label": "C3"},
+    {"logical": 3, "target": "pc1", "kind": "cannon", "label": "C4"},
+    {"logical": 4, "target": "pc1", "kind": "cannon", "label": "C5"},
+    {"logical": 5, "target": "pc1", "kind": "cannon", "label": "C6"},
+    {"logical": 6, "target": "pc1", "kind": "cannon", "label": "C7"},
+    {"logical": 7, "target": "pc1", "kind": "cannon", "label": "C8"},
+    {"logical": 8, "target": "pc1", "kind": "cannon", "label": "C9"},
+    {"logical": 9, "target": "pc1", "kind": "cannon", "label": "C10"},
+    {"logical": 10, "target": "pc1", "kind": "cannon", "label": "C11"},
+    {"logical": 11, "target": "pc1", "kind": "cannon", "label": "C12"},
+    {"logical": 12, "target": "pc1", "kind": "projector", "label": "P1", "fb4Serial": "XE MODEL-Z-1"},
+    {"logical": 13, "target": "pc1", "kind": "projector", "label": "P2", "fb4Serial": "XE MODEL-Z-2"},
+    {"logical": 14, "target": "pc1", "kind": "projector", "label": "P3", "fb4Serial": "XE MODEL-Z-3"},
+    {"logical": 15, "target": "pc1", "kind": "projector", "label": "P4", "fb4Serial": "XE MODEL-Z-4"},
+    {"logical": 16, "target": "pc1", "kind": "projector", "label": "P5", "fb4Serial": "XE MODEL-Z-5"},
+    {"logical": 17, "target": "pc1", "kind": "projector", "label": "P6", "fb4Serial": "XE MODEL-Z-6"},
+    {"logical": 18, "target": "pc1", "kind": "projector", "label": "P7", "fb4Serial": "XE MODEL-Z-7"},
+    {"logical": 19, "target": "pc1", "kind": "projector", "label": "P8", "fb4Serial": "XE MODEL-Z-8"},
+    {"logical": 20, "target": "pc1", "kind": "projector", "label": "P9", "fb4Serial": "XE MODEL-Z-9"},
+    {"logical": 21, "target": "pc1", "kind": "projector", "label": "P10", "fb4Serial": "XE MODEL-Z-10"},
+    {"logical": 22, "target": "pc1", "kind": "projector", "label": "P11", "fb4Serial": "XE MODEL-Z-11"},
+    {"logical": 23, "target": "pc1", "kind": "projector", "label": "P12", "fb4Serial": "XE MODEL-Z-12"}
   ]
 }
