@@ -312,11 +312,8 @@ export function MiniGridPreview({
           if (f.kind === 'projector') ctx2d!.rect(px - dotR, py - dotR, dotR * 2, dotR * 2);
           else ctx2d!.arc(px, py, dotR, 0, Math.PI * 2);
           ctx2d!.fillStyle = `rgb(${r},${g},${b})`;
-          ctx2d!.shadowColor = `rgb(${r},${g},${b})`;
-          ctx2d!.shadowBlur = dotR * 1.2;
           ctx2d!.fill();
         }
-        ctx2d!.shadowBlur = 0;
       } else if (geo) {
         // Ring of glowing dots on black.
         ctx2d!.fillStyle = '#0a0a12';
@@ -334,11 +331,8 @@ export function MiniGridPreview({
           ctx2d!.beginPath();
           ctx2d!.arc(px, py, dotR, 0, Math.PI * 2);
           ctx2d!.fillStyle = `rgb(${r},${g},${b})`;
-          ctx2d!.shadowColor = `rgb(${r},${g},${b})`;
-          ctx2d!.shadowBlur = dotR * 1.2;
           ctx2d!.fill();
         }
-        ctx2d!.shadowBlur = 0;
       } else {
         for (let i = 0; i < count; i++) {
           const col = i % COLS;

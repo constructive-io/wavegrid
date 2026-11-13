@@ -214,7 +214,13 @@ export class Receiver {
         handleCommand(this._animState, cmd);
         applyPaint(grid, cmd.cells, this._animState.attack);
       } else if (cmd.action === 'evalPattern') {
-        const sameCode = this._animState.patternActive && this._sandbox?.loaded && cmd.code === this._patternCode;
+        // Only a full param set counts as a re-send: an evalPattern with no params
+        // (a playlist, a restart) still reloads and resets the clock.
+        const sameCode =
+          this._animState.patternActive &&
+          this._sandbox?.loaded &&
+          cmd.code === this._patternCode &&
+          Object.keys(cmd.params ?? {}).length > 0;
         handleCommand(this._animState, cmd);
         if (sameCode) {
           // The same pattern again (a UI restarting it, a reconnect): take its

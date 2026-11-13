@@ -197,10 +197,15 @@ export function coercePalaceParams(p: Record<string, unknown>, count: number): P
   const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
   const paint = emptyPaint(count);
   if (Array.isArray(p.paint)) for (let i = 0; i < Math.min(paint.length, p.paint.length); i++) paint[i] = num(p.paint[i], paint[i]);
+  for (let i = 0; i < paint.length; i += 2) if (paint[i] >= 360) paint[i] %= 360;
   const who: Who = p.who === 'cannon' || p.who === 'projector' ? p.who : 'both';
+  const stops = (p.stops as unknown[]).filter(
+    (st): st is [number, number] => Array.isArray(st) && st.length >= 2 && Number.isFinite(st[0]) && Number.isFinite(st[1])
+  ).map(([h, sat]) => [h, sat] as [number, number]);
+  if (stops.length === 0) return null;
   return {
     kind: 'palace',
-    stops: p.stops as [number, number][],
+    stops,
     flow: p.flow,
     span: num(p.span, 1),
     spin: num(p.spin, 1),

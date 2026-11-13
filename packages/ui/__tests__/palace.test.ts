@@ -77,3 +77,12 @@ describe('palace pattern', () => {
     expect(coerceParams(defaultParams(24) as unknown as Record<string, unknown>)).toBeNull();
   });
 });
+
+describe('coercePalaceParams', () => {
+  it('drops malformed stops and rejects a look with none', async () => {
+    const { coercePalaceParams } = await import('../src/lib/palace');
+    const base = defaultParams(24) as unknown as Record<string, unknown>;
+    expect(coercePalaceParams({ ...base, stops: [null, 'x', [10, 20], [Number.NaN, 1]] }, 24)?.stops).toEqual([[10, 20]]);
+    expect(coercePalaceParams({ ...base, stops: [null] }, 24)).toBeNull();
+  });
+});
