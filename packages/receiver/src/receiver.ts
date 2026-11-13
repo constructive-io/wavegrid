@@ -95,6 +95,7 @@ export class Receiver {
   private _sandbox: SandboxEngine | null = null;
   private _sandboxReady: Promise<SandboxEngine> | null = null;
   private _patternTime = 0;
+  private _patternCode: string | null = null;
   private _patternFrame = 0;
 
   constructor(config: Partial<ReceiverConfig> = {}) {
@@ -213,8 +214,23 @@ export class Receiver {
         handleCommand(this._animState, cmd);
         applyPaint(grid, cmd.cells, this._animState.attack);
       } else if (cmd.action === 'evalPattern') {
+        // Only a full param set counts as a re-send: an evalPattern with no params
+        // (a playlist, a restart) still reloads and resets the clock.
+        const sameCode =
+          this._animState.patternActive &&
+          this._sandbox?.loaded &&
+          cmd.code === this._patternCode &&
+          Object.keys(cmd.params ?? {}).length > 0;
         handleCommand(this._animState, cmd);
-        this.handleEvalPattern(cmd);
+        if (sameCode) {
+          // The same pattern again (a UI restarting it, a reconnect): take its
+          // params without resetting the pattern clock.
+          for (const [name, value] of Object.entries(cmd.params ?? {})) {
+            this.handleSetPatternParam({ type: 'command', action: 'setPatternParam', name, value });
+          }
+        } else {
+          this.handleEvalPattern(cmd);
+        }
       } else if (cmd.action === 'clear') {
         handleCommand(this._animState, cmd);
         this.disposeSandbox();
@@ -313,6 +329,7 @@ export class Receiver {
       .then((sb) => {
         try {
           const meta = sb.loadPattern(cmd.code, cmd.params);
+          this._patternCode = cmd.code;
           this._patternTime = 0;
           this._patternFrame = 0;
           console.log('  ◈ Pattern loaded:', meta.name || '(anonymous)');

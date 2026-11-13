@@ -22,6 +22,7 @@ export function isGracePaintRunning(pattern: PatternState | null): boolean {
 
 /** A GracePaint param set from loosely-typed JSON (the brain's `ctx.p`, a saved Look), or null. */
 export function coerceParams(p: Record<string, unknown>): GracePaintParams | null {
+  if (p.kind === 'palace') return null;
   if (typeof p.anim !== 'string' || typeof p.flow !== 'string') return null;
   if (!Array.isArray(p.stops) || !Array.isArray(p.paint)) return null;
   return {

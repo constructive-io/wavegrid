@@ -1,6 +1,6 @@
 import { type Layout, presets } from '@wavegrid/layout/client';
 import { DEFAULT_POOL_SETTINGS, type PoolColor, type PoolSettings } from '@wavegrid/pool';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AudioTab } from '@/components/audio-tab';
 import { BottomSheet, type SnapPoint } from '@/components/bottom-sheet';
@@ -18,6 +18,7 @@ import { LoginScreen } from '@/components/login-screen';
 import { LooksTab } from '@/components/looks-tab';
 import type { PreviewFixture } from '@/components/mini-grid-preview';
 import { useMotion } from '@/components/motion-tab';
+import { PalaceTab } from '@/components/palace-tab';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
 import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
@@ -35,6 +36,7 @@ import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
 import { type GracePaintControls, useGracePaint } from '@/lib/use-grace-paint';
 import { useIsPhone } from '@/lib/use-media-query';
+import { type PalaceControls, usePalace } from '@/lib/use-palace';
 import { type Look, type PlaylistState, useSocket } from '@/lib/use-socket';
 
 // Stands in only until /api/config answers, and matches useConfig's own fallback.
@@ -51,6 +53,7 @@ type TrailFadeEntry = {
 
 const allTabs: { key: GridMode; label: string }[] = [
   { key: 'paint', label: 'Paint' },
+  { key: 'palace', label: 'Palace' },
   { key: 'pool', label: 'Pool' },
   { key: 'gradient', label: 'Gradient' },
   { key: 'scenes', label: 'Scenes' },
@@ -69,11 +72,17 @@ const allTabs: { key: GridMode; label: string }[] = [
   { key: 'video', label: 'Video' }
 ];
 
-// Tabs shown in the bar. The rest stay wired up (ToolContent, GridMode) and
-// come back by adding their key here.
-// Grace + GracePaint are built for the Grace Cathedral rings; hidden (code kept) for the Palace show.
-const SHOWN_TABS: GridMode[] = ['paint', 'pool', 'gradient'];
-const tabs = allTabs.filter((t) => SHOWN_TABS.includes(t.key));
+type TabDef = { key: GridMode; label: string };
+
+// Tabs shown in the bar, chosen by the rig: Palace when the layout has
+// projectors, Grace and GracePaint on concentric rings. The rest stay wired up
+// (ToolContent, GridMode) and come back by adding their key here.
+function tabsFor(layout: { topology?: string; fixtures?: { kind?: string }[] }): TabDef[] {
+  const shown: GridMode[] = ['paint', 'pool', 'gradient'];
+  if (layout.fixtures?.some((f) => f.kind === 'projector')) shown.push('palace');
+  if (layout.topology === 'rings') shown.push('grace', 'gracepaint');
+  return allTabs.filter((t) => shown.includes(t.key));
+}
 
 /* ---------- Tool content (no tabs, just the active tool) ---------- */
 
@@ -93,7 +102,7 @@ function ToolContent({
   numCannons, gridColumns, fixtures, layout,
   activePattern, onPatternSelect,
   playlistState,
-  easing, gracePaint, looks
+  easing, gracePaint, palace, looks
 }: {
   tab: GridMode;
   hue: number; sat: number; bright: number; brushSize: number; softEdge: boolean; trailFade: boolean;
@@ -129,6 +138,7 @@ function ToolContent({
   playlistState: PlaylistState | null;
   easing: PreviewEasing;
   gracePaint: GracePaintControls;
+  palace: PalaceControls;
   looks: Look[];
 }) {
   return (
@@ -288,6 +298,23 @@ function ToolContent({
         />
       )}
 
+      {tab === 'palace' && (
+        <PalaceTab
+          controls={palace}
+          looks={looks}
+          hue={hue}
+          sat={sat}
+          bright={bright}
+          onHue={setHue}
+          onSat={setSat}
+          onBright={setBright}
+          animSpeed={animSpeed}
+          easing={easing}
+          fixtures={fixtures}
+          compact={isPhone}
+        />
+      )}
+
       {tab === 'gracepaint' && (
         <GracePaintTab
           controls={gracePaint}
@@ -360,10 +387,12 @@ function ToolContent({
 /* ---------- Tab strip ---------- */
 
 function TabStrip({
+  tabs,
   tab,
   setTab,
   variant
 }: {
+  tabs: TabDef[];
   tab: GridMode;
   setTab: (t: GridMode) => void;
   variant: 'phone' | 'bottom' | 'right';
@@ -405,11 +434,13 @@ function TabStrip({
 /* ---------- Desktop/tablet ToolPanel (non-phone) ---------- */
 
 function ToolPanel({
+  tabs,
   tab,
   setTab,
   layout,
   toolContentProps
 }: {
+  tabs: TabDef[];
   tab: GridMode;
   setTab: (t: GridMode) => void;
   layout: PanelLayout;
@@ -427,7 +458,7 @@ function ToolPanel({
           : { borderTop: '1px solid #1a1a25' })
       }}
     >
-      <TabStrip tab={tab} setTab={setTab} variant={isRight ? 'right' : 'bottom'} />
+      <TabStrip tabs={tabs} tab={tab} setTab={setTab} variant={isRight ? 'right' : 'bottom'} />
 
       <div
         className='flex-1 overflow-y-auto'
@@ -580,11 +611,12 @@ export default function Home() {
   const GRID_COLUMNS = config?.gridColumns ?? 7;
   const FIXTURES = config?.layout?.fixtures;
   const LAYOUT = config?.layout ?? FALLBACK_LAYOUT;
+  const tabs = useMemo(() => tabsFor(LAYOUT), [LAYOUT]);
 
   const [tab, setTab] = useState<GridMode>(() => {
     if (typeof window === 'undefined') return 'paint';
     const saved = localStorage.getItem('wavegrid-tab');
-    if (saved && tabs.some((t) => t.key === saved)) return saved as GridMode;
+    if (saved && allTabs.some((t) => t.key === saved)) return saved as GridMode;
     return 'paint';
   });
   // Beside the grid, not under it: the parameters are read while looking at the
@@ -773,6 +805,12 @@ export default function Home() {
 
   const gracePaint = useGracePaint(NUM_CANNONS, send, pattern, handlePatternSelect);
   gracePaintRef.current = gracePaint;
+  const palace = usePalace(LAYOUT.fixtures, send, pattern, handlePatternSelect);
+
+  // A tab saved on another rig (or hidden here) falls back to Paint.
+  useEffect(() => {
+    if (config && !tabs.some((t) => t.key === tab)) setTab('paint');
+  }, [config, tabs, tab]);
 
   const handleCannon = useCallback(
     (index: number, h: number, s: number, b: number) => {
@@ -780,12 +818,16 @@ export default function Home() {
         gracePaint.paint(index, h, s);
         return;
       }
+      if (tab === 'palace') {
+        palace.paint(index, h, s);
+        return;
+      }
       send({ type: 'cannon', index, h, s, b });
       if (trailFade && b > 0) {
         scheduleTrailFade(index, h, s, b);
       }
     },
-    [gracePaint, scheduleTrailFade, send, tab, trailFade]
+    [gracePaint, palace, scheduleTrailFade, send, tab, trailFade]
   );
 
   const flags = useFlagAnimation(send);
@@ -980,6 +1022,7 @@ export default function Home() {
     playlistState,
     easing: previewEasing,
     gracePaint,
+    palace,
     looks
   };
 
@@ -1242,7 +1285,7 @@ export default function Home() {
 
         {/* Bottom sheet */}
         <BottomSheet snap={sheetSnap} onSnapChange={setSheetSnap}>
-          <TabStrip tab={tab} setTab={handleTabChange} variant="phone" />
+          <TabStrip tabs={tabs} tab={tab} setTab={handleTabChange} variant="phone" />
           <div style={{ padding: '4px 16px 24px' }}>
             <ToolContent tab={tab} {...toolContentProps} />
           </div>
@@ -1411,6 +1454,7 @@ export default function Home() {
           style={layout === 'right' ? undefined : { maxHeight: '50%', minHeight: 0 }}
         >
           <ToolPanel
+            tabs={tabs}
             tab={tab}
             setTab={handleTabChange}
             layout={layout}
