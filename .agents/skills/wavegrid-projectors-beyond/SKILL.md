@@ -19,11 +19,11 @@ receiver ──OSC/UDP :8000──▶ BEYOND ──TCP 3348──▶ FB4-XE ─�
 
 ## Layout
 
-`interleaved-12x2` (`interleavedLayout` in `packages/layout/src/generators.ts`): row 0 is 12 cannons, row 1 is 12 projectors shifted half a column right (a zipper), so a finger can zigzag through all 24. Logical order is cannons 0–11, then projectors 12–23. Any size works as `interleaved:<cols>x<rows>`. The options are `stagger` (0 ≤ s < 1, default 0.5) and `first` (`cannon`/`projector`). The UI draws cannons as circles and projectors as squares, and the canvas follows the layout's aspect ratio.
+`interleaved-12x2` (`interleavedLayout` in `packages/layout/src/generators.ts`): row 0 is 12 cannons, row 1 is 12 projectors shifted half a column right (a zipper), so a finger can zigzag through all 24. Logical order is cannons 0–11, then projectors 12–23. `interleaved-16x2` is the same with 16 + 16 (cannons 0–15, projectors 16–31); it is the final Palace rig. Any size works as `interleaved:<cols>x<rows>`. The options are `stagger` (0 ≤ s < 1, default 0.5) and `first` (`cannon`/`projector`). The UI draws cannons as circles and projectors as squares, and the canvas follows the layout's aspect ratio.
 
 ## Routing
 
-`examples/routing-interleaved-12x2.json` is one `beyond` target on `127.0.0.1:8000` (BEYOND is on the receiver PC), `zoneBase: 0`, and 24 routes labelled C1–C12 / P1–P12 with their `kind`.
+`examples/routing-interleaved-12x2.json` is one `beyond` target on `127.0.0.1:8000` (BEYOND is on the receiver PC), `zoneBase: 0`, and 24 routes labelled C1–C12 / P1–P12 with their `kind`. `examples/routing-interleaved-16x2.json` is the 32-zone version (C1–C16 on zones 0–15, P1–P16 on 16–31). The routing file must match the layout the brain runs.
 
 ```sh
 wavegrid projects routing import examples/routing-interleaved-12x2.json

@@ -60,6 +60,13 @@ describe('interleaved shorthand', () => {
     expect(layout.fixtures.filter(f => f.kind === 'projector')).toHaveLength(12);
   });
 
+  it('resolves the 16×2 preset as 16 cannons then 16 projectors', () => {
+    const layout = resolveLayout({ preset: 'interleaved-16x2' });
+    expect(layout.count).toBe(32);
+    expect(layout.fixtures.slice(0, 16).every(f => f.kind === 'cannon')).toBe(true);
+    expect(layout.fixtures.slice(16).every(f => f.kind === 'projector')).toBe(true);
+  });
+
   it('resolves an interleaved spec with stagger and first', () => {
     const layout = resolveLayout({ kind: 'interleaved', cols: 2, rows: 2, stagger: 0.25, first: 'projector' });
     expect(layout.fixtures[0].kind).toBe('projector');

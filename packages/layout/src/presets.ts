@@ -10,6 +10,8 @@ export const presets: Record<string, () => Layout> = {
   'grid-7x2': () => gridLayout({ cols: 7, rows: 2, id: 'grid-7x2', name: '7×2 grid (14)' }),
   /** Palace of Fine Arts: a row of 12 cannons over a row of 12 projectors shifted half a step (zipper). */
   'interleaved-12x2': () => interleavedLayout({ cols: 12, rows: 2, id: 'interleaved-12x2' }),
+  /** Palace of Fine Arts, final rig: 16 cannons over 16 projectors (zipper). */
+  'interleaved-16x2': () => interleavedLayout({ cols: 16, rows: 2, id: 'interleaved-16x2' }),
   'ring-6': () => ringLayout({ count: 6, id: 'ring-6', name: '6-cannon ring' }),
   nova: () => ringLayout({ count: 6, id: 'nova', name: 'Nova (6-laser ring)' }),
   /**
