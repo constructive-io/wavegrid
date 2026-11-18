@@ -34,6 +34,11 @@ export function buildLayoutSpec(choice: LayoutChoice): LayoutSpec {
       throw new Error('An interleaved layout needs both columns and rows.');
     }
     spec = { kind: 'interleaved', cols: choice.cols, rows: choice.rows };
+  } else if (choice.kind === 'frames') {
+    if (choice.frames == null || choice.cols == null || choice.rows == null) {
+      throw new Error('A frames layout needs a frame count plus columns and rows per frame.');
+    }
+    spec = { kind: 'frames', frames: choice.frames, cols: choice.cols, rows: choice.rows };
   } else if (choice.kind === 'ring' || choice.kind === 'filledRing') {
     if (choice.count == null) {
       throw new Error(`A ${choice.kind} layout needs a cannon count.`);
@@ -70,6 +75,7 @@ function specToChoice(spec: LayoutSpec | undefined): LayoutChoice {
     kind: spec.kind,
     cols: spec.cols,
     rows: spec.rows,
+    frames: spec.frames,
     count: spec.count,
     innerRadius: spec.innerRadius
   };

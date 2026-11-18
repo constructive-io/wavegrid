@@ -88,17 +88,21 @@ export type RunMode = 'simple' | 'distributed';
  * Layout kinds a config can ask for. `annulus` is sugar: it distributes a
  * fixture count over concentric rings and resolves to a `rings` layout.
  */
-export type LayoutKind = Topology | 'annulus' | 'interleaved';
+export type LayoutKind = Topology | 'annulus' | 'interleaved' | 'frames';
 
 /** How a layout is described in a config file. */
 export interface LayoutSpec {
   /** Reference a built-in preset by id (takes precedence over `kind`). */
   preset?: string;
   kind?: LayoutKind;
-  /** grid: number of columns. */
+  /** grid: number of columns (frames: columns per frame). */
   cols?: number;
-  /** grid: number of rows. */
+  /** grid: number of rows (frames: rows per frame). */
   rows?: number;
+  /** frames: number of truss frames in the line. */
+  frames?: number;
+  /** frames: empty cells between neighbouring frames (default 2). */
+  gap?: number;
   /** ring / filledRing / annulus: number of cannons. */
   count?: number;
   /** rings: the concentric rings, in any order (outer-first is the result). */

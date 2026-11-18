@@ -10,6 +10,7 @@ describe('parseLayoutSpec', () => {
   it('parses each custom shorthand', () => {
     expect(parseLayoutSpec('grid:7x2')).toEqual({ kind: 'grid', cols: 7, rows: 2 });
     expect(parseLayoutSpec('ring:6')).toEqual({ kind: 'ring', count: 6 });
+    expect(parseLayoutSpec('frames:5x2x3')).toEqual({ kind: 'frames', frames: 5, cols: 2, rows: 3 });
     expect(parseLayoutSpec('filled:25')).toEqual({ kind: 'filledRing', count: 25 });
     expect(parseLayoutSpec('annulus:25')).toEqual({ kind: 'annulus', count: 25 });
     expect(parseLayoutSpec('annulus:25@0.35')).toEqual({ kind: 'annulus', count: 25, innerRadius: 0.35 });
@@ -37,6 +38,7 @@ describe('parseLayoutSpec', () => {
     expect(() => parseLayoutSpec('nope')).toThrow(/Unknown layout/);
     expect(() => parseLayoutSpec('blob:3')).toThrow(/Unknown layout kind/);
     expect(() => parseLayoutSpec('grid:7')).toThrow(/<cols>x<rows>/);
+    expect(() => parseLayoutSpec('frames:5x2')).toThrow(/<frames>x<cols>x<rows>/);
     expect(() => parseLayoutSpec('ring:0')).toThrow(/whole number/);
     expect(() => parseLayoutSpec('annulus:25@1')).toThrow(/innerRadius/);
     expect(() => parseLayoutSpec('rings:12,x')).toThrow(/whole number/);
@@ -65,6 +67,13 @@ describe('interleaved shorthand', () => {
     expect(layout.count).toBe(32);
     expect(layout.fixtures.slice(0, 16).every(f => f.kind === 'cannon')).toBe(true);
     expect(layout.fixtures.slice(16).every(f => f.kind === 'projector')).toBe(true);
+  });
+
+  it('resolves the Civic Center preset as five frames of six cannons', () => {
+    const layout = resolveLayout({ preset: 'civic-center' });
+    expect(layout.count).toBe(30);
+    expect(layout.fixtures.every(f => f.kind === 'cannon')).toBe(true);
+    expect(layout.fixtures[29].label).toBe('F5-6');
   });
 
   it('resolves an interleaved spec with stagger and first', () => {
