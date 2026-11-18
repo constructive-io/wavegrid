@@ -173,10 +173,10 @@ export interface FramesParams {
 
 /**
  * A line of identical truss frames, each holding a `cols`×`rows` block of
- * cannons, with `gap` empty cells between frames. Indices are frame-major
- * (frame 1's cannons first), matching one junction box per frame, while
- * `row`/`col` are the joined grid (`frames * cols` wide, gaps removed) so grid
- * animations sweep straight across all frames. Labels read `F<frame>-<n>`.
+ * cannons, with `gap` empty cells between frames. Indices are row-major over
+ * the joined grid (`frames * cols` wide, gaps removed), as the server's shift,
+ * mirror and orientation maths assume, so grid animations sweep straight
+ * across all frames. Labels read `F<frame>-<n>`, n row-major within the frame.
  */
 export function framesLayout({ frames, cols, rows, gap = 2, id, name }: FramesParams): Layout {
   if (frames < 1 || cols < 1 || rows < 1) {
@@ -187,17 +187,15 @@ export function framesLayout({ frames, cols, rows, gap = 2, id, name }: FramesPa
   const cx = ((frames - 1) * pitch + cols - 1) / 2;
   const cy = (rows - 1) / 2;
   const raw: RawFixture[] = [];
-  for (let f = 0; f < frames; f++) {
-    let n = 1;
-    for (let r = 0; r < rows; r++) {
+  for (let r = 0; r < rows; r++) {
+    for (let f = 0; f < frames; f++) {
       for (let c = 0; c < cols; c++) {
-        raw.push({ x: f * pitch + c - cx, y: r - cy, row: r, col: f * cols + c, label: `F${f + 1}-${n++}` });
+        raw.push({ x: f * pitch + c - cx, y: r - cy, row: r, col: f * cols + c, label: `F${f + 1}-${r * cols + c + 1}` });
       }
     }
   }
   const totalCols = frames * cols;
-  const at = new Map(raw.map((fx, i) => [`${fx.row}:${fx.col}`, i]));
-  const perimeter = gridPerimeter(totalCols, rows).map(g => at.get(`${Math.floor(g / totalCols)}:${g % totalCols}`) as number);
+  const perimeter = gridPerimeter(totalCols, rows);
   return finalize(raw, {
     id: id ?? `frames-${frames}x${cols}x${rows}`,
     name: name ?? `${frames} frames of ${cols}×${rows} (${raw.length})`,
