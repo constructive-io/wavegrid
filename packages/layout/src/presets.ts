@@ -14,15 +14,15 @@ export const presets: Record<string, () => Layout> = {
   'interleaved-16x2': () => interleavedLayout({ cols: 16, rows: 2, id: 'interleaved-16x2' }),
   /**
    * Civic Center Plaza, "Five Frames": five truss frames in a line down the
-   * plaza toward City Hall, six cannons on the floor of each (2 deep × 3
-   * across). Seen from above with City Hall on the left, so frame 1 is the
-   * one nearest City Hall.
+   * plaza toward City Hall, each holding one line of six cannons across its
+   * width (beams fan outward from the frame's centre). Seen from above with
+   * City Hall on the left: five columns of six, frame 1 nearest City Hall.
    */
   'civic-center': () => framesLayout({
     frames: 5,
-    cols: 2,
-    rows: 3,
-    gap: 3,
+    cols: 1,
+    rows: 6,
+    gap: 0,
     id: 'civic-center',
     name: 'Civic Center (5 frames × 6)'
   }),

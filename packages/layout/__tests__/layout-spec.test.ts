@@ -73,6 +73,7 @@ describe('interleaved shorthand', () => {
     const layout = resolveLayout({ preset: 'civic-center' });
     expect(layout.count).toBe(30);
     expect(layout.fixtures.every(f => f.kind === 'cannon')).toBe(true);
+    expect([layout.cols, layout.rows]).toEqual([5, 6]);
     expect(layout.fixtures[29].label).toBe('F5-6');
   });
 
