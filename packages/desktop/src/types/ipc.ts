@@ -38,9 +38,11 @@ export interface ProjectSummary {
  *  Mirrors the CLI's LayoutSpec. */
 export interface LayoutChoice {
   preset?: string;
-  kind?: 'grid' | 'interleaved' | 'ring' | 'filledRing' | 'annulus' | 'rings';
+  kind?: 'grid' | 'interleaved' | 'frames' | 'ring' | 'filledRing' | 'annulus' | 'rings';
   cols?: number;
   rows?: number;
+  /** frames: number of truss frames (cols × rows cannons each). */
+  frames?: number;
   count?: number;
   /** annulus: size of the hole in the middle, 0..1. */
   innerRadius?: number;

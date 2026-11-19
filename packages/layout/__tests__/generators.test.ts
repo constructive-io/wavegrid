@@ -1,4 +1,4 @@
-import { annulusLayout, filledRingLayout, gridLayout, interleavedLayout, ringLayout, ringsLayout } from '../src/generators';
+import { annulusLayout, filledRingLayout, framesLayout, gridLayout, interleavedLayout, ringLayout, ringsLayout } from '../src/generators';
 
 describe('gridLayout', () => {
   it('creates a row-major grid with correct count and grid coords', () => {
@@ -225,5 +225,35 @@ describe('interleavedLayout', () => {
     expect(() => interleavedLayout({ cols: 2, rows: 1, stagger: 1 })).toThrow();
     expect(() => interleavedLayout({ cols: 2, rows: 1, stagger: -0.1 })).toThrow();
     expect(() => interleavedLayout({ cols: 2, rows: 1, first: 'disco' as never })).toThrow();
+  });
+});
+
+describe('framesLayout', () => {
+  it('lays frames left to right with gaps and row-major indices over the joined grid', () => {
+    const layout = framesLayout({ frames: 5, cols: 2, rows: 3, gap: 3 });
+    expect(layout.count).toBe(30);
+    expect(layout.cols).toBe(10);
+    expect(layout.rows).toBe(3);
+    expect(layout.hasGridCoords).toBe(true);
+    layout.fixtures.forEach((f, i) => expect(f.row * layout.cols + f.col).toBe(i));
+    expect(layout.fixtures.slice(0, 4).map(f => f.label)).toEqual(['F1-1', 'F1-2', 'F2-1', 'F2-2']);
+    expect(layout.fixtures[10]).toMatchObject({ label: 'F1-3', row: 1, col: 0 });
+    // 1 cell between a frame's own columns, 1 + gap between frames.
+    expect(layout.fixtures[1].x - layout.fixtures[0].x).toBeCloseTo(1);
+    expect(layout.fixtures[2].x - layout.fixtures[1].x).toBeCloseTo(4);
+    expect(new Set(layout.fixtures.map(f => `${f.row}:${f.col}`)).size).toBe(30);
+  });
+
+  it('walks the perimeter of the joined grid', () => {
+    const layout = framesLayout({ frames: 5, cols: 2, rows: 3 });
+    expect(layout.perimeter).toHaveLength(2 * 10 + 2 * 1);
+    expect(new Set(layout.perimeter).size).toBe(layout.perimeter.length);
+    const corners = [0, 9].flatMap(col => [0, 2].map(row => layout.fixtures.find(f => f.row === row && f.col === col)!.index));
+    for (const i of corners) expect(layout.perimeter).toContain(i);
+  });
+
+  it('rejects empty frames and negative gaps', () => {
+    expect(() => framesLayout({ frames: 0, cols: 2, rows: 3 })).toThrow();
+    expect(() => framesLayout({ frames: 5, cols: 2, rows: 3, gap: -1 })).toThrow();
   });
 });

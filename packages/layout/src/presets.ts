@@ -1,4 +1,4 @@
-import { annulusLayout, filledRingLayout, gridLayout, interleavedLayout, ringLayout, ringsLayout } from './generators';
+import { annulusLayout, filledRingLayout, framesLayout, gridLayout, interleavedLayout, ringLayout, ringsLayout } from './generators';
 import { Layout, LayoutSpec } from './types';
 
 /**
@@ -12,6 +12,20 @@ export const presets: Record<string, () => Layout> = {
   'interleaved-12x2': () => interleavedLayout({ cols: 12, rows: 2, id: 'interleaved-12x2' }),
   /** Palace of Fine Arts, final rig: 16 cannons over 16 projectors (zipper). */
   'interleaved-16x2': () => interleavedLayout({ cols: 16, rows: 2, id: 'interleaved-16x2' }),
+  /**
+   * Civic Center Plaza, "Five Frames": five truss frames in a line down the
+   * plaza toward City Hall, each holding one line of six cannons across its
+   * width (beams fan outward from the frame's centre). Seen from above with
+   * City Hall on the left: five columns of six, frame 1 nearest City Hall.
+   */
+  'civic-center': () => framesLayout({
+    frames: 5,
+    cols: 1,
+    rows: 6,
+    gap: 0,
+    id: 'civic-center',
+    name: 'Civic Center (5 frames × 6)'
+  }),
   'ring-6': () => ringLayout({ count: 6, id: 'ring-6', name: '6-cannon ring' }),
   nova: () => ringLayout({ count: 6, id: 'nova', name: 'Nova (6-laser ring)' }),
   /**
@@ -105,6 +119,11 @@ export function resolveLayout(spec: LayoutSpec): Layout {
       id: spec.id,
       name: spec.name
     });
+  case 'frames':
+    if (spec.frames == null || spec.cols == null || spec.rows == null) {
+      throw new Error('frames layout requires "frames", "cols" and "rows"');
+    }
+    return framesLayout({ frames: spec.frames, cols: spec.cols, rows: spec.rows, gap: spec.gap, id: spec.id, name: spec.name });
   case 'annulus':
     if (spec.count == null) throw new Error('annulus layout requires "count"');
     return annulusLayout({ count: spec.count, innerRadius: spec.innerRadius, id: spec.id, name: spec.name });

@@ -158,6 +158,55 @@ export function interleavedLayout({ cols, rows, stagger = 0.5, first = 'cannon',
   });
 }
 
+export interface FramesParams {
+  /** Number of truss frames, left to right. */
+  frames: number;
+  /** Cannons across each frame's depth (columns per frame). */
+  cols: number;
+  /** Cannons along each frame's width (rows). */
+  rows: number;
+  /** Empty cells between neighbouring frames. Default 2. */
+  gap?: number;
+  id?: string;
+  name?: string;
+}
+
+/**
+ * A line of identical truss frames, each holding a `cols`×`rows` block of
+ * cannons, with `gap` empty cells between frames. Indices are row-major over
+ * the joined grid (`frames * cols` wide, gaps removed), as the server's shift,
+ * mirror and orientation maths assume, so grid animations sweep straight
+ * across all frames. Labels read `F<frame>-<n>`, n row-major within the frame.
+ */
+export function framesLayout({ frames, cols, rows, gap = 2, id, name }: FramesParams): Layout {
+  if (frames < 1 || cols < 1 || rows < 1) {
+    throw new Error('framesLayout requires frames >= 1, cols >= 1 and rows >= 1');
+  }
+  if (!Number.isFinite(gap) || gap < 0) throw new Error(`framesLayout gap must be >= 0, got ${String(gap)}`);
+  const pitch = cols + gap;
+  const cx = ((frames - 1) * pitch + cols - 1) / 2;
+  const cy = (rows - 1) / 2;
+  const raw: RawFixture[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let f = 0; f < frames; f++) {
+      for (let c = 0; c < cols; c++) {
+        raw.push({ x: f * pitch + c - cx, y: r - cy, row: r, col: f * cols + c, label: `F${f + 1}-${r * cols + c + 1}` });
+      }
+    }
+  }
+  const totalCols = frames * cols;
+  const perimeter = gridPerimeter(totalCols, rows);
+  return finalize(raw, {
+    id: id ?? `frames-${frames}x${cols}x${rows}`,
+    name: name ?? `${frames} frames of ${cols}×${rows} (${raw.length})`,
+    topology: 'grid',
+    cols: totalCols,
+    rows,
+    hasGridCoords: true,
+    perimeter
+  });
+}
+
 export interface RingParams {
   count: number;
   id?: string;

@@ -108,11 +108,12 @@ Operators don't run these — they use `wavegrid start` (see [Running a Show](#r
 
 ## Layouts
 
-The physical arrangement is a **layout** stored in the project — never code. Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `nova`, `grace-cathedral` (12 + 12 + centre), `ring-25-filled`, `ring-25-hollow`, `disc-25`. Pick one at `wavegrid projects create`, or change it later:
+The physical arrangement is a **layout** stored in the project — never code. Built-in presets: `grid-7x7`, `grid-7x2`, `ring-6`, `nova`, `grace-cathedral` (12 + 12 + centre), `ring-25-filled`, `ring-25-hollow`, `disc-25`, `interleaved-12x2`, `interleaved-16x2`, `civic-center` (5 truss frames × 6). Pick one at `wavegrid projects create`, or change it later:
 
 ```sh
 wavegrid projects config set layout grid-7x7        # a built-in preset
 wavegrid projects config set layout grid:9x4        # cols × rows
+wavegrid projects config set layout frames:5x2x3    # 5 frames in a line, 2 cols × 3 rows each
 wavegrid projects config set layout ring:6          # one ring
 wavegrid projects config set layout annulus:25@0.5  # rings with a hole in the middle
 wavegrid projects config set layout rings:12,8,4,1  # explicit rings, outermost first

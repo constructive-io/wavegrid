@@ -26,6 +26,8 @@ export {
   type AnnulusParams,
   filledRingLayout,
   type FilledRingParams,
+  framesLayout,
+  type FramesParams,
   gridLayout,
   type GridParams,
   interleavedLayout,
