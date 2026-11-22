@@ -2,6 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { DEFAULT_CONFIG } from '@wavegrid/layout';
+
 import { openStore, parseProjectFile, type ProjectFile } from '../src';
 
 function tmp(prefix: string): string {
@@ -136,11 +138,19 @@ describe('project files', () => {
     const noActive = sampleFile();
     noActive.config = { ...noActive.config, activeLightMap: null };
     store.openProjectFile(file, noActive);
-    const receiver = { alpha: 0.5, fallbackDelay: 1000, lightMap: '/etc/wavegrid/light-map.json' };
+    const receiver = {
+      alpha: 0.5,
+      fallbackDelay: 1000,
+      server: 'ws://10.0.0.2:3000',
+      lightMap: '/etc/wavegrid/light-map.json'
+    };
     store.saveProjectConfig('venue', { ...store.getProjectConfig('venue')!, receiver });
 
     store.openProjectFile(file, noActive);
-    expect(store.getProjectConfig('venue')?.receiver?.lightMap).toBe('/etc/wavegrid/light-map.json');
+    expect(store.getProjectConfig('venue')?.receiver).toEqual({
+      ...DEFAULT_CONFIG.receiver,
+      lightMap: '/etc/wavegrid/light-map.json'
+    });
 
     store.openProjectFile(file, sampleFile());
     expect(store.getProjectConfig('venue')?.receiver?.lightMap).toBeUndefined();

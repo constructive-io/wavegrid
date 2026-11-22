@@ -1,4 +1,4 @@
-import { resolveLayout, type WavegridConfig } from '@wavegrid/layout';
+import { DEFAULT_CONFIG, resolveLayout, type WavegridConfig } from '@wavegrid/layout';
 import path from 'path';
 
 import { deleteLightMap, isLightMapName, listLightMaps, readLightMap, saveLightMap, setActiveLightMap } from './light-maps';
@@ -291,7 +291,7 @@ function keepMachineLocal(
   // A file that names an active light map wins over it; otherwise keep it.
   const localMap = local.receiver?.lightMap;
   if (localMap && !incoming.activeLightMap && incoming.receiver?.lightMap == null) {
-    config.receiver = { ...(incoming.receiver ?? local.receiver!), lightMap: localMap };
+    config.receiver = { ...(incoming.receiver ?? DEFAULT_CONFIG.receiver), lightMap: localMap };
   }
   return { config, keptLocalOsc };
 }
