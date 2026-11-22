@@ -45,6 +45,9 @@ export function runProjectsOpen(flags: Flags, file: string | undefined): void {
     console.log('');
     console.log(c.green(`  ✓ ${result.created ? 'Opened' : 'Refreshed'} project ${c.bold(result.project)} from ${result.file}`));
     console.log(`  ${c.gray(`light maps: ${result.lightMapCount} · looks: ${result.lookCount} · devices: ${result.deviceCount}`)}`);
+    if (result.keptLocalOsc) {
+      console.log(`  ${c.gray('kept this machine’s OSC target — the file had none')}`);
+    }
     if (result.generatedSecrets) {
       console.log(`  ${c.gray('Generated fresh secrets for this machine. Add UI users with `wavegrid projects users add`.')}`);
     }

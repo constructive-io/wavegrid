@@ -81,7 +81,7 @@ export async function importProjectFromFile(req: ImportRequest): Promise<ImportS
       generatedSecrets: opened.generatedSecrets,
       deviceCount: opened.deviceCount,
       userCount: 0,
-      keptLocalOsc: false,
+      keptLocalOsc: opened.keptLocalOsc,
       path: file
     };
   }
