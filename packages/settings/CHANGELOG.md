@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/settings@1.2.0...@wavegrid/settings@1.3.0) (2026-11-22)
+
+### Bug Fixes
+
+- **desktop:** authenticate the embedded UI against a joined brain; isolate the store in desktop tests ([7dc65c1](https://github.com/constructive-io/wavegrid/commit/7dc65c1edc84f84744ac1470cae393389f1f4df7))
+- **settings,layout:** import keeps the local OSC target; inline layouts export as JSON, not the default preset ([a5320f0](https://github.com/constructive-io/wavegrid/commit/a5320f0230fc78652082604d2f6c111fd21aa1ce))
+- **settings:** a kept receiver.lightMap does not bring back removed receiver settings ([8c9801d](https://github.com/constructive-io/wavegrid/commit/8c9801d54e1eb23890b750a0c824271d517edd57))
+- **settings:** a project file's osc block replaces the local one whole on refresh ([8f3b9da](https://github.com/constructive-io/wavegrid/commit/8f3b9da4e35627ddd1590d199a07820ab3173094))
+- **settings:** keep a local receiver.lightMap on refresh unless the file names an active light map ([9e57cfb](https://github.com/constructive-io/wavegrid/commit/9e57cfbf04576943cd242b9fb627b5c8da393e7e))
+- **settings:** reject "." and ".." as project names, keep the local OSC target on project-file refresh ([91b35f5](https://github.com/constructive-io/wavegrid/commit/91b35f57a2dd438129116f2d80c1f55e8c7d3b89))
+- **settings:** validate light map names before opening, and apply removed looks/devices on refresh ([167e6f0](https://github.com/constructive-io/wavegrid/commit/167e6f045ff29f34874469cbe4d008f1e6637427))
+
+### Features
+
+- .wavegrid project files kept outside the repo, plus explicit fixture layouts ([f4b2146](https://github.com/constructive-io/wavegrid/commit/f4b2146d7b6cdc2088880a69c36a76dd341ecd2a))
+- **auth:** sessions last 30 days instead of 60 minutes ([95c59af](https://github.com/constructive-io/wavegrid/commit/95c59afb01494fb0adc47fa8dc6b23742e8bb56a))
+- **desktop:** Join a brain receiver-only mode ([ea220a0](https://github.com/constructive-io/wavegrid/commit/ea220a0f66ed0f5fcb75489614b5219a677980d8))
+
 # [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/settings@1.1.0...@wavegrid/settings@1.2.0) (2026-09-17)
 
 ### Bug Fixes

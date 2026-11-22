@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.4.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/layout@1.3.0...@wavegrid/layout@1.4.0) (2026-11-22)
+
+### Bug Fixes
+
+- **layout:** reject empty perimeters and non-integer grid coordinates in fixtures layouts ([c7a2b5a](https://github.com/constructive-io/wavegrid/commit/c7a2b5aa184121c4dd8c984183cd65d28b9f2834))
+- **settings,layout:** import keeps the local OSC target; inline layouts export as JSON, not the default preset ([a5320f0](https://github.com/constructive-io/wavegrid/commit/a5320f0230fc78652082604d2f6c111fd21aa1ce))
+
+### Features
+
+- .wavegrid project files kept outside the repo, plus explicit fixture layouts ([f4b2146](https://github.com/constructive-io/wavegrid/commit/f4b2146d7b6cdc2088880a69c36a76dd341ecd2a))
+- **desktop:** Join a brain receiver-only mode ([ea220a0](https://github.com/constructive-io/wavegrid/commit/ea220a0f66ed0f5fcb75489614b5219a677980d8))
+- **layout:** grace-28 preset — 12 + 12 + inner ring of 4 ([c46959e](https://github.com/constructive-io/wavegrid/commit/c46959eed46c3f5a35cbd285dc66818c6fdc6e09))
+- projector fixture kind, interleaved 12x2 layout, dormant projector control API ([871c274](https://github.com/constructive-io/wavegrid/commit/871c27409896dfcfbfb5aaf0595ad5cd2278f77d))
+
 # [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/layout@1.2.0...@wavegrid/layout@1.3.0) (2026-09-17)
 
 ### Bug Fixes

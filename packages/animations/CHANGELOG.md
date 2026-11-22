@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/animations@1.1.0...@wavegrid/animations@1.2.0) (2026-11-22)
+
+### Features
+
+- **layout:** grace-28 preset — 12 + 12 + inner ring of 4 ([c46959e](https://github.com/constructive-io/wavegrid/commit/c46959eed46c3f5a35cbd285dc66818c6fdc6e09))
+
 # [1.1.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/animations@1.0.2...@wavegrid/animations@1.1.0) (2026-09-17)
 
 ### Features

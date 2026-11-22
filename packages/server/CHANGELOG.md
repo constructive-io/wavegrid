@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.4.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/server@1.3.0...@wavegrid/server@1.4.0) (2026-11-22)
+
+### Features
+
+- **looks:** GracePaint Looks saved on the brain — Save / tap to recall / rename / delete strip, persisted in the project state dir, shared by every UI ([edd1f52](https://github.com/constructive-io/wavegrid/commit/edd1f523eef5b5c745031df857352db99c3d6c97))
+- **pool:** Rotate — a constant slow turn of the whole pool under every mode ([6be5add](https://github.com/constructive-io/wavegrid/commit/6be5add65d9d7d7713ce45e67e27bfc15c8b1cb6))
+- projector fixture kind, interleaved 12x2 layout, dormant projector control API ([871c274](https://github.com/constructive-io/wavegrid/commit/871c27409896dfcfbfb5aaf0595ad5cd2278f77d))
+- **ui:** GracePaint simplified — no Speed/Brightness, explicit Rotation speed; colour picks never restart the running animation; hide unused tabs; Unwind keeps the centre lit ([4a33287](https://github.com/constructive-io/wavegrid/commit/4a33287e76b703349ac7c92ba70b50fb2f302bf5))
+- **ui:** GracePaint tab — paint pane colours while a brightness choreography runs; Grace previews ease like the receiver; drop Nova tab ([69b7d69](https://github.com/constructive-io/wavegrid/commit/69b7d690a993418b5d315194ee552e80a858424c))
+
 # [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/server@1.2.0...@wavegrid/server@1.3.0) (2026-09-17)
 
 ### Bug Fixes

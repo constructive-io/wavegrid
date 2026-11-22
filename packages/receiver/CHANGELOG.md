@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.4.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/receiver@1.3.0...@wavegrid/receiver@1.4.0) (2026-11-22)
+
+### Features
+
+- **desktop:** Join a brain receiver-only mode ([ea220a0](https://github.com/constructive-io/wavegrid/commit/ea220a0f66ed0f5fcb75489614b5219a677980d8))
+- projector fixture kind, interleaved 12x2 layout, dormant projector control API ([871c274](https://github.com/constructive-io/wavegrid/commit/871c27409896dfcfbfb5aaf0595ad5cd2278f77d))
+
 # [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/receiver@1.2.0...@wavegrid/receiver@1.3.0) (2026-09-17)
 
 ### Bug Fixes

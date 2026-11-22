@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/osc@1.1.0...@wavegrid/osc@1.2.0) (2026-11-22)
+
+### Features
+
+- projector fixture kind, interleaved 12x2 layout, dormant projector control API ([871c274](https://github.com/constructive-io/wavegrid/commit/871c27409896dfcfbfb5aaf0595ad5cd2278f77d))
+
 # [1.1.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/osc@1.0.1...@wavegrid/osc@1.1.0) (2026-09-17)
 
 ### Features

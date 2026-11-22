@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.4.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/ui@1.3.0...@wavegrid/ui@1.4.0) (2026-11-22)
+
+### Bug Fixes
+
+- **looks:** Save after Stop records the look as Solid, not the last animation ([5734ba7](https://github.com/constructive-io/wavegrid/commit/5734ba7f166acd84781cc64a8803cb6587e3e4ab))
+- **looks:** Save/rename without window.prompt — Electron has none, so Save silently did nothing ([8518344](https://github.com/constructive-io/wavegrid/commit/85183449f16c6aa11bfcbaee5b5d4e0628b46272))
+- **ui:** GracePaint — drop the Start button; any tap already takes over the window ([1627012](https://github.com/constructive-io/wavegrid/commit/1627012d070d17ef4c958c93b9a7e3a3ef8482f4))
+
+### Features
+
+- **audio:** Grace mode — music steers GracePaint colour only (slow hue/sat drift, gradient step on strong beats); brightness stays with the animation ([73a91dd](https://github.com/constructive-io/wavegrid/commit/73a91dde855f01a568115fe643a312cb132efcf5))
+- **looks:** GracePaint Looks saved on the brain — Save / tap to recall / rename / delete strip, persisted in the project state dir, shared by every UI ([edd1f52](https://github.com/constructive-io/wavegrid/commit/edd1f523eef5b5c745031df857352db99c3d6c97))
+- **pool:** Rotate — a constant slow turn of the whole pool under every mode ([6be5add](https://github.com/constructive-io/wavegrid/commit/6be5add65d9d7d7713ce45e67e27bfc15c8b1cb6))
+- projector fixture kind, interleaved 12x2 layout, dormant projector control API ([871c274](https://github.com/constructive-io/wavegrid/commit/871c27409896dfcfbfb5aaf0595ad5cd2278f77d))
+- **ui:** Audio tab hears the room — raw mic (no echo-cancel/noise-suppression/AGC), finer FFT, auto-levelling to the room; mic is the default source; Audio tab shown again ([2cededb](https://github.com/constructive-io/wavegrid/commit/2cededb46bfa354a0aef2361ef0cdf488e16b094))
+- **ui:** Grace tab — 16 gradient palettes × 14 slow rotating looks; inner four of grace-28 read as centre ([3754878](https://github.com/constructive-io/wavegrid/commit/3754878ef96a4435d8e9003568b807fc1c25de97))
+- **ui:** GracePaint animations read on the lasers — lit panes hold 80–100, dark panes go to 0, no all-dark moments ([42f03dc](https://github.com/constructive-io/wavegrid/commit/42f03dc507264312e623b6c4f5348ae8cfb33f42))
+- **ui:** GracePaint colour controls in sub-tabs — Gradients (+ rotation), Ring Colours, Paint ([9e4e975](https://github.com/constructive-io/wavegrid/commit/9e4e975ab7d551570f5da1829603a44ff3768065))
+- **ui:** GracePaint gradients and ring pairs take over the whole window (clear paint) ([08ab6df](https://github.com/constructive-io/wavegrid/commit/08ab6df17a0ca7b031d9152c522daa8336f3fdd4))
+- **ui:** GracePaint polish — Still→Solid, breathers dip deep and move last, colour sub-tab icons, Preview toggle removed ([8f27802](https://github.com/constructive-io/wavegrid/commit/8f2780211832f8c1c90861b0d222262f290a260a))
+- **ui:** GracePaint simplified — no Speed/Brightness, explicit Rotation speed; colour picks never restart the running animation; hide unused tabs; Unwind keeps the centre lit ([4a33287](https://github.com/constructive-io/wavegrid/commit/4a33287e76b703349ac7c92ba70b50fb2f302bf5))
+- **ui:** GracePaint tab — paint pane colours while a brightness choreography runs; Grace previews ease like the receiver; drop Nova tab ([69b7d69](https://github.com/constructive-io/wavegrid/commit/69b7d690a993418b5d315194ee552e80a858424c))
+- **ui:** Looks gets its own tab (moved out of GracePaint) ([68debce](https://github.com/constructive-io/wavegrid/commit/68debce0a4eadffee892dfabb2f1306fa496d657))
+- **ui:** Looks tab has sub-tabs (Looks now; Playlist to follow) ([ece1f8b](https://github.com/constructive-io/wavegrid/commit/ece1f8b713e3ead77c888d7ca302688939f05199))
+
 # [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/ui@1.2.0...@wavegrid/ui@1.3.0) (2026-09-17)
 
 ### Bug Fixes

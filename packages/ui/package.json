@@ -1,6 +1,6 @@
 {
   "name": "@wavegrid/ui",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "description": "Wavegrid control UI — a static Vite SPA served by @wavegrid/server on one origin",
   "license": "SEE LICENSE IN LICENSE",

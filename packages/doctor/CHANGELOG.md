@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/doctor@1.2.0...@wavegrid/doctor@1.3.0) (2026-11-22)
+
+### Features
+
+- **desktop:** Join a brain receiver-only mode ([ea220a0](https://github.com/constructive-io/wavegrid/commit/ea220a0f66ed0f5fcb75489614b5219a677980d8))
+
 # [1.2.0](https://github.com/constructive-io/wavegrid/compare/@wavegrid/doctor@1.1.0...@wavegrid/doctor@1.2.0) (2026-09-17)
 
 ### Features
