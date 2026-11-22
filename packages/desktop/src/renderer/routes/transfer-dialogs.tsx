@@ -130,29 +130,29 @@ export function ImportProjectDialog({
   const [result, setResult] = React.useState<ImportSummary | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setResult(null);
+      setError(null);
+      setName('');
+    }
+  };
+
   const run = async () => {
     setError(null);
+    setResult(null);
     try {
       const r = await onImport({ name: name.trim() || undefined, activate, overwrite });
       if (r) setResult(r);
-      else setOpen(false);
+      else changeOpen(false);
     } catch (e) {
       setError((e as Error).message);
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) {
-          setResult(null);
-          setError(null);
-          setName('');
-        }
-      }}
-    >
+    <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
         <Button variant='outline' size='sm' disabled={busy}>
           <Upload />
@@ -163,7 +163,8 @@ export function ImportProjectDialog({
         <DialogHeader>
           <DialogTitle>Import a project</DialogTitle>
           <DialogDescription>
-            Reads a bundle exported here or by <code>wavegrid projects export</code>.
+            Opens a <code>.wavegrid</code> project file, or a bundle exported here or by{' '}
+            <code>wavegrid projects export</code>.
           </DialogDescription>
         </DialogHeader>
 
@@ -212,7 +213,7 @@ export function ImportProjectDialog({
         )}
 
         <DialogFooter>
-          <Button variant='outline' onClick={() => setOpen(false)}>
+          <Button variant='outline' onClick={() => changeOpen(false)}>
             {result ? 'Close' : 'Cancel'}
           </Button>
           <Button disabled={busy} onClick={() => void run()}>
