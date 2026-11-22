@@ -11,7 +11,7 @@ import {
   writeFileAtomic
 } from './paths';
 import { type PortableDevice } from './portable';
-import { createProject, getProjectConfig, hasProject, type ProjectConfig } from './projects';
+import { createProject, getProjectConfig, hasProject, isProjectName, type ProjectConfig } from './projects';
 import { type DeviceRecord } from './registry';
 import { generateSecrets, readSecrets } from './secrets';
 
@@ -108,8 +108,8 @@ export function parseProjectFile(raw: unknown): ProjectFile {
     throw new Error(`Unsupported project file version ${String(raw.version)} — this Wavegrid reads version 1.`);
   }
   const problems: string[] = [];
-  if (typeof raw.name !== 'string' || !/^[a-zA-Z0-9._-]+$/.test(raw.name)) {
-    problems.push('"name" must be letters, numbers, ".", "_" or "-"');
+  if (!isProjectName(raw.name)) {
+    problems.push('"name" must be letters, numbers, ".", "_" or "-" (and not "." or "..")');
   }
   if (raw.description != null && typeof raw.description !== 'string') problems.push('"description" must be a string');
   if (!isObject(raw.config)) {
@@ -267,6 +267,33 @@ export interface OpenProjectFileResult {
   lightMapCount: number;
   lookCount: number;
   deviceCount: number;
+  /** True when a refresh kept this machine's OSC target because the file had none. */
+  keptLocalOsc: boolean;
+}
+
+/**
+ * A file never carries this machine's OSC target or its local file paths
+ * (`buildProjectFile` drops them), so a refresh must not wipe them either.
+ */
+function keepMachineLocal(
+  incoming: ProjectConfig,
+  local: ProjectConfig | null
+): { config: ProjectConfig; keptLocalOsc: boolean } {
+  if (!local) return { config: incoming, keptLocalOsc: false };
+  const config: ProjectConfig = { ...incoming };
+  let keptLocalOsc = false;
+  if (config.osc == null) {
+    if (local.osc && Object.keys(local.osc).length > 0) {
+      config.osc = local.osc;
+      keptLocalOsc = true;
+    }
+  } else if (config.osc.routingConfig == null && local.osc?.routingConfig) {
+    config.osc = { ...config.osc, routingConfig: local.osc.routingConfig };
+  }
+  if (config.receiver && config.receiver.lightMap == null && local.receiver?.lightMap) {
+    config.receiver = { ...config.receiver, lightMap: local.receiver.lightMap };
+  }
+  return { config, keptLocalOsc };
 }
 
 /**
@@ -285,6 +312,9 @@ export function openProjectFile(
   const doc = parseProjectFile(raw);
   const resolved = path.resolve(file);
   const project = opts.name ?? doc.name;
+  if (!isProjectName(project)) {
+    throw new Error(`Invalid project name "${project}". Use letters, numbers, ".", "_" or "-".`);
+  }
   const exists = hasProject(paths, project);
   if (exists && !opts.overwrite && getProjectFileLink(paths, project)?.path !== resolved) {
     throw new Error(
@@ -293,7 +323,8 @@ export function openProjectFile(
     );
   }
 
-  createProject(paths, project, doc.config, { activate: opts.activate });
+  const { config, keptLocalOsc } = keepMachineLocal(doc.config, exists ? getProjectConfig(paths, project) : null);
+  createProject(paths, project, config, { activate: opts.activate });
 
   const maps = doc.lightMaps ?? [];
   const keep = new Set(maps.map((m) => m.name));
@@ -342,6 +373,7 @@ export function openProjectFile(
     file: resolved,
     created: !exists,
     generatedSecrets,
+    keptLocalOsc,
     lightMapCount: maps.length,
     lookCount: doc.looks?.length ?? 0,
     deviceCount: doc.devices?.length ?? 0

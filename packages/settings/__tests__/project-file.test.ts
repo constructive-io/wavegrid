@@ -98,6 +98,41 @@ describe('project files', () => {
     expect(store.listDevices('venue')[0].address).toBe('10.0.0.5');
   });
 
+  it('rejects project names that are not a single directory', () => {
+    expect(() => parseProjectFile({ ...sampleFile(), name: '..' })).toThrow(/"name"/);
+    expect(() => parseProjectFile({ ...sampleFile(), name: '.' })).toThrow(/"name"/);
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    expect(() => store.openProjectFile(file, sampleFile(), { name: '..' })).toThrow(/Invalid project name/);
+    expect(() => store.createProject('..', {} as never)).toThrow(/Invalid project name/);
+    expect(store.listProjects()).toEqual([]);
+  });
+
+  it('keeps this machine’s OSC target and local paths across a refresh', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    const first = store.openProjectFile(file, sampleFile());
+    expect(first.keptLocalOsc).toBe(false);
+    const beyond = { host: '10.0.0.9', port: 8000, gridOrder: 'row' as const };
+    store.saveProjectConfig('venue', {
+      ...store.getProjectConfig('venue')!,
+      osc: { beyond, routingConfig: '/etc/wavegrid/routing.json' }
+    });
+
+    const refreshed = store.openProjectFile(file, sampleFile());
+    expect(refreshed.keptLocalOsc).toBe(true);
+    expect(store.getProjectConfig('venue')?.osc).toEqual({ beyond, routingConfig: '/etc/wavegrid/routing.json' });
+
+    const withOsc = sampleFile();
+    withOsc.config = { ...withOsc.config, osc: { beyond: { ...beyond, port: 9000 } } };
+    const again = store.openProjectFile(file, withOsc);
+    expect(again.keptLocalOsc).toBe(false);
+    expect(store.getProjectConfig('venue')?.osc).toEqual({
+      beyond: { ...beyond, port: 9000 },
+      routingConfig: '/etc/wavegrid/routing.json'
+    });
+  });
+
   it('applies deletions when a refreshed file has no looks or devices', () => {
     const store = openStore({ baseDir: tmp('wg-pf-store-') });
     const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');

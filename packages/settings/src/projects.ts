@@ -70,13 +70,18 @@ export interface CreateProjectOptions {
   activate?: boolean;
 }
 
+/** A project name is one directory under `data/projects`, so "." and ".." are out. */
+export function isProjectName(name: unknown): name is string {
+  return typeof name === 'string' && /^[a-zA-Z0-9._-]+$/.test(name) && name !== '.' && name !== '..';
+}
+
 export function createProject(
   paths: StorePaths,
   name: string,
   config: ProjectConfig,
   opts: CreateProjectOptions = {}
 ): void {
-  if (!name || !/^[a-zA-Z0-9._-]+$/.test(name)) {
+  if (!isProjectName(name)) {
     throw new Error(`Invalid project name "${name}". Use letters, numbers, ".", "_" or "-".`);
   }
   const reg = readRegistry(paths);
