@@ -108,7 +108,7 @@ describe('project files', () => {
     expect(store.listProjects()).toEqual([]);
   });
 
-  it('keeps this machine’s OSC target and local paths across a refresh', () => {
+  it('keeps this machine’s OSC target across a refresh when the file has none', () => {
     const store = openStore({ baseDir: tmp('wg-pf-store-') });
     const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
     const first = store.openProjectFile(file, sampleFile());
@@ -127,10 +127,7 @@ describe('project files', () => {
     withOsc.config = { ...withOsc.config, osc: { beyond: { ...beyond, port: 9000 } } };
     const again = store.openProjectFile(file, withOsc);
     expect(again.keptLocalOsc).toBe(false);
-    expect(store.getProjectConfig('venue')?.osc).toEqual({
-      beyond: { ...beyond, port: 9000 },
-      routingConfig: '/etc/wavegrid/routing.json'
-    });
+    expect(store.getProjectConfig('venue')?.osc).toEqual({ beyond: { ...beyond, port: 9000 } });
   });
 
   it('applies deletions when a refreshed file has no looks or devices', () => {

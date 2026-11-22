@@ -272,8 +272,9 @@ export interface OpenProjectFileResult {
 }
 
 /**
- * A file never carries this machine's OSC target or its local file paths
- * (`buildProjectFile` drops them), so a refresh must not wipe them either.
+ * A file with no `osc` block says nothing about the hardware next to this
+ * machine, so a refresh keeps the OSC target configured here (as
+ * `importProject` does). A file that has one replaces it whole.
  */
 function keepMachineLocal(
   incoming: ProjectConfig,
@@ -282,16 +283,9 @@ function keepMachineLocal(
   if (!local) return { config: incoming, keptLocalOsc: false };
   const config: ProjectConfig = { ...incoming };
   let keptLocalOsc = false;
-  if (config.osc == null) {
-    if (local.osc && Object.keys(local.osc).length > 0) {
-      config.osc = local.osc;
-      keptLocalOsc = true;
-    }
-  } else if (config.osc.routingConfig == null && local.osc?.routingConfig) {
-    config.osc = { ...config.osc, routingConfig: local.osc.routingConfig };
-  }
-  if (config.receiver && config.receiver.lightMap == null && local.receiver?.lightMap) {
-    config.receiver = { ...config.receiver, lightMap: local.receiver.lightMap };
+  if (config.osc == null && local.osc && Object.keys(local.osc).length > 0) {
+    config.osc = local.osc;
+    keptLocalOsc = true;
   }
   return { config, keptLocalOsc };
 }
