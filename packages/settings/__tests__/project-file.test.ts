@@ -130,6 +130,22 @@ describe('project files', () => {
     expect(store.getProjectConfig('venue')?.osc).toEqual({ beyond: { ...beyond, port: 9000 } });
   });
 
+  it('keeps a local receiver.lightMap unless the file names an active light map', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    const noActive = sampleFile();
+    noActive.config = { ...noActive.config, activeLightMap: null };
+    store.openProjectFile(file, noActive);
+    const receiver = { alpha: 0.5, fallbackDelay: 1000, lightMap: '/etc/wavegrid/light-map.json' };
+    store.saveProjectConfig('venue', { ...store.getProjectConfig('venue')!, receiver });
+
+    store.openProjectFile(file, noActive);
+    expect(store.getProjectConfig('venue')?.receiver?.lightMap).toBe('/etc/wavegrid/light-map.json');
+
+    store.openProjectFile(file, sampleFile());
+    expect(store.getProjectConfig('venue')?.receiver?.lightMap).toBeUndefined();
+  });
+
   it('applies deletions when a refreshed file has no looks or devices', () => {
     const store = openStore({ baseDir: tmp('wg-pf-store-') });
     const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');

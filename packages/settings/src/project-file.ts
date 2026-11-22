@@ -287,6 +287,12 @@ function keepMachineLocal(
     config.osc = local.osc;
     keptLocalOsc = true;
   }
+  // receiver.lightMap is this machine's own correction file (save drops it).
+  // A file that names an active light map wins over it; otherwise keep it.
+  const localMap = local.receiver?.lightMap;
+  if (localMap && !incoming.activeLightMap && incoming.receiver?.lightMap == null) {
+    config.receiver = { ...(incoming.receiver ?? local.receiver!), lightMap: localMap };
+  }
   return { config, keptLocalOsc };
 }
 
