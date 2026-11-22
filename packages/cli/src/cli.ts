@@ -16,6 +16,7 @@ import {
   SIGNALS_USAGE
 } from './commands/osc-signals';
 import { runPrintConfig } from './commands/print-config';
+import { runProjectsOpen, runProjectsSave } from './commands/project-file';
 import { runProjectsExport, runProjectsImport } from './commands/project-io';
 import { runProjects, runUse } from './commands/projects';
 import { runReceiver } from './commands/receiver';
@@ -54,6 +55,8 @@ ${c.bold('Projects')} — manage and edit projects
   projects devices list|assign  List / name / shard-assign devices that joined
   projects osc                  Set the OSC laser target (BEYOND/FB4) — wizard
   projects routing show|gen     One global routing spec → per-device configs
+  projects open <file>          Open a .wavegrid project file (re-run to refresh)
+  projects save [file]          Write the project to its .wavegrid file
   projects export [--out f]     Write a portable project bundle
   projects import <file>        Restore a project from a bundle
   projects env export           Write a .env for the project
@@ -85,7 +88,7 @@ ${c.bold('Options')}
   -h, --help          Show this help
   -v, --version       Show version
 
-${c.gray('Shortcuts: `init`, `config`, `secrets`, `users`, `devices`, `env` work as aliases for the `projects …` forms.')}
+${c.gray('Shortcuts: `init`, `open`, `config`, `secrets`, `users`, `devices`, `env` work as aliases for the `projects …` forms.')}
 `;
 
 /** Top-level menu (bare `wavegrid`). */
@@ -116,6 +119,8 @@ const PROJECTS_SUBS: SubCommand[] = [
   { value: 'devices', description: 'List, rename, or forget devices that joined the project' },
   { value: 'osc', description: 'Set the OSC laser target (BEYOND/FB4/routing) — interactive wizard' },
   { value: 'routing', description: 'One global routing spec; each laptop\'s config is generated from it' },
+  { value: 'open', description: 'Open a .wavegrid project file into the store (re-run to refresh)' },
+  { value: 'save', description: 'Write the project to its .wavegrid project file' },
   { value: 'export', description: 'Write a portable project bundle (no machine identity)' },
   { value: 'import', description: 'Restore a project from a portable bundle' },
   { value: 'env', description: 'Write a .env for the project' }
@@ -210,6 +215,7 @@ function coerce(value: string): string | number | boolean {
 
 const KNOWN_COMMANDS = [
   'init',
+  'open',
   'start',
   'server',
   'receiver',
@@ -439,6 +445,12 @@ async function dispatchProjects(
   case 'routing':
     await dispatchRouting(rest, flags, prompter, nonInteractive);
     break;
+  case 'open':
+    runProjectsOpen(flags, rest[0]);
+    break;
+  case 'save':
+    runProjectsSave(flags, rest[0]);
+    break;
   case 'export':
     runProjectsExport(flags);
     break;
@@ -502,6 +514,10 @@ export async function run(argvInput: string[] = process.argv.slice(2)): Promise<
       await runInit(flags, prompter);
       break;
     }
+    // `open` is a shortcut alias for `projects open`.
+    case 'open':
+      runProjectsOpen(flags, positionals[1]);
+      break;
     case 'start': {
       keepOpen = !nonInteractive;
       await runStart({ flags, prompter: nonInteractive ? undefined : prompter });

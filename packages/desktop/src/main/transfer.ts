@@ -1,7 +1,7 @@
 // Project export/import driven by native file dialogs. The bundle format and
 // all store writes come from @wavegrid/settings — this only chooses the file and
 // reads/writes it, so a bundle written here imports with the CLI and vice versa.
-import { openStore } from '@wavegrid/settings';
+import { isProjectFile, openStore } from '@wavegrid/settings';
 import { dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -55,7 +55,7 @@ export async function importProjectFromFile(req: ImportRequest): Promise<ImportS
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Import a Wavegrid project',
     properties: ['openFile'],
-    filters: [{ name: 'Wavegrid project', extensions: ['json'] }]
+    filters: [{ name: 'Wavegrid project', extensions: ['wavegrid', 'json'] }]
   });
   const file = filePaths[0];
   if (canceled || !file) return null;
@@ -67,9 +67,27 @@ export async function importProjectFromFile(req: ImportRequest): Promise<ImportS
     throw new Error(`${path.basename(file)} is not valid JSON.`);
   }
 
+  const store = openStore();
+  // A `.wavegrid` project file carries no users or secrets: secrets are kept
+  // or generated here, and this machine's users stay as they are.
+  if (isProjectFile(raw)) {
+    const opened = store.openProjectFile(file, raw, {
+      name: req.name?.trim() ? req.name.trim() : undefined,
+      activate: req.activate,
+      overwrite: req.overwrite
+    });
+    return {
+      project: opened.project,
+      generatedSecrets: opened.generatedSecrets,
+      deviceCount: opened.deviceCount,
+      userCount: 0,
+      keptLocalOsc: opened.keptLocalOsc,
+      path: file
+    };
+  }
+
   // parseBundle rejects anything that is not a v1 project export, so a stray
   // JSON file cannot be half-imported.
-  const store = openStore();
   const result = store.importProject(raw, {
     name: req.name?.trim() ? req.name.trim() : undefined,
     activate: req.activate,

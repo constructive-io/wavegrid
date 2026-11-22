@@ -88,7 +88,24 @@ export type RunMode = 'simple' | 'distributed';
  * Layout kinds a config can ask for. `annulus` is sugar: it distributes a
  * fixture count over concentric rings and resolves to a `rings` layout.
  */
-export type LayoutKind = Topology | 'annulus' | 'interleaved';
+export type LayoutKind = Topology | 'annulus' | 'interleaved' | 'fixtures';
+
+/**
+ * One fixture of a `fixtures` layout: an explicit position for a venue whose
+ * shape no generator describes. `x`/`y` are in any unit (only ratios matter),
+ * with y growing downwards like the UI canvas. Array order is logical order.
+ */
+export interface FixtureSpec {
+  x: number;
+  y: number;
+  kind?: FixtureKind;
+  label?: string;
+  /** Grid coordinates, when the venue has them. Give both on every fixture or none. */
+  row?: number;
+  col?: number;
+  /** Concentric ring index (0 = innermost). Default 0. */
+  ring?: number;
+}
 
 /** How a layout is described in a config file. */
 export interface LayoutSpec {
@@ -109,6 +126,15 @@ export interface LayoutSpec {
   stagger?: number;
   /** interleaved: kind of the even rows (default cannon; odd rows are the other kind). */
   first?: FixtureKind;
+  /** fixtures: every fixture's position, in logical order. */
+  fixtures?: FixtureSpec[];
+  /**
+   * fixtures: which family of patterns the shape behaves like. Default `grid`
+   * when every fixture has row/col, otherwise `ring`.
+   */
+  topology?: Topology;
+  /** fixtures: indices tracing the outer edge in draw order. Default: all, by angle. */
+  perimeter?: number[];
   /** Override the generated id/name. */
   id?: string;
   name?: string;

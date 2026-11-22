@@ -38,7 +38,8 @@ export interface ProjectSummary {
  *  Mirrors the CLI's LayoutSpec. */
 export interface LayoutChoice {
   preset?: string;
-  kind?: 'grid' | 'interleaved' | 'ring' | 'filledRing' | 'annulus' | 'rings';
+  /** `fixtures` comes from a project file and is edited there, not in the app. */
+  kind?: 'grid' | 'interleaved' | 'ring' | 'filledRing' | 'annulus' | 'rings' | 'fixtures';
   cols?: number;
   rows?: number;
   count?: number;

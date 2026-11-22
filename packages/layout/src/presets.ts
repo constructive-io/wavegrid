@@ -1,4 +1,4 @@
-import { annulusLayout, filledRingLayout, gridLayout, interleavedLayout, ringLayout, ringsLayout } from './generators';
+import { annulusLayout, filledRingLayout, fixturesLayout, gridLayout, interleavedLayout, ringLayout, ringsLayout } from './generators';
 import { Layout, LayoutSpec } from './types';
 
 /**
@@ -108,6 +108,15 @@ export function resolveLayout(spec: LayoutSpec): Layout {
   case 'annulus':
     if (spec.count == null) throw new Error('annulus layout requires "count"');
     return annulusLayout({ count: spec.count, innerRadius: spec.innerRadius, id: spec.id, name: spec.name });
+  case 'fixtures':
+    if (!spec.fixtures?.length) throw new Error('fixtures layout requires a non-empty "fixtures" list');
+    return fixturesLayout({
+      fixtures: spec.fixtures,
+      topology: spec.topology,
+      perimeter: spec.perimeter,
+      id: spec.id,
+      name: spec.name
+    });
   default:
     throw new Error('layout spec must set either "preset" or "kind"');
   }

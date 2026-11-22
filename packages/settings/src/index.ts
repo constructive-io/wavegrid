@@ -16,6 +16,22 @@ export {
   type PortableProject
 } from './portable';
 
+// Project files (`<name>.wavegrid`)
+export {
+  type BuildProjectFileResult,
+  isProjectFile,
+  type OpenProjectFileOptions,
+  type OpenProjectFileResult,
+  parseProjectFile,
+  PROJECT_FILE_EXTENSION,
+  type ProjectFile,
+  type ProjectFileLightMap,
+  type ProjectFileLink,
+  type ProjectFileLook,
+  type SaveProjectFileOptions,
+  type SaveProjectFileResult
+} from './project-file';
+
 // Config synchronization (revisioned, server-mediated + peer fallback)
 export {
   type ApplyResult,
