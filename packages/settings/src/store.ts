@@ -37,6 +37,18 @@ import {
   type PortableProject
 } from './portable';
 import {
+  buildProjectFile,
+  type BuildProjectFileResult,
+  getProjectFileLink,
+  openProjectFile,
+  type OpenProjectFileOptions,
+  type OpenProjectFileResult,
+  type ProjectFileLink,
+  saveProjectFile,
+  type SaveProjectFileOptions,
+  type SaveProjectFileResult
+} from './project-file';
+import {
   createProject,
   type CreateProjectOptions,
   deleteProject,
@@ -183,6 +195,15 @@ export interface SettingsStore {
   exportProject(project: string, opts?: ExportOptions): PortableProject;
   importProject(bundle: unknown, opts?: ImportOptions): ImportResult;
 
+  // Project files (`<name>.wavegrid`): the shareable definition of an
+  // installation, kept outside the store and outside this repository.
+  /** Load a parsed project file read from `file` into the store. */
+  openProjectFile(file: string, raw: unknown, opts?: OpenProjectFileOptions): OpenProjectFileResult;
+  /** Write a project to `opts.file`, or to the file it was opened from. */
+  saveProjectFile(project: string, opts?: SaveProjectFileOptions): SaveProjectFileResult;
+  buildProjectFile(project: string): BuildProjectFileResult;
+  getProjectFileLink(project: string): ProjectFileLink | null;
+
   // Config synchronization (revisioned; server-mediated primary, peer fallback)
   getSyncState(project: string): SyncState;
   applySyncUpdate(project: string, update: ConfigUpdate): ApplyResult;
@@ -290,6 +311,11 @@ export function openStore(opts: StoreOptions = {}): SettingsStore {
 
     exportProject: (project, o) => exportProject(paths, project, o),
     importProject: (bundle, o) => importProject(paths, parseBundle(bundle), o),
+
+    openProjectFile: (file, raw, o) => openProjectFile(paths, file, raw, o),
+    saveProjectFile: (project, o) => saveProjectFile(paths, project, o),
+    buildProjectFile: (project) => buildProjectFile(paths, project),
+    getProjectFileLink: (project) => getProjectFileLink(paths, project),
 
     getSyncState: (project) => readSyncState(paths, project),
     applySyncUpdate: (project, update) => applyUpdate(paths, project, update),

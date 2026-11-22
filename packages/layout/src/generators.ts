@@ -1,4 +1,4 @@
-import { Fixture, FixtureKind, Layout, RingSpec, Topology } from './types';
+import { Fixture, FixtureKind, FixtureSpec, Layout, RingSpec, Topology } from './types';
 
 interface RawFixture {
   x: number;
@@ -412,4 +412,68 @@ function share(count: number, radii: number[]): number[] {
     alloc[best]--;
   }
   return alloc;
+}
+
+export interface FixturesParams {
+  fixtures: FixtureSpec[];
+  topology?: Topology;
+  perimeter?: number[];
+  id?: string;
+  name?: string;
+}
+
+/**
+ * A layout from explicit fixture positions, for venues no generator describes.
+ * Positions are re-centred on their centroid so polar axes (angle, radius) are
+ * meaningful whatever origin the author used.
+ */
+export function fixturesLayout({ fixtures, topology, perimeter, id, name }: FixturesParams): Layout {
+  if (!Array.isArray(fixtures) || fixtures.length < 1) {
+    throw new Error('fixtures layout requires a non-empty "fixtures" list');
+  }
+  fixtures.forEach((f, i) => {
+    if (!f || !Number.isFinite(f.x) || !Number.isFinite(f.y)) {
+      throw new Error(`fixtures layout: fixture ${i} needs numeric "x" and "y"`);
+    }
+    if (f.kind != null && f.kind !== 'cannon' && f.kind !== 'projector') {
+      throw new Error(`fixtures layout: fixture ${i} has unknown kind "${String(f.kind)}"`);
+    }
+  });
+  const withGrid = fixtures.filter(f => f.row != null && f.col != null).length;
+  if (withGrid !== 0 && withGrid !== fixtures.length) {
+    throw new Error('fixtures layout: give "row" and "col" on every fixture or on none');
+  }
+  const hasGridCoords = withGrid === fixtures.length;
+
+  const cx = fixtures.reduce((sum, f) => sum + f.x, 0) / fixtures.length;
+  const cy = fixtures.reduce((sum, f) => sum + f.y, 0) / fixtures.length;
+  const raw: RawFixture[] = fixtures.map((f, i) => ({
+    x: f.x - cx,
+    y: f.y - cy,
+    row: hasGridCoords ? (f.row as number) : -1,
+    col: hasGridCoords ? (f.col as number) : -1,
+    label: f.label ?? `${i + 1}`,
+    ring: f.ring ?? 0,
+    kind: f.kind
+  }));
+
+  const count = raw.length;
+  let edge: number[];
+  if (perimeter) {
+    const bad = perimeter.find(i => !Number.isInteger(i) || i < 0 || i >= count);
+    if (bad !== undefined) throw new Error(`fixtures layout: perimeter index ${bad} is out of range 0..${count - 1}`);
+    edge = perimeter.slice();
+  } else {
+    edge = raw.map((_, i) => i).sort((a, b) => Math.atan2(raw[a].y, raw[a].x) - Math.atan2(raw[b].y, raw[b].x));
+  }
+
+  return finalize(raw, {
+    id: id ?? `fixtures-${count}`,
+    name: name ?? `${count} fixtures`,
+    topology: topology ?? (hasGridCoords ? 'grid' : 'ring'),
+    cols: hasGridCoords ? Math.max(...raw.map(f => f.col)) + 1 : 0,
+    rows: hasGridCoords ? Math.max(...raw.map(f => f.row)) + 1 : 0,
+    hasGridCoords,
+    perimeter: edge
+  });
 }

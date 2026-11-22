@@ -47,6 +47,8 @@ export function buildLayoutSpec(choice: LayoutChoice): LayoutSpec {
       throw new Error('A rings layout needs cannons per ring, e.g. 12,8,4,1.');
     }
     spec = parseLayoutSpec(`rings:${choice.ringCounts.trim()}`);
+  } else if (choice.kind === 'fixtures') {
+    throw new Error('Explicit fixture positions are edited in the .wavegrid project file.');
   } else {
     throw new Error('Pick a preset or a custom shape for the layout.');
   }
@@ -66,6 +68,7 @@ function specToChoice(spec: LayoutSpec | undefined): LayoutChoice {
       .join(',');
     return { kind: 'rings', ringCounts: counts };
   }
+  if (spec.kind === 'fixtures') return { kind: 'fixtures', count: spec.fixtures?.length };
   return {
     kind: spec.kind,
     cols: spec.cols,
@@ -123,7 +126,7 @@ export function applyEditable(existing: ProjectConfig | null, edit: EditableConf
   else delete receiver.server;
   return {
     ...prev,
-    layout: buildLayoutSpec(edit.layout),
+    layout: edit.layout.kind === 'fixtures' && prev.layout?.kind === 'fixtures' ? prev.layout : buildLayoutSpec(edit.layout),
     mode: edit.mode,
     simpleModeMax: edit.simpleModeMax,
     server: { host: edit.serverHost, port: edit.serverPort },

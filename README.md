@@ -120,7 +120,20 @@ wavegrid projects config set layout rings:12,8,4,1  # explicit rings, outermost 
 
 Round rigs are concentric rings: one ring is a ring, a ring plus smaller ones inside it is a ring with a hollow centre, and rings all the way in to a centre fixture is a symmetric disc. `annulus` picks the rings for you from a cannon count and the size of the hole (`0` = solid disc).
 
+A venue no generator describes can list every fixture's position instead (`"kind": "fixtures"`); see [Project files](docs/project-file.md).
+
 The server resolves the layout once and broadcasts it; the UI and receiver render from it — no per-process `NUM_CANNONS`/`GRID_COLUMNS` to keep in sync. The project *name* is just a label — the preset controls the shape.
+
+## Project files
+
+A project's whole definition — layout, run settings, routing, light maps, Looks and planned devices — can live in a `<name>.wavegrid` file outside this repository. It holds no secrets, users or machine identity, so it is safe to commit:
+
+```sh
+wavegrid projects open venue.wavegrid --activate   # load (re-run to refresh after edits)
+wavegrid projects save                             # write store edits back to the file
+```
+
+See [docs/project-file.md](docs/project-file.md) for the format.
 
 ## Sharding
 

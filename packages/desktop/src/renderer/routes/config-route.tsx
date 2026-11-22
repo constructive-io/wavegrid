@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { EditableConfig, LayoutChoice } from '@/types/ipc';
 
-type Shape = 'preset' | 'grid' | 'ring' | 'annulus' | 'rings' | 'filledRing';
+type Shape = 'preset' | 'grid' | 'ring' | 'annulus' | 'rings' | 'filledRing' | 'fixtures';
 
 /** Cannons per ring, outermost first — "12,8,4,1". */
 function ringCountsValid(text: string | undefined): boolean {
@@ -143,11 +143,13 @@ export function ConfigRoute({ project, presets, config, loading, onSave, busy }:
         ? Number(draft.layout.cols) >= 1 && Number(draft.layout.rows) >= 1
         : shape === 'rings'
           ? ringCountsValid(draft.layout.ringCounts)
-          : shape === 'annulus'
-            ? Number(draft.layout.count) >= 1 &&
+          : shape === 'fixtures'
+            ? true
+            : shape === 'annulus'
+              ? Number(draft.layout.count) >= 1 &&
             Number(draft.layout.innerRadius) >= 0 &&
             Number(draft.layout.innerRadius) < 1
-            : Number(draft.layout.count) >= 1;
+              : Number(draft.layout.count) >= 1;
   const valid =
     layoutValid &&
     Number.isInteger(numeric(String(draft.serverPort))) &&
@@ -226,10 +228,17 @@ export function ConfigRoute({ project, presets, config, loading, onSave, busy }:
                 { value: 'ring', label: 'Ring' },
                 { value: 'annulus', label: 'Ring w/ hole' },
                 { value: 'rings', label: 'Concentric rings' },
-                { value: 'filledRing', label: 'Filled ring' }
+                { value: 'filledRing', label: 'Filled ring' },
+                ...(shape === 'fixtures' ? [{ value: 'fixtures' as Shape, label: 'From project file' }] : [])
               ]}
             />
           </div>
+          {shape === 'fixtures' && (
+            <p className='text-sm text-muted-foreground'>
+              {draft.layout.count ?? 0} fixtures placed by the project file. Edit their positions in its .wavegrid file and
+              open it again to apply.
+            </p>
+          )}
           {shape === 'preset' && (
             <div className='flex flex-col gap-1.5'>
               <Label>Preset</Label>

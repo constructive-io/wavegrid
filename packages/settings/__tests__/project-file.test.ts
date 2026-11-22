@@ -1,0 +1,127 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
+import { openStore, parseProjectFile, type ProjectFile } from '../src';
+
+function tmp(prefix: string): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+function sampleFile(): ProjectFile {
+  return {
+    wavegrid: 'project',
+    version: 1,
+    name: 'venue',
+    description: 'A venue kept in its own repo',
+    config: {
+      layout: {
+        kind: 'fixtures',
+        fixtures: [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+          { x: 2, y: 0 }
+        ]
+      },
+      mode: 'local',
+      activeLightMap: 'swap'
+    } as never,
+    lightMaps: [{ name: 'swap', numCannons: 3, gridColumns: 3, physicalLights: [1, 0, 2] }],
+    looks: [{ id: 'l1', name: 'Blue', params: { hue: 240 } }],
+    devices: [{ id: 'dev-1', name: 'foh', layout: 'fixtures', mode: 'simple', shard: null }],
+    stations: [{ id: 'booth', passcode: 'not-a-real-field-yet' }]
+  };
+}
+
+function writeJson(file: string, data: unknown): void {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+describe('project files', () => {
+  it('opens a file into the store without secrets or users in it', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    writeJson(file, sampleFile());
+
+    const result = store.openProjectFile(file, JSON.parse(fs.readFileSync(file, 'utf8')), { activate: true });
+
+    expect(result).toMatchObject({ project: 'venue', created: true, generatedSecrets: true, lightMapCount: 1, lookCount: 1, deviceCount: 1 });
+    expect(store.getProjectConfig('venue')?.activeLightMap).toBe('swap');
+    expect(store.readLightMap('venue', 'swap')?.physicalLights).toEqual([1, 0, 2]);
+    expect(store.listDevices('venue')).toHaveLength(1);
+    const looks = JSON.parse(fs.readFileSync(path.join(store.stateDir('venue'), 'looks.json'), 'utf8'));
+    expect(looks.looks[0].name).toBe('Blue');
+    expect(store.getProjectFileLink('venue')?.path).toBe(path.resolve(file));
+  });
+
+  it('saves back to the same file, keeping unknown sections and leaving out secrets', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    writeJson(file, sampleFile());
+    store.openProjectFile(file, JSON.parse(fs.readFileSync(file, 'utf8')));
+    store.addUser('venue', 'admin', 'wavegrid123');
+
+    const { file: written } = store.saveProjectFile('venue');
+    expect(written).toBe(path.resolve(file));
+
+    const text = fs.readFileSync(file, 'utf8');
+    const saved = JSON.parse(text);
+    expect(saved.wavegrid).toBe('project');
+    expect(saved.description).toBe('A venue kept in its own repo');
+    expect(saved.stations).toEqual([{ id: 'booth', passcode: 'not-a-real-field-yet' }]);
+    expect(saved.config.layout.kind).toBe('fixtures');
+    expect(saved.lightMaps).toHaveLength(1);
+    expect(saved.looks).toHaveLength(1);
+    expect(saved.users).toBeUndefined();
+    expect(saved.secrets).toBeUndefined();
+    const secrets = store.readSecrets('venue');
+    expect(text).not.toContain(secrets.jwtSecret as string);
+    expect(text).not.toContain(secrets.receiverKey as string);
+  });
+
+  it('re-opening the linked file refreshes the project and keeps secrets and device addresses', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    writeJson(file, sampleFile());
+    store.openProjectFile(file, JSON.parse(fs.readFileSync(file, 'utf8')));
+    const secrets = store.readSecrets('venue');
+    store.registerDevice('venue', { id: 'dev-1', name: 'foh', address: '10.0.0.5', layout: 'fixtures', mode: 'simple', shard: null } as never);
+
+    const edited: ProjectFile = { ...sampleFile(), lightMaps: [], config: { ...sampleFile().config, activeLightMap: null } };
+    writeJson(file, edited);
+    const result = store.openProjectFile(file, edited);
+
+    expect(result.created).toBe(false);
+    expect(result.generatedSecrets).toBe(false);
+    expect(store.readSecrets('venue')).toEqual(secrets);
+    expect(store.listLightMaps('venue')).toHaveLength(0);
+    expect(store.listDevices('venue')[0].address).toBe('10.0.0.5');
+  });
+
+  it('refuses to replace a project that came from somewhere else unless told to', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    store.createProject('venue', { layout: { preset: 'nova' } } as never);
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    expect(() => store.openProjectFile(file, sampleFile())).toThrow(/already exists/);
+    expect(store.openProjectFile(file, sampleFile(), { overwrite: true }).created).toBe(false);
+    expect(store.openProjectFile(file, sampleFile(), { name: 'venue-copy' }).project).toBe('venue-copy');
+  });
+
+  it('leaves machine-local paths out of a saved file, with a warning', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    store.createProject('rig', { layout: { preset: 'nova' }, osc: { routingConfig: '/home/me/routing.json' } } as never);
+    const file = path.join(tmp('wg-pf-repo-'), 'rig.wavegrid');
+    const result = store.saveProjectFile('rig', { file });
+    expect(result.warnings.join('\n')).toMatch(/routingConfig/);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).config.osc?.routingConfig).toBeUndefined();
+    expect(() => store.saveProjectFile('nope', { file })).toThrow(/Unknown project/);
+  });
+
+  it('validates the whole file before writing anything', () => {
+    expect(() => parseProjectFile({ wavegrid: 'project-export', version: 1 })).toThrow(/Not a Wavegrid project file/);
+    expect(() => parseProjectFile({ ...sampleFile(), version: 2 })).toThrow(/version 2/);
+    expect(() =>
+      parseProjectFile({ ...sampleFile(), name: 'bad name', config: { layout: { kind: 'fixtures', fixtures: [] } }, looks: [{}] })
+    ).toThrow(/name[\s\S]*config\.layout[\s\S]*looks\[0\]/);
+  });
+});
