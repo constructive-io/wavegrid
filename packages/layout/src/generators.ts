@@ -422,6 +422,10 @@ export interface FixturesParams {
   name?: string;
 }
 
+function isGridIndex(n: unknown): boolean {
+  return Number.isInteger(n) && (n as number) >= 0;
+}
+
 /**
  * A layout from explicit fixture positions, for venues no generator describes.
  * Positions are re-centred on their centroid so polar axes (angle, radius) are
@@ -444,6 +448,10 @@ export function fixturesLayout({ fixtures, topology, perimeter, id, name }: Fixt
     throw new Error('fixtures layout: give "row" and "col" on every fixture or on none');
   }
   const hasGridCoords = withGrid === fixtures.length;
+  if (hasGridCoords) {
+    const bad = fixtures.findIndex(f => !isGridIndex(f.row) || !isGridIndex(f.col));
+    if (bad !== -1) throw new Error(`fixtures layout: fixture ${bad} needs whole, non-negative "row" and "col"`);
+  }
 
   const cx = fixtures.reduce((sum, f) => sum + f.x, 0) / fixtures.length;
   const cy = fixtures.reduce((sum, f) => sum + f.y, 0) / fixtures.length;
@@ -460,6 +468,9 @@ export function fixturesLayout({ fixtures, topology, perimeter, id, name }: Fixt
   const count = raw.length;
   let edge: number[];
   if (perimeter) {
+    if (!Array.isArray(perimeter) || perimeter.length === 0) {
+      throw new Error('fixtures layout: "perimeter" must list at least one fixture index');
+    }
     const bad = perimeter.find(i => !Number.isInteger(i) || i < 0 || i >= count);
     if (bad !== undefined) throw new Error(`fixtures layout: perimeter index ${bad} is out of range 0..${count - 1}`);
     edge = perimeter.slice();

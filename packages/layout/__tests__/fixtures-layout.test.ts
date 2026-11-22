@@ -54,5 +54,8 @@ describe('fixtures layout', () => {
       fixturesLayout({ fixtures: [{ x: 0, y: 0, row: 0, col: 0 }, { x: 1, y: 0 }] })
     ).toThrow(/every fixture or on none/);
     expect(() => fixturesLayout({ fixtures: [{ x: 0, y: 0 }], perimeter: [3] })).toThrow(/out of range/);
+    expect(() => fixturesLayout({ fixtures: [{ x: 0, y: 0 }], perimeter: [] })).toThrow(/at least one/);
+    expect(() => fixturesLayout({ fixtures: [{ x: 0, y: 0, row: 0, col: 0.5 }] })).toThrow(/whole, non-negative/);
+    expect(() => fixturesLayout({ fixtures: [{ x: 0, y: 0, row: -1, col: 0 }] })).toThrow(/whole, non-negative/);
   });
 });
