@@ -1,7 +1,7 @@
 import { resolveLayout, type WavegridConfig } from '@wavegrid/layout';
 import path from 'path';
 
-import { deleteLightMap, listLightMaps, readLightMap, saveLightMap, setActiveLightMap } from './light-maps';
+import { deleteLightMap, isLightMapName, listLightMaps, readLightMap, saveLightMap, setActiveLightMap } from './light-maps';
 import {
   projectDevicesFile,
   projectDir,
@@ -123,12 +123,21 @@ export function parseProjectFile(raw: unknown): ProjectFile {
   }
   if (raw.lightMaps != null) {
     if (!Array.isArray(raw.lightMaps)) problems.push('"lightMaps" must be a list');
-    else raw.lightMaps.forEach((m, i) => {
-      if (!isObject(m) || typeof m.name !== 'string' || !Array.isArray(m.physicalLights) ||
-        typeof m.numCannons !== 'number' || typeof m.gridColumns !== 'number') {
-        problems.push(`lightMaps[${i}] needs name, numCannons, gridColumns and physicalLights`);
-      }
-    });
+    else {
+      const seen = new Set<string>();
+      raw.lightMaps.forEach((m, i) => {
+        if (!isObject(m) || !Array.isArray(m.physicalLights) ||
+          !Number.isInteger(m.numCannons) || (m.numCannons as number) < 1 || typeof m.gridColumns !== 'number') {
+          problems.push(`lightMaps[${i}] needs name, numCannons (>= 1), gridColumns and physicalLights`);
+        } else if (!isLightMapName(m.name)) {
+          problems.push(`lightMaps[${i}] name must start with a letter or number and use letters, numbers, space, ".", "_" or "-"`);
+        } else if (seen.has(m.name)) {
+          problems.push(`lightMaps[${i}] repeats the name "${m.name}"`);
+        } else {
+          seen.add(m.name);
+        }
+      });
+    }
   }
   if (raw.looks != null) {
     if (!Array.isArray(raw.looks)) problems.push('"looks" must be a list');
@@ -295,15 +304,14 @@ export function openProjectFile(
   const active = doc.config.activeLightMap ?? null;
   setActiveLightMap(paths, project, active && keep.has(active) ? active : null);
 
-  if (doc.looks) {
-    writeFileAtomic(looksFile(paths, project), JSON.stringify({ looks: doc.looks }, null, 2) + '\n');
-  }
+  // A missing section means an empty one: buildProjectFile leaves empty lists out.
+  writeFileAtomic(looksFile(paths, project), JSON.stringify({ looks: doc.looks ?? [] }, null, 2) + '\n');
 
-  if (doc.devices) {
+  {
     const known = new Map(
       (readJsonFile<{ devices: DeviceRecord[] }>(projectDevicesFile(paths, project))?.devices ?? []).map((d) => [d.id, d])
     );
-    const devices: DeviceRecord[] = doc.devices.map((d) => {
+    const devices: DeviceRecord[] = (doc.devices ?? []).map((d) => {
       const live = known.get(d.id);
       return {
         id: d.id,

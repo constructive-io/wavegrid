@@ -98,6 +98,28 @@ describe('project files', () => {
     expect(store.listDevices('venue')[0].address).toBe('10.0.0.5');
   });
 
+  it('applies deletions when a refreshed file has no looks or devices', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    store.openProjectFile(file, sampleFile());
+    const { looks: _looks, devices: _devices, ...rest } = sampleFile();
+    store.openProjectFile(file, rest);
+    expect(store.listDevices('venue')).toHaveLength(0);
+    const looks = JSON.parse(fs.readFileSync(path.join(store.stateDir('venue'), 'looks.json'), 'utf8'));
+    expect(looks.looks).toEqual([]);
+  });
+
+  it('rejects a bad light map before touching the existing project', () => {
+    const store = openStore({ baseDir: tmp('wg-pf-store-') });
+    const file = path.join(tmp('wg-pf-repo-'), 'venue.wavegrid');
+    store.openProjectFile(file, sampleFile());
+    const bad = { ...sampleFile(), lightMaps: [{ name: 'bar/main', numCannons: 3, gridColumns: 3, physicalLights: [0, 1, 2] }] };
+    expect(() => store.openProjectFile(file, bad)).toThrow(/lightMaps\[0\] name/);
+    expect(store.readLightMap('venue', 'swap')).toBeTruthy();
+    const dup = { ...sampleFile(), lightMaps: [sampleFile().lightMaps![0], sampleFile().lightMaps![0]] };
+    expect(() => parseProjectFile(dup)).toThrow(/repeats the name/);
+  });
+
   it('refuses to replace a project that came from somewhere else unless told to', () => {
     const store = openStore({ baseDir: tmp('wg-pf-store-') });
     store.createProject('venue', { layout: { preset: 'nova' } } as never);

@@ -36,8 +36,12 @@ export interface LightMapSummary {
 
 const NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._ -]*$/;
 
+export function isLightMapName(name: unknown): name is string {
+  return typeof name === 'string' && NAME_RE.test(name);
+}
+
 function assertName(name: string): void {
-  if (!name || !NAME_RE.test(name)) {
+  if (!isLightMapName(name)) {
     throw new Error(`Invalid light-map name "${name}". Use letters, numbers, space, ".", "_" or "-".`);
   }
 }
