@@ -450,6 +450,15 @@ function getCalibrationOutput(): CannonState[] {
   return output;
 }
 
+function calibrationPreview() {
+  return JSON.stringify({ type: 'command', action: 'calibrationPreview', grid: calibrationMode ? getCalibrationOutput() : null });
+}
+
+function broadcastCalibrationPreview() {
+  fanout([...wss.clients].filter(ws => extensions.audience(ws) === 'receiver'), calibrationPreview(), dropClient);
+  broadcastState();
+}
+
 function loadPhysicalLightMap(): number[] {
   const identity = Array.from({ length: NUM_CANNONS }, (_, index) => index);
   try {
@@ -760,6 +769,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     sendToClient(ws, JSON.stringify({ type: 'command', action: 'setBrightness', value: masterBrightness }));
   }
   for (const packet of extensions.initialPayloads(ws)) sendToClient(ws, JSON.stringify(packet));
+  if (extensions.audience(ws) === 'receiver') sendToClient(ws, calibrationPreview());
   ws.on('message', receiveMessage);
   if (extensions.isScoped(ws)) return;
 
@@ -994,18 +1004,18 @@ function handleMessage(msg: any, ws?: WebSocket) {
   case 'calibration_mode':
     calibrationMode = !!msg.enabled;
     if (!calibrationMode) previewPhysicalIndex = null;
-    broadcastState();
+    broadcastCalibrationPreview();
     break;
   case 'physical_preview':
     if (typeof msg.physicalIndex === 'number') {
       calibrationMode = true;
       previewPhysicalIndex = Math.max(0, Math.min(NUM_CANNONS - 1, Math.round(msg.physicalIndex)));
-      broadcastState();
+      broadcastCalibrationPreview();
     }
     break;
   case 'physical_preview_clear':
     previewPhysicalIndex = null;
-    if (calibrationMode) broadcastState();
+    if (calibrationMode) broadcastCalibrationPreview();
     break;
   case 'selection':
     if (Array.isArray(msg.indices)) {

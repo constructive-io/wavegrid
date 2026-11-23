@@ -160,6 +160,35 @@ describe('Receiver', () => {
     }
   });
 
+  it('identifies only the addressed fixture, without uncovering the show or rotating the preview', () => {
+    jest.useFakeTimers();
+    const input = new WebSocketInput({ url: 'ws://example.com:9999' });
+    jest.spyOn(input, 'connect').mockImplementation(() => {});
+    const r = new Receiver({ input, output: new CallbackOutput(() => {}), alpha: 1, shard: { start: 3, end: 4 } });
+    r.start();
+    try {
+      input.emit('connected');
+      input.emit('command', { type: 'command', action: 'setOrientation', rotation: 180 });
+      input.emit('command', { type: 'command', action: 'paint', cells: [{ idx: 44, h: 60, s: 100, b: 100 }] });
+      input.emit('command', { type: 'command', action: 'setBrightness', value: 20 });
+      jest.advanceTimersByTime(40);
+      expect(r.getOutputState().map(c => c.b)).toEqual([0, 20]);
+      input.emit('command', { type: 'command', action: 'stationOverlay', cells: [{ idx: 4, h: 0, s: 0, b: 0 }] });
+      const grid = Array.from({ length: 49 }, (_, idx) => ({ h: 45, s: 0, b: idx === 3 ? 100 : 0 }));
+      input.emit('command', { type: 'command', action: 'calibrationPreview', grid });
+      expect(r.getOutputState().map(c => c.b)).toEqual([20, 0]);
+      input.emit('disconnected');
+      expect(r.getOutputState().map(c => c.b)).toEqual([0, 0]);
+      input.emit('connected');
+      input.emit('command', { type: 'command', action: 'stationOverlay', cells: [{ idx: 4, h: 0, s: 0, b: 0 }] });
+      input.emit('command', { type: 'command', action: 'calibrationPreview', grid: null });
+      expect(r.getOutputState().map(c => c.b)).toEqual([0, 0]);
+    } finally {
+      r.stop();
+      jest.useRealTimers();
+    }
+  });
+
   describe('sharding', () => {
     it('should return full grid when no shard config', () => {
       const r = new Receiver();
