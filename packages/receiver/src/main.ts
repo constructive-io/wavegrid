@@ -106,6 +106,7 @@ export function startReceiver(resolved: ResolvedConfig = loadWavegridConfig()): 
   const outputs: OutputAdapter[] = [new ConsoleOutput()];
   const outputLabels: string[] = ['Console'];
   const savedPhysicalMap = loadPhysicalLightMap(NUM_CANNONS);
+  let physicalLightMap = savedPhysicalMap ?? undefined;
 
   // ─── OSC output adapters (from @wavegrid/osc) ───
   if (process.env.ROUTING_CONFIG) {
@@ -124,21 +125,13 @@ export function startReceiver(resolved: ResolvedConfig = loadWavegridConfig()): 
     const host = process.env.BEYOND_HOST;
     const port = parseInt(process.env.BEYOND_PORT || String(DEFAULT_BEYOND_PORT), 10);
     const gridOrder = (process.env.BEYOND_GRID_ORDER || 'row').toLowerCase();
-    const projectorMap: Record<number, number> = {};
     // Column-major reordering is only meaningful for grid layouts.
     const canColumnOrder = gridOrder === 'column' && GRID_COLUMNS > 0;
     const rows = GRID_COLUMNS > 0 ? Math.ceil(NUM_CANNONS / GRID_COLUMNS) : 0;
-    for (let i = 0; i < NUM_CANNONS; i++) {
-      if (savedPhysicalMap) {
-        projectorMap[i] = savedPhysicalMap[i];
-      } else if (canColumnOrder) {
-        const r = Math.floor(i / GRID_COLUMNS);
-        const c = i % GRID_COLUMNS;
-        projectorMap[i] = c * rows + r;
-      } else {
-        projectorMap[i] = i;
-      }
-    }
+    const projectorMap = savedPhysicalMap ?? Array.from({ length: NUM_CANNONS }, (_, i) =>
+      canColumnOrder ? (i % GRID_COLUMNS) * rows + Math.floor(i / GRID_COLUMNS) : i
+    );
+    physicalLightMap = projectorMap;
     const beyond = new BeyondOscOutput({ host, port, projectorMap });
     beyond.connect();
     outputs.push(beyond);
@@ -175,6 +168,7 @@ export function startReceiver(resolved: ResolvedConfig = loadWavegridConfig()): 
     output,
     alpha: ALPHA,
     fallbackDelay: FALLBACK_DELAY,
+    physicalLightMap,
     shard,
     layout
   });

@@ -9,8 +9,6 @@
 import type { ProjectorControl, ProjectorCueCommand } from '@wavegrid/osc';
 import type { StationCell } from '@wavegrid/stations';
 
-import type { CannonState } from './filter';
-
 export interface SetAnimationCommand {
   type: 'command';
   action: 'setAnimation';
@@ -121,7 +119,7 @@ export interface ProjectorCueRelayCommand {
 
 export type CommandMessage =
   | { type: 'command'; action: 'stationOverlay'; cells: StationCell[] }
-  | { type: 'command'; action: 'calibrationPreview'; grid: CannonState[] | null }
+  | { type: 'command'; action: 'calibrationPreview'; preview: { physicalIndex: number | null } | null }
   | ProjectorCommand
   | ProjectorCueRelayCommand
   | SetAnimationCommand
