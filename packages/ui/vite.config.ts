@@ -22,7 +22,8 @@ export default defineConfig({
   server: {
     port: 3003,
     proxy: {
-      '/api': { target: WG_DEV_SERVER, changeOrigin: true }
+      '/api': { target: WG_DEV_SERVER, changeOrigin: true },
+      '/plugins': { target: WG_DEV_SERVER, changeOrigin: true }
     }
   }
 });
