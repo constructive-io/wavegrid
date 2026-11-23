@@ -1,0 +1,4 @@
+[
+  { "name": "Ocean", "params": { "hue": 210, "saturation": 85, "brightness": 70 } },
+  { "name": "Sunset", "params": { "hue": 30, "saturation": 95, "brightness": 70 } }
+]

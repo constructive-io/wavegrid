@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plugin controls</title>
+<style>
+  body { background: #171717; color: #eee; font: 16px system-ui; margin: 20px; }
+  label { display: block; margin: 16px 0; }
+  button, input { font: inherit; }
+</style>
+<h1>Plugin controls</h1>
+<p id="status" role="status">Connecting to Wavegrid…</p>
+<label>Hue <input id="hue" type="range" min="0" max="360" value="210"></label>
+<button id="start">Start</button>
+<button id="stop">Stop</button>
+<button id="use-brush">Use shared brush</button>
+<button id="set-brush">Send color to shared brush</button>
+<script>
+  const hue = document.getElementById('hue');
+  const status = document.getElementById('status');
+  let params = { hue: 210, saturation: 85, brightness: 70 };
+  let brush = { h: 210, s: 85, b: 70 };
+  function send(type, data = {}) { parent.postMessage({ wg: 1, type, ...data }, '*'); }
+  function state(pattern) {
+    params = { ...params, ...pattern.params };
+    hue.value = params.hue;
+    status.textContent = pattern.running ? 'Running' : 'Stopped';
+  }
+  window.addEventListener('message', event => {
+    if (event.source !== parent || !event.data || event.data.wg !== 1) return;
+    const message = event.data;
+    if (message.type === 'init') { brush = message.brush; state(message.pattern); }
+    if (message.type === 'state') state(message);
+    if (message.type === 'brush') brush = { h: message.h, s: message.s, b: message.b };
+  });
+  hue.oninput = () => { params.hue = Number(hue.value); send('setParams', { params: { hue: params.hue } }); };
+  document.getElementById('start').onclick = () => send('start', { params });
+  document.getElementById('stop').onclick = () => send('stop');
+  document.getElementById('use-brush').onclick = () => send('setParams', {
+    params: { hue: brush.h, saturation: brush.s, brightness: brush.b }
+  });
+  document.getElementById('set-brush').onclick = () => send('setBrush', {
+    h: params.hue, s: params.saturation, b: params.brightness
+  });
+</script>
+</html>

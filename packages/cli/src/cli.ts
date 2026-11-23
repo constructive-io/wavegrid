@@ -15,6 +15,7 @@ import {
   runSignalsSend,
   SIGNALS_USAGE
 } from './commands/osc-signals';
+import { runPluginsNew } from './commands/plugins';
 import { runPrintConfig } from './commands/print-config';
 import { runProjectsOpen, runProjectsSave } from './commands/project-file';
 import { runProjectsExport, runProjectsImport } from './commands/project-io';
@@ -68,6 +69,10 @@ ${c.bold('Settings')} — global store
   settings initialize           Create/ensure the global store scaffold
   settings clear                Wipe the whole store — every project (confirm required)
 
+${c.bold('Plugins')} — author project plugins
+  plugins new <id>               Scaffold beside --project <file.wavegrid> (else active project's linked file)
+    [--view] [--audio <mode>]    Include a sandboxed view and/or audio binding (grace)
+
 ${c.bold('Run')}
   start                         Run the active project — server + UI + receiver (one laptop)
   server                        Run the brain only — server + UI + API + WebSocket (no receiver)
@@ -95,6 +100,7 @@ ${c.gray('Shortcuts: `init`, `open`, `config`, `secrets`, `users`, `devices`, `e
 
 /** Top-level menu (bare `wavegrid`). */
 const COMMANDS: SubCommand[] = [
+  { value: 'plugins', description: 'Create a project plugin' },
   { value: 'projects', description: 'Manage projects: list, create, use, config, secrets, users, env' },
   { value: 'stations', description: 'Manage project station fixture groups' },
   { value: 'settings', description: 'Global store: environment, initialize, clear all' },
@@ -217,6 +223,7 @@ function coerce(value: string): string | number | boolean {
 }
 
 const KNOWN_COMMANDS = [
+  'plugins',
   'stations',
   'init',
   'open',
@@ -512,6 +519,11 @@ export async function run(argvInput: string[] = process.argv.slice(2)): Promise<
     }
 
     switch (command) {
+    case 'plugins':
+      if (positionals[1] === 'new') runPluginsNew(flags, positionals[2]);
+      else if (positionals[1]) unknownSub('plugins', positionals[1]);
+      else console.log('Usage: wavegrid plugins new <id> [--project <file.wavegrid>] [--view] [--audio <mode>]');
+      break;
     // `init` is a shortcut alias for `projects create`.
     case 'init': {
       if (positionals[1]) flags.project = positionals[1];
