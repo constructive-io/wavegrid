@@ -1,4 +1,5 @@
 import { DEFAULT_CONFIG, resolveLayout, type WavegridConfig } from '@wavegrid/layout';
+import fs from 'fs';
 import path from 'path';
 
 import { deleteLightMap, isLightMapName, listLightMaps, readLightMap, saveLightMap, setActiveLightMap } from './light-maps';
@@ -10,6 +11,7 @@ import {
   type StorePaths,
   writeFileAtomic
 } from './paths';
+import { checkPluginFolderDestination, pluginRefProblems, type ProjectPluginRef, readProjectPlugins, replaceProjectPlugins, storedPluginSnapshots, writePluginFolder } from './plugins';
 import { type PortableDevice } from './portable';
 import { createProject, getProjectConfig, hasProject, isProjectName, type ProjectConfig } from './projects';
 import { type DeviceRecord } from './registry';
@@ -58,16 +60,18 @@ export interface ProjectFile {
   looks?: ProjectFileLook[];
   /** Planned devices: names and shards. Addresses and lastSeen never travel. */
   devices?: PortableDevice[];
+  plugins?: ProjectPluginRef[];
   [extra: string]: unknown;
 }
 
-const KNOWN_KEYS = new Set(['wavegrid', 'version', 'name', 'description', 'config', 'lightMaps', 'looks', 'devices']);
+const KNOWN_KEYS = new Set(['wavegrid', 'version', 'name', 'description', 'config', 'lightMaps', 'looks', 'devices', 'plugins']);
 
 /** Where a store project came from: the file it was opened from or last saved to. */
 export interface ProjectFileLink {
   path: string;
   /** Top-level fields this version does not understand, written back on save. */
   extra: Record<string, unknown>;
+  plugins?: ProjectPluginRef[];
 }
 
 function linkFile(paths: StorePaths, project: string): string {
@@ -108,6 +112,7 @@ export function parseProjectFile(raw: unknown): ProjectFile {
     throw new Error(`Unsupported project file version ${String(raw.version)} — this Wavegrid reads version 1.`);
   }
   const problems: string[] = [];
+  if (raw.plugins !== undefined) problems.push(...pluginRefProblems(raw.plugins));
   if (!isProjectName(raw.name)) {
     problems.push('"name" must be letters, numbers, ".", "_" or "-" (and not "." or "..")');
   }
@@ -197,6 +202,12 @@ export function buildProjectFile(paths: StorePaths, project: string): BuildProje
     name: project,
     config: portableConfig(getProjectConfig(paths, project) ?? {}, warnings)
   };
+  if (link?.plugins !== undefined) document.plugins = link.plugins;
+  else {
+    const stored = storedPluginSnapshots(paths, project);
+    if (stored.errors.length) throw new Error(stored.errors.join('\n'));
+    if (stored.snapshots.length) document.plugins = stored.snapshots.map(s => ({ path: s.path }));
+  }
 
   const lightMaps = listLightMaps(paths, project)
     .map((s) => readLightMap(paths, project, s.name))
@@ -225,6 +236,8 @@ export function buildProjectFile(paths: StorePaths, project: string): BuildProje
 export interface SaveProjectFileOptions {
   /** Where to write. Default: the file the project was opened from or last saved to. */
   file?: string;
+  /** Replace conflicting plugin files at a save-as destination, preserving unrelated files. */
+  overwrite?: boolean;
 }
 
 export interface SaveProjectFileResult extends BuildProjectFileResult {
@@ -240,8 +253,18 @@ export function saveProjectFile(paths: StorePaths, project: string, opts: SavePr
   }
   const file = path.resolve(target);
   const result = buildProjectFile(paths, project);
+  const { snapshots, errors } = storedPluginSnapshots(paths, project);
+  if (errors.length) throw new Error(`Cannot save plugins:\n  - ${errors.join('\n  - ')}`);
+  const sameFolder = link && path.dirname(file) === path.dirname(link.path);
+  const copies = snapshots.map(snapshot => ({ ...snapshot, destination: path.resolve(path.dirname(file), snapshot.path) }))
+    .filter(snapshot => !sameFolder || !fs.existsSync(snapshot.destination));
+  for (const snapshot of copies) {
+    if (file === snapshot.destination || file.startsWith(snapshot.destination + path.sep)) throw new Error('Plugin folder overlaps the target project file');
+    checkPluginFolderDestination(snapshot.destination, snapshot.files, opts.overwrite);
+  }
+  for (const snapshot of copies) writePluginFolder(snapshot.destination, snapshot.files, opts.overwrite);
   writeFileAtomic(file, JSON.stringify(result.document, null, 2) + '\n');
-  writeLink(paths, project, { path: file, extra: link?.extra ?? {} });
+  writeLink(paths, project, { path: file, extra: link?.extra ?? {}, plugins: result.document.plugins });
   return { ...result, file };
 }
 
@@ -312,6 +335,7 @@ export function openProjectFile(
   const doc = parseProjectFile(raw);
   const resolved = path.resolve(file);
   const project = opts.name ?? doc.name;
+  const plugins = readProjectPlugins(path.dirname(resolved), doc.plugins ?? []);
   if (!isProjectName(project)) {
     throw new Error(`Invalid project name "${project}". Use letters, numbers, ".", "_" or "-".`);
   }
@@ -325,6 +349,7 @@ export function openProjectFile(
 
   const { config, keptLocalOsc } = keepMachineLocal(doc.config, exists ? getProjectConfig(paths, project) : null);
   createProject(paths, project, config, { activate: opts.activate });
+  replaceProjectPlugins(paths, project, plugins);
 
   const maps = doc.lightMaps ?? [];
   const keep = new Set(maps.map((m) => m.name));
@@ -366,7 +391,7 @@ export function openProjectFile(
   for (const [k, v] of Object.entries(doc)) {
     if (!KNOWN_KEYS.has(k) || k === 'description') extra[k] = v;
   }
-  writeLink(paths, project, { path: resolved, extra });
+  writeLink(paths, project, { path: resolved, extra, plugins: doc.plugins });
 
   return {
     project,
