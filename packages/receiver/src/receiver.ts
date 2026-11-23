@@ -330,7 +330,7 @@ export class Receiver {
           : this._animState.brightness;
 
         // Send filtered output to the output adapter
-        this.config.output.send(this.getOutputState());
+        this.config.output.send(this.getOutputState(), this.calibrationPreview !== null);
         this._tickErrors = 0;
       } catch (err) {
         this._tickErrors++;
