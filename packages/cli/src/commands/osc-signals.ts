@@ -151,7 +151,7 @@ function probeAdapter(
   zones: number[],
   serial: string | undefined,
   onSendError: (err: Error) => void
-): OutputAdapter & { connect: () => void } {
+): OutputAdapter & { connect: () => void; flush: (timeoutMs?: number) => Promise<void> } {
   if (target.kind === 'fb4') {
     if (!serial) throw new Error('FB4 addressing needs a 5-digit serial: --serial 12345');
     return new FB4OscOutput({
@@ -173,8 +173,8 @@ function probeAdapter(
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Time given to the UDP socket to flush before it is closed. */
-const FLUSH_MS = 100;
+/** Longest wait for queued UDP sends to go out or fail before the socket is closed. */
+const FLUSH_TIMEOUT_MS = 5000;
 
 /**
  * Light one fixture at a time so the operator can watch which physical laser
@@ -214,9 +214,10 @@ export async function runSignalsProbe(flags: Flags): Promise<void> {
       await sleep(hold);
     }
     adapter.send(probeGrid(count, null, color));
-    // UDP sends are queued on the socket; closing it immediately drops the
-    // blackout frame, which is the one frame that must not be lost.
-    await sleep(FLUSH_MS);
+    // UDP sends are queued on the socket; closing it before they settle drops
+    // the blackout frame, the one frame that must not be lost, and hides a
+    // late DNS failure.
+    await adapter.flush(FLUSH_TIMEOUT_MS);
   } finally {
     adapter.close();
   }

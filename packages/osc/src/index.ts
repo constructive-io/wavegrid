@@ -30,4 +30,5 @@ export {
   encodeBeyondProjectorMessages,
   encodeFB4Messages,
   FB4OscOutput,
+  flushOscClient,
   RoutedOscOutput} from './osc-adapters';
