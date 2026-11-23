@@ -65,6 +65,8 @@ export function AudioTab({ audio }: AudioTabProps) {
       <ControlGroup label="Source">
         {/* Mic input — the default source: the raw room signal, auto-levelled */}
         <button
+          disabled={!audio.state.micActive && !!audio.micUnavailableReason}
+          aria-describedby="mic-source-help"
           onClick={audio.state.micActive ? () => audio.stopMic() : audio.startMic}
           className="w-full px-4 py-4 rounded-xl text-base font-semibold transition-all"
           style={{
@@ -75,9 +77,10 @@ export function AudioTab({ audio }: AudioTabProps) {
         >
           {audio.state.micActive ? '⏹ Stop Mic' : '🎤 Live Mic'}
         </button>
-        <p className="text-xs" style={{ color: 'rgba(136,136,152,0.6)' }}>
-          Raw microphone, no voice processing; levels calibrate to the room in a few seconds.
+        <p id="mic-source-help" className="text-xs" style={{ color: 'rgba(136,136,152,0.6)' }}>
+          {audio.micUnavailableReason || 'Raw microphone, no voice processing; levels calibrate to the room in a few seconds.'}
         </p>
+        {audio.micError && <p role="alert" className="text-xs text-red-400">{audio.micError}</p>}
 
         <div
           onDragOver={(e) => e.preventDefault()}

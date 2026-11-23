@@ -32,6 +32,20 @@ function fixture() {
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
 describe('project plugins', () => {
+  it.each([true, 'grace', 'future'])('preserves a generic pluginAudio condition: %s', pluginAudio => {
+    const f = fixture();
+    const showWhen = { topology: 'rings', pluginAudio };
+    json(path.join(f.plugin, 'tab.json'), { id: 'dependent', label: 'Dependent', showWhen, cards: [] });
+    f.store.openProjectFile(f.file, f.doc);
+    const loaded = loadProjectPlugins(f.store.paths, 'venue');
+    expect(loaded.errors).toEqual([]);
+    expect(loaded.plugins[0].tabs[0].showWhen).toEqual(showWhen);
+  });
+  it.each([false, '', null, 1, [], {}])('rejects a malformed pluginAudio condition: %j', pluginAudio => {
+    const f = fixture();
+    json(path.join(f.plugin, 'tab.json'), { id: 'bad', label: 'Bad', showWhen: { pluginAudio }, cards: [] });
+    expect(() => f.store.openProjectFile(f.file, f.doc)).toThrow(/showWhen/);
+  });
   it('loads validated audio metadata and keeps only the first binding with a warning', () => {
     const f = fixture();
     const audio = { mode: 'grace', params: { hueShift: 'hueShift', satShift: 'satShift' },

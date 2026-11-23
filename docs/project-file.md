@@ -107,7 +107,7 @@ exist there. Presets contain arbitrary JSON.
 A tab JSON file contains `id`, `label`, optional `showWhen` (default `"always"`),
 optional `pattern` overriding the manifest's pattern, and `cards`:
 `[{ "title": "Color", "controls": [] }]`. `showWhen` is `"always"`, `"never"`, or an object
-whose `fixtureKind`, `topology`, `minFixtures` and `layoutId` conditions are ANDed.
+whose `fixtureKind`, `topology`, `minFixtures`, `layoutId` and `pluginAudio` conditions are ANDed.
 An empty object always matches. Tab ids in `/api/config` are `<pluginId>/<tabId>`.
 
 ### Controls and presets
@@ -212,6 +212,25 @@ exceed the message budget, the host includes the newest Looks that fit and sets
 metadata retain their budget instead of being dropped along with the Looks.
 
 ### Declarative audio bindings
+
+`showWhen: { "pluginAudio": true }` shows a tab when any loaded project plugin
+has a validated audio binding; `showWhen: { "pluginAudio": "grace" }` requires
+an exact binding-mode match. Mode names are nonempty strings, not project IDs.
+Missing context or no retained bindings means no match. This condition is ANDed
+with any layout conditions, for example
+`{ "topology": "rings", "pluginAudio": "grace" }`. It is available to both
+built-in and plugin tabs. Bindings count even when their owning tab is hidden or
+unmounted, since audio dispatch is host-owned. Only validated bindings retained
+by first-binding-wins resolution count, not the currently selected audio mode,
+running pattern or successful catalog fetch.
+
+The built-in Audio tab uses `{ "pluginAudio": "grace" }`, exposing its source
+and mode controls when a loaded plugin supports the currently implemented
+binding mode. Thus Grace Cathedral projects show Audio, while projects without
+an audio binding (such as Palace) keep it hidden. Opening Audio or selecting
+Grace mode does not start or replace a pattern; start the plugin pattern first,
+then select a microphone or audio file to drive it. Other Audio modes retain
+their existing behavior.
 
 A tab can declare host-owned audio control, independent of whether its view or
 cards are mounted. Currently only `mode: "grace"` is supported:

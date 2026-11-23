@@ -5,6 +5,14 @@ import { coerceCards, coercePluginParams, coercePlugins, pluginAssetUrl } from '
 import { allTabs, registryFor, tabById, tabsFor } from '../src/lib/tab-registry';
 import { fetchPluginText, parsePluginPresets, pluginParamUpdates } from '../src/lib/use-plugin-pattern';
 
+it('preserves valid audio conditions and fails closed on malformed ones', () => {
+  for (const pluginAudio of [true, 'grace', 'future', false, '', null, 1, [], {}]) {
+    const showWhen = { topology: 'rings', pluginAudio };
+    const plugins = coercePlugins([{ id: 'demo', tabs: [{ id: 'dependent', label: 'Dependent', showWhen }] }]);
+    expect(plugins[0].tabs[0].showWhen).toEqual(pluginAudio === true || (typeof pluginAudio === 'string' && pluginAudio.length > 0) ? showWhen : 'never');
+  }
+});
+
 const raw = [{ id: 'demo', name: 'Demo', pattern: 'pattern.js', presetsFile: 'presets.json', tabs: [
   { id: 'demo/all', label: 'All', cards: [] },
   { id: 'projectors', label: 'Projectors', showWhen: { fixtureKind: 'projector' }, cards: [] },

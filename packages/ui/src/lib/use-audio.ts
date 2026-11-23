@@ -81,6 +81,8 @@ export interface AudioEngineState {
 
 export interface AudioEngine {
   state: AudioEngineState;
+  micUnavailableReason: string | null;
+  micError: string | null;
   mode: AudioMode;
   blend: BlendMode;
   palette: AudioPalette;
@@ -183,6 +185,9 @@ export function useAudio(
   // Energy over replace: the reading an operator wants from audio is level, and
   // replace means what they hear is what the rig shows rather than a tint on
   // whatever was already running.
+  const [micError, setMicError] = useState<string | null>(null);
+  const micUnavailableReason = typeof navigator === 'undefined' || typeof navigator.mediaDevices?.getUserMedia !== 'function'
+    ? 'Microphone unavailable. Use HTTPS or localhost and a browser with microphone support.' : null;
   const [mode, setMode] = useState<AudioMode>('energy');
   const [blend, setBlend] = useState<BlendMode>('replace');
   const [palette, setPalette] = useState<AudioPalette>('civic');
@@ -275,6 +280,10 @@ export function useAudio(
   }, [resetGraceShift]);
 
   const setAudioMode = useCallback((nextMode: AudioMode) => {
+    if (modeRef.current !== nextMode && modeRef.current !== 'grace') {
+      sendRef.current({ type: 'audio_layer_clear' });
+    }
+    modeRef.current = nextMode;
     resetVisualState();
     setMode(nextMode);
   }, [resetVisualState]);
@@ -698,7 +707,7 @@ export function useAudio(
       grid: outputLayer
     });
 
-    if (audioContextRef.current) {
+    if (audioContextRef.current && sourceRef.current) {
       const elapsed = audioContextRef.current.currentTime - startTimeRef.current + offsetRef.current;
       const dur = audioBufferRef.current?.duration || 1;
       setAudioState((s) => ({
@@ -726,6 +735,7 @@ export function useAudio(
         sourceRef.current.onended = null;
         sourceRef.current.stop();
       } catch { /* already stopped */ }
+      sourceRef.current.disconnect();
       sourceRef.current = null;
     }
     if (animFrameRef.current) {
@@ -735,6 +745,7 @@ export function useAudio(
     analyserRef.current = null;
     resetVisualState();
     offsetRef.current = 0;
+    startTimeRef.current = 0;
     // Clear the audio overlay on the Simulator so base grid shows through
     sendRef.current({ type: 'audio_layer_clear' });
     setAudioState((s) => ({ ...s, playing: false, currentTime: 0 }));
@@ -868,43 +879,55 @@ export function useAudio(
   }, [resetVisualState, startAmbientLoop]);
 
   const startMic = useCallback(async () => {
-    // Stop any file playback first
-    stopPlayback();
+    if (micUnavailableReason) {
+      setMicError(micUnavailableReason);
+      return;
+    }
+    setMicError(null);
+    try {
+      // Stop any file playback first
+      stopPlayback();
 
-    if (!audioContextRef.current) audioContextRef.current = new AudioContext();
-    const ctx = audioContextRef.current;
-    if (ctx.state === 'suspended') await ctx.resume();
+      if (!audioContextRef.current) audioContextRef.current = new AudioContext();
+      const ctx = audioContextRef.current;
+      if (ctx.state === 'suspended') await ctx.resume();
 
-    const stream = await navigator.mediaDevices.getUserMedia(RAW_MIC_CONSTRAINTS);
-    micStreamRef.current = stream;
-    featureRef.current.room = createRoomGain();
+      const stream = await navigator.mediaDevices.getUserMedia(RAW_MIC_CONSTRAINTS);
+      micStreamRef.current = stream;
+      featureRef.current.room = createRoomGain();
 
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.7;
-    analyser.minDecibels = -90;
-    analyser.maxDecibels = -20;
-    source.connect(analyser);
-    // Don't connect to destination — avoid feedback loop
-    micSourceRef.current = source;
-    analyserRef.current = analyser;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.7;
+      analyser.minDecibels = -90;
+      analyser.maxDecibels = -20;
+      source.connect(analyser);
+      // Don't connect to destination — avoid feedback loop
+      micSourceRef.current = source;
+      analyserRef.current = analyser;
 
-    resetVisualState();
-    setAudioState((s) => ({ ...s, micActive: true }));
-    animFrameRef.current = requestAnimationFrame(processFrame);
-  }, [stopPlayback, processFrame, resetVisualState]);
+      resetVisualState();
+      setAudioState((s) => ({ ...s, micActive: true }));
+      animFrameRef.current = requestAnimationFrame(processFrame);
+    } catch (error) {
+      stopMic(false);
+      setMicError('Could not start microphone: ' + (error instanceof Error ? error.message : String(error)));
+    }
+  }, [micUnavailableReason, stopPlayback, stopMic, processFrame, resetVisualState]);
 
   const loadFile = useCallback(async (file: File) => {
     // Stop mic if active
-    stopMic();
+    stopMic(false);
+    stopPlayback();
+    startAmbientLoop();
     if (!audioContextRef.current) audioContextRef.current = new AudioContext();
     const arrayBuffer = await file.arrayBuffer();
     const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
     audioBufferRef.current = audioBuffer;
     const bpm = detectBPM(audioBuffer);
     setAudioState({ playing: false, micActive: false, fileName: file.name, duration: audioBuffer.duration, currentTime: 0, bpm });
-  }, [detectBPM, stopMic]);
+  }, [detectBPM, stopMic, stopPlayback, startAmbientLoop]);
 
   useEffect(() => {
     if (isAmbientMode(mode)) {
@@ -927,6 +950,8 @@ export function useAudio(
 
   return {
     state: audioState,
+    micUnavailableReason,
+    micError,
     mode,
     blend,
     palette,
