@@ -22,6 +22,7 @@ export type {
 } from './osc-adapters';
 export {
   BeyondOscOutput,
+  createOscClient,
   createRoutedOutput,
   DEBUG_OSC,
   encodeBeyondCueMessage,

@@ -89,6 +89,39 @@ export interface OscMessage {
   ints?: boolean;
 }
 
+const sendErrorHandlers = new WeakMap<Client, (err: unknown) => void>();
+
+/**
+ * Open a UDP OSC client whose failures are logged, not thrown. A target that
+ * cannot be resolved or reached (a placeholder host, a laptop off the network)
+ * must not take the receiver, and with it the server and UI, down. Each
+ * distinct error is logged once per client so a bad host does not flood the log.
+ */
+export function createOscClient(host: string, port: number, label = 'OSC'): Client {
+  const client = new Client(host, port);
+  const seen = new Set<string>();
+  const report = (err: unknown): void => {
+    const message = err instanceof Error ? err.message : String(err);
+    if (seen.has(message)) return;
+    seen.add(message);
+    console.warn(`  [${label}] send to ${host}:${port} failed: ${message}`);
+  };
+  client.on('error', report);
+  sendErrorHandlers.set(client, report);
+  return client;
+}
+
+function deliver(client: Client, msg: Message): void {
+  const onError = sendErrorHandlers.get(client);
+  try {
+    const pending = client.send(msg);
+    if (pending && typeof pending.catch === 'function') pending.catch((err: unknown) => onError?.(err));
+  } catch (err) {
+    if (!onError) throw err;
+    onError(err);
+  }
+}
+
 /** Send an OSC message with explicit int typing. */
 function sendInts(client: Client, address: string, value: number | number[]): void {
   const msg = new Message(address);
@@ -96,7 +129,7 @@ function sendInts(client: Client, address: string, value: number | number[]): vo
   for (const v of values) {
     msg.append({ type: 'integer', value: Math.round(v) });
   }
-  client.send(msg);
+  deliver(client, msg);
 }
 
 function sendOsc(client: Client, msg: OscMessage): void {
@@ -111,7 +144,7 @@ function sendFloats(client: Client, address: string, value: number | number[]): 
   for (const v of values) {
     msg.append({ type: 'float', value: v });
   }
-  client.send(msg);
+  deliver(client, msg);
 }
 
 // ═══════════════════════════════════════════════════
@@ -255,7 +288,7 @@ export class BeyondOscOutput implements OutputAdapter {
 
   /** Initialize the UDP client. Call before receiver.start(). */
   connect(): void {
-    this.client = new Client(this.config.host, this.config.port);
+    this.client = createOscClient(this.config.host, this.config.port, 'OSC→BEYOND');
   }
 
   send(grid: CannonState[], calibration = false): void {
@@ -400,7 +433,7 @@ export class FB4OscOutput implements OutputAdapter {
   }
 
   connect(): void {
-    this.client = new Client(this.config.host, this.config.port);
+    this.client = createOscClient(this.config.host, this.config.port, 'OSC→FB4');
   }
 
   send(grid: CannonState[]): void {

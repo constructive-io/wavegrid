@@ -463,3 +463,27 @@ describe('RoutedOscOutput projector controls', () => {
     routed.close();
   });
 });
+
+describe('unreachable OSC targets', () => {
+  it('logs a send to an unresolvable host once instead of crashing', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const unhandled = jest.fn();
+    process.on('unhandledRejection', unhandled);
+    const adapter = new BeyondOscOutput({
+      host: 'wavegrid-placeholder-host.invalid',
+      port: nextPort(),
+      projectorMap: { 0: 0 },
+      sendEveryNFrames: 1
+    });
+    adapter.connect();
+    adapter.send(makeSingleGrid(0, 0, 100, 100));
+    adapter.send(makeSingleGrid(0, 120, 100, 100));
+    await new Promise((r) => setTimeout(r, 500));
+    adapter.close();
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('wavegrid-placeholder-host.invalid');
+    warn.mockRestore();
+  });
+});
