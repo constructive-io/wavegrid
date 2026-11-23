@@ -1,4 +1,5 @@
 // Store facade
+export { addProjectPlugin } from './plugin-scaffold';
 export {
   loadProjectPlugins,
   PLUGIN_MAX_BYTES,

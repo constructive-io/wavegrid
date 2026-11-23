@@ -110,6 +110,14 @@ optional `pattern` overriding the manifest's pattern, and `cards`:
 whose `fixtureKind`, `topology`, `minFixtures`, `layoutId` and `pluginAudio` conditions are ANDed.
 An empty object always matches. Tab ids in `/api/config` are `<pluginId>/<tabId>`.
 
+### Writing a plugin
+
+Run `wavegrid plugins new my-show --project venue.wavegrid` to create a validated
+starter and register it in the file. Add `--view` for a sandboxed iframe and
+`--audio grace` for host-owned audio shifts. Without `--project`, the command uses
+the active store project's linked file. See the [plugin authoring guide](plugins.md)
+for the complete workflow, pattern context API and project examples.
+
 ### Controls and presets
 
 Controls are JSON data, rendered as native Wavegrid cards; plugins never supply

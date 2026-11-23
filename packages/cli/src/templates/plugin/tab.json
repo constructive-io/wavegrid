@@ -1,0 +1,15 @@
+{
+  "id": "main",
+  "label": "My plugin",
+  "showWhen": "always",
+  "cards": [{
+    "title": "Color",
+    "controls": [
+      { "type": "slider", "param": "hue", "label": "Hue", "min": 0, "max": 360, "default": 210 },
+      { "type": "slider", "param": "saturation", "label": "Saturation", "min": 0, "max": 100, "default": 85 },
+      { "type": "slider", "param": "brightness", "label": "Brightness", "min": 0, "max": 100, "default": 70 },
+      { "type": "button", "label": "Start", "action": "start" },
+      { "type": "button", "label": "Stop", "action": "stop" }
+    ]
+  }]
+}
