@@ -45,4 +45,14 @@ describe('shared pattern sandbox', () => {
     engine.loadPattern(code);
     expect(engine.renderFrame(0, 0, 1)?.[0]).toEqual({ h: 120, s: 80, b: 60 });
   });
+
+  it('loads mixed-format patterns with line comments before declarations', () => {
+    engine.loadPattern(`({
+      // Pride palette
+      // Shared by render
+      var hue = 120;
+      render: function(ctx) { ctx.fill(hue, 80, 60); }
+    })`);
+    expect(engine.renderFrame(0, 0, 1)?.[0]).toEqual({ h: 120, s: 80, b: 60 });
+  });
 });

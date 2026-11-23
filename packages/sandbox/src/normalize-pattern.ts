@@ -1,6 +1,6 @@
 export function transformMixedFormat(code: string): string | null {
   const trimmed = code.trim();
-  if (!/^\(\{\s*(?:var|let|const|function)\s/.test(trimmed) || !trimmed.endsWith('})')) return null;
+  if (!/^\(\{(?:\s|\/\/[^\n]*(?:\n|$))*(?:var|let|const|function)\s/.test(trimmed) || !trimmed.endsWith('})')) return null;
 
   // Extract the inner content (between ({ and }))
   const inner = trimmed.slice(2, -2);
