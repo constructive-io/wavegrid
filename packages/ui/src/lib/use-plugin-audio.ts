@@ -61,17 +61,15 @@ export function usePluginAudio(plugins: UIPlugin[] | undefined, pattern: Pattern
   const run = useRef({ active: false, sent: new Set<LoadedPluginAudio>() });
   const current = useRef({ bindings, pattern, send, mode, playing });
   current.current = { bindings, pattern, send, mode, playing };
-  const receive = useCallback((out: GraceAudioOutput): boolean => {
+  const receive = useCallback((out: GraceAudioOutput): void => {
     const snapshot = current.current;
     const binding = activePluginAudio(snapshot.bindings, snapshot.pattern);
-    if (!binding) return false;
-    if (snapshot.mode !== 'grace' || !snapshot.playing) return true;
+    if (!binding || snapshot.mode !== 'grace' || !snapshot.playing) return;
     for (const command of pluginAudioCommands(binding, snapshot.pattern, out)) {
       snapshot.send(command);
       run.current.sent.add(binding);
       snapshot.pattern = { ...snapshot.pattern!, params: { ...snapshot.pattern!.params, [command.name as string]: command.value } };
     }
-    return true;
   }, []);
 
   useEffect(() => {

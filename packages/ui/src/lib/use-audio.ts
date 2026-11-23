@@ -169,7 +169,7 @@ export function useAudio(
   _grid: CannonColor[],
   send: (msg: Record<string, unknown>) => void,
   fade: number = 50,
-  /** Grace Audio sink: colour offsets for the running GracePaint pattern and gradient steps. */
+  /** Grace Audio sink for host-owned plugin bindings. */
   onGrace?: (out: GraceAudioOutput) => void
 ): AudioEngine {
   const [audioState, setAudioState] = useState<AudioEngineState>({

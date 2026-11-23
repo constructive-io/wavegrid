@@ -1,5 +1,3 @@
-import { resolveLayout } from '@wavegrid/layout';
-
 import {
   createGraceAudio,
   type GraceAudioInput,
@@ -7,8 +5,6 @@ import {
   STEP_MIN_S,
   stepGraceAudio
 } from '../src/lib/grace-audio';
-import { defaultParams, gracePaintPattern } from '../src/lib/grace-paint';
-import { GRADIENTS } from '../src/lib/grace-rings';
 
 const ON = { drift: true, beats: true };
 const quiet: GraceAudioInput = { low: 0, mid: 0.4, high: 0, beat: false, lowRatio: 1 };
@@ -57,41 +53,5 @@ describe('Grace Audio slew', () => {
     for (let i = 0; i < 10; i++) steps += stepGraceAudio(s, strong, 1 / 60, ON).step ? 1 : 0;
     expect(steps).toBe(1);
     expect(stepGraceAudio(s, strong, 1 / 60, { drift: true, beats: false }).step).toBe(false);
-  });
-});
-
-describe('GracePaint colour shift params', () => {
-  const layout = resolveLayout({ preset: 'grace-cathedral' });
-  const pattern = new Function('return (' + gracePaintPattern() + ');')();
-  const render = (p: Record<string, unknown>) => {
-    const cells = layout.fixtures.map(() => ({ h: 0, s: 0, b: 0 }));
-    pattern.render({
-      count: layout.count, cols: 0, rows: 0, t: 3, dt: 1 / 60, frame: 180, p,
-      set(i: number, h: number, s: number, b: number) { cells[i] = { h, s, b }; },
-      get(i: number) { const c = cells[i]; return [c.h, c.s, c.b]; },
-      polar(i: number): [number, number] { const f = layout.fixtures[i]; return [f.radius, f.angle]; },
-      xy(i: number): [number, number] { const f = layout.fixtures[i]; return [f.x, f.y]; },
-      uv(i: number): [number, number] { const f = layout.fixtures[i]; return [f.u, f.v]; }
-    });
-    return cells;
-  };
-
-  test('hueShift/satShift move colour only; brightness is identical', () => {
-    const base = { ...defaultParams(layout.count, GRADIENTS[0]), anim: 'collapse', spin: 0 } as Record<string, unknown>;
-    const a = render(base);
-    const b = render({ ...base, hueShift: 40, satShift: -20 });
-    a.forEach((c, i) => {
-      expect(b[i].b).toBe(c.b);
-      expect(b[i].h).toBeCloseTo((c.h + 40) % 360, 5);
-      expect(b[i].s).toBe(Math.max(0, c.s - 20));
-    });
-  });
-
-  test('shift applies to painted panes too and wraps around 360', () => {
-    const paint = Array.from({ length: layout.count * 2 }, (_, k) => (k % 2 === 0 ? 350 : 80));
-    const base = { ...defaultParams(layout.count, GRADIENTS[0]), paint } as Record<string, unknown>;
-    const c = render({ ...base, hueShift: 30, satShift: 50 })[0];
-    expect(c.h).toBeCloseTo(20, 5);
-    expect(c.s).toBe(100);
   });
 });

@@ -19,7 +19,6 @@ import { registryFor, tabById, type TabDef, tabsFor, type ToolContentProps } fro
 import { useAudio } from '@/lib/use-audio';
 import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
-import { type GracePaintControls, useGracePaint } from '@/lib/use-grace-paint';
 import { useIsPhone } from '@/lib/use-media-query';
 import { usePluginAudio } from '@/lib/use-plugin-audio';
 import { useSocket } from '@/lib/use-socket';
@@ -385,15 +384,9 @@ export default function Home() {
 
   const gridData = grid.length > 0 ? grid : Array.from({ length: NUM_CANNONS }, () => ({ h: 220, s: 90, b: 80 }));
 
-  // Grace Audio steers GracePaint's colour; the pattern hook is created below.
-  const gracePaintRef = useRef<GracePaintControls | null>(null);
-  const pluginAudioRef = useRef<((out: GraceAudioOutput) => boolean) | null>(null);
+  const pluginAudioRef = useRef<((out: GraceAudioOutput) => void) | null>(null);
   const onGraceAudio = useCallback((out: GraceAudioOutput) => {
-    const pluginHandled = pluginAudioRef.current?.(out) ?? false;
-    const gp = gracePaintRef.current;
-    if (!gp) return;
-    gp.setColourShift(out.hueShift, out.satShift);
-    if (out.step && !pluginHandled) gp.nextGradient();
+    pluginAudioRef.current?.(out);
   }, []);
   const audio = useAudio(NUM_CANNONS, GRID_COLUMNS, gridData, send, smoothness, onGraceAudio);
   const pluginAudio = usePluginAudio(config?.plugins, pattern, send, audio.mode, audio.state.playing || audio.state.micActive);
@@ -466,9 +459,6 @@ export default function Home() {
     []
   );
 
-  const gracePaint = useGracePaint(NUM_CANNONS, send, pattern, handlePatternSelect);
-  gracePaintRef.current = gracePaint;
-
   // A tab saved on another rig (or hidden here) falls back to Paint.
   useEffect(() => {
     if (config && !tabs.some((t) => t.id === tab)) setTab('paint');
@@ -480,16 +470,12 @@ export default function Home() {
         pluginPaint.current?.({ index, h, s, b });
         return;
       }
-      if (tab === 'gracepaint') {
-        gracePaint.paint(index, h, s);
-        return;
-      }
       send({ type: 'cannon', index, h, s, b });
       if (trailFade && b > 0) {
         scheduleTrailFade(index, h, s, b);
       }
     },
-    [gracePaint, scheduleTrailFade, send, tab, trailFade, pluginPaintEnabled]
+    [scheduleTrailFade, send, trailFade, pluginPaintEnabled]
   );
 
   const flags = useFlagAnimation(send);
@@ -684,7 +670,6 @@ export default function Home() {
     onPatternSelect: handlePatternSelect,
     playlistState,
     easing: previewEasing,
-    gracePaint,
     looks
   };
 

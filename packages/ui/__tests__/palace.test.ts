@@ -1,6 +1,5 @@
 import { presets, resolveLayout } from '@wavegrid/layout';
 
-import { coerceParams } from '../src/lib/use-grace-paint';
 import {
   ANIMS, defaultParams, emptyPaint, FLOWS, type PalaceParams, palacePattern, SCENES, SPANS, SPINS
 } from '../src/lib/palace';
@@ -67,9 +66,5 @@ describe('legacy Palace pattern parity baseline', () => {
       expect(SPANS.some((x) => x.key === s.params.span)).toBe(true);
       expect(SPINS.some((x) => x.key === s.params.spin)).toBe(true);
     }
-  });
-
-  it('a Palace look is never taken as a GracePaint look', () => {
-    expect(coerceParams(defaultParams(24) as unknown as Record<string, unknown>)).toBeNull();
   });
 });

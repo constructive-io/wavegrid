@@ -63,7 +63,7 @@ it.each([undefined, 'demo/other'])('controls a shared-source pattern started by 
   render(pattern); await new Promise(resolve => setImmediate(resolve));
   const callback = render(pattern);
   expect(activePluginAudio([binding], pattern)).toBe(binding);
-  expect(callback(out)).toBe(true);
+  callback(out);
   expect(send).toHaveBeenCalledWith({ type: 'setPatternParam', name: 'stops', value: binding.values[1] });
   expect(send.mock.calls.every(([message]) => message.type === 'setPatternParam')).toBe(true);
 });
@@ -75,11 +75,16 @@ it('maps output fields, suppresses unchanged params, and ignores non-finite shif
   expect(pluginAudioCommands(binding, live, { hueShift: NaN, satShift: Infinity, step: false })).toEqual([]);
 });
 
+it.each([null, { ...live, active: false }, { ...live, code: 'other' }])('does not dispatch or auto-start on a beat without an active bound pattern: %j', async pattern => {
+  (await mount(pattern))(out);
+  expect(send).not.toHaveBeenCalled();
+});
+
 it('loads source and keyed values without mounting a plugin tab, then updates the active brain pattern', async () => {
   const callback = await mount();
   expect(global.fetch).toHaveBeenCalledWith('/plugins/demo/pattern.js');
   expect(global.fetch).toHaveBeenCalledWith('/plugins/demo/gradients.json');
-  expect(callback(out)).toBe(true);
+  callback(out);
   expect(send).toHaveBeenCalledWith({ type: 'setPatternParam', name: 'stops', value: binding.values[1] });
   expect(send.mock.calls.every(([message]) => message.type === 'setPatternParam')).toBe(true);
 });
@@ -111,7 +116,7 @@ it('does not reset a binding that sent no commands during the Grace audio run', 
 
 it('does not reset a newly active binding when only a different pattern ran during audio', async () => {
   const callback = await mount({ ...live, code: 'other' });
-  expect(callback(out)).toBe(false);
+  callback(out);
   render(live, 'energy', false);
   expect(send).not.toHaveBeenCalled();
 });
@@ -138,7 +143,7 @@ it('warns on a bad values fetch without starting a pattern or clearing paint on 
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   global.fetch = jest.fn(async (url: any) => ({ ok: true, text: async () => String(url).endsWith('pattern.js') ? binding.source : 'invalid JSON' })) as any;
   const callback = await mount();
-  expect(callback(out)).toBe(true);
+  callback(out);
   expect(warn).toHaveBeenCalled(); expect(send).not.toHaveBeenCalled();
 });
 

@@ -27,7 +27,12 @@ function isParams(p: unknown): p is Record<string, unknown> {
 }
 
 function migrateParams(params: Record<string, unknown>): Record<string, unknown> {
-  return params.kind === 'palace' && params.plugin === undefined ? { ...params, plugin: 'palace/palace' } : params;
+  if (params.kind === 'palace' && params.plugin === undefined) return { ...params, plugin: 'palace/palace' };
+  if (!Object.prototype.hasOwnProperty.call(params, 'plugin') && !Object.prototype.hasOwnProperty.call(params, 'kind') &&
+      typeof params.anim === 'string' && typeof params.flow === 'string' && Array.isArray(params.stops) && Array.isArray(params.paint)) {
+    return { ...params, plugin: 'grace/gracepaint' };
+  }
+  return params;
 }
 
 interface JsonRange {
@@ -130,20 +135,20 @@ export class LookStore {
       let contents = fs.readFileSync(this.file, 'utf8');
       const raw = JSON.parse(contents) as { looks?: unknown };
       if (!Array.isArray(raw.looks)) return;
-      const migrated: number[] = [];
+      const migrated: { index: number; plugin: string }[] = [];
       raw.looks.forEach((l, index) => {
         if (!isParams(l) || typeof l.id !== 'string' || !isParams(l.params)) return;
         const params = migrateParams(l.params);
-        if (params !== l.params) {
+        if (params !== l.params && typeof params.plugin === 'string') {
           l.params = params;
-          migrated.push(index);
+          migrated.push({ index, plugin: params.plugin });
         }
       });
       if (migrated.length) {
         const ranges = jsonRanges(contents).fields!.get('looks')!.items!;
-        const offsets = migrated.map(index => ranges[index].fields!.get('params')!.end).sort((a, b) => b - a);
-        for (const end of offsets) {
-          contents = `${contents.slice(0, end)},"plugin":"palace/palace"${contents.slice(end)}`;
+        const offsets = migrated.map(({ index, plugin }) => ({ end: ranges[index].fields!.get('params')!.end, plugin })).sort((a, b) => b.end - a.end);
+        for (const { end, plugin } of offsets) {
+          contents = `${contents.slice(0, end)},"plugin":${JSON.stringify(plugin)}${contents.slice(end)}`;
         }
         this.write(contents);
       }

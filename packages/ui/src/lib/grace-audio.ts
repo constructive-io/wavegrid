@@ -1,5 +1,5 @@
 /**
- * Grace Audio: music steers the *colour* of the running GracePaint pattern and
+ * Grace Audio: music steers the *colour* of the running bound plugin pattern and
  * nothing else. Brightness stays with the animation.
  *
  * Bass slowly warms/turns the hue, mids lift the saturation, and a strong beat
