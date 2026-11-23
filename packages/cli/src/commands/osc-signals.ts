@@ -151,7 +151,7 @@ function probeAdapter(
   zones: number[],
   serial: string | undefined,
   onSendError: (err: Error) => void
-): OutputAdapter & { connect: () => void; flush: (timeoutMs?: number) => Promise<void> } {
+): OutputAdapter & { connect: () => void; flush: (timeoutMs?: number) => Promise<boolean> } {
   if (target.kind === 'fb4') {
     if (!serial) throw new Error('FB4 addressing needs a 5-digit serial: --serial 12345');
     return new FB4OscOutput({
@@ -205,6 +205,7 @@ export async function runSignalsProbe(flags: Flags): Promise<void> {
   console.log('');
 
   let sendError: Error | undefined;
+  let flushed = false;
   const adapter = probeAdapter(target, zones, serial, (err) => { sendError ??= err; });
   adapter.connect();
   try {
@@ -217,12 +218,15 @@ export async function runSignalsProbe(flags: Flags): Promise<void> {
     // UDP sends are queued on the socket; closing it before they settle drops
     // the blackout frame, the one frame that must not be lost, and hides a
     // late DNS failure.
-    await adapter.flush(FLUSH_TIMEOUT_MS);
+    flushed = await adapter.flush(FLUSH_TIMEOUT_MS);
   } finally {
     adapter.close();
   }
   if (sendError) {
     throw new Error(`OSC sends to ${target.host}:${target.port} failed: ${sendError.message}`);
+  }
+  if (!flushed) {
+    throw new Error(`OSC sends to ${target.host}:${target.port} did not finish within ${FLUSH_TIMEOUT_MS}ms; the blackout frame may not have gone out`);
   }
   console.log('');
   console.log(c.green('  ✓ done — everything blacked out'));

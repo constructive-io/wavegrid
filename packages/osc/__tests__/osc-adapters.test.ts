@@ -500,7 +500,7 @@ describe('unreachable OSC targets', () => {
     });
     adapter.connect();
     adapter.send(makeSingleGrid(0, 0, 100, 100));
-    await adapter.flush(10000);
+    expect(await adapter.flush(10000)).toBe(true);
     adapter.close();
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]).toBeInstanceOf(Error);

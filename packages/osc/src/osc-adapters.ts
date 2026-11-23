@@ -78,8 +78,8 @@ export interface OutputAdapter {
   /** Projector-only controls keyed by logical index. Non-projectors are ignored. */
   sendProjector?(controls: Record<number, ProjectorControl>): void;
   sendCue?(command: ProjectorCueCommand): void;
-  /** Resolve once every send issued so far has gone out or failed (bounded by `timeoutMs`). */
-  flush?(timeoutMs?: number): Promise<void>;
+  /** Resolve `true` once every send issued so far has gone out or failed, `false` if `timeoutMs` passed first. */
+  flush?(timeoutMs?: number): Promise<boolean>;
   close(): void;
 }
 
@@ -142,15 +142,18 @@ function deliver(client: Client, msg: Message): void {
 /**
  * Wait until every send issued on `client` so far has gone out or failed, or
  * `timeoutMs` passes, so a caller can judge success (or close the socket)
- * without dropping the last frame or missing a late DNS failure.
+ * without dropping the last frame or missing a late DNS failure. Resolves
+ * `false` when the timeout passed with sends still in flight.
  */
-export async function flushOscClient(client: Client, timeoutMs = 2000): Promise<void> {
+export async function flushOscClient(client: Client, timeoutMs = 2000): Promise<boolean> {
   const inFlight = pendingSends.get(client);
-  if (!inFlight || inFlight.size === 0) return;
+  if (!inFlight || inFlight.size === 0) return true;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); });
-  await Promise.race([Promise.allSettled([...inFlight]), timeout]);
+  const timeout = new Promise<false>((resolve) => { timer = setTimeout(() => resolve(false), timeoutMs); });
+  const settled = Promise.allSettled([...inFlight]).then(() => true as const);
+  const result = await Promise.race([settled, timeout]);
   clearTimeout(timer);
+  return result;
 }
 
 /** Send an OSC message with explicit int typing. */
@@ -387,8 +390,8 @@ export class BeyondOscOutput implements OutputAdapter {
     sendOsc(this.client, msg);
   }
 
-  flush(timeoutMs?: number): Promise<void> {
-    return this.client ? flushOscClient(this.client, timeoutMs) : Promise.resolve();
+  flush(timeoutMs?: number): Promise<boolean> {
+    return this.client ? flushOscClient(this.client, timeoutMs) : Promise.resolve(true);
   }
 
   close(): void {
@@ -497,8 +500,8 @@ export class FB4OscOutput implements OutputAdapter {
     }
   }
 
-  flush(timeoutMs?: number): Promise<void> {
-    return this.client ? flushOscClient(this.client, timeoutMs) : Promise.resolve();
+  flush(timeoutMs?: number): Promise<boolean> {
+    return this.client ? flushOscClient(this.client, timeoutMs) : Promise.resolve(true);
   }
 
   close(): void {
@@ -652,8 +655,9 @@ export class RoutedOscOutput implements OutputAdapter {
     return [...this.projectorIndices].sort((a, b) => a - b);
   }
 
-  async flush(timeoutMs?: number): Promise<void> {
-    await Promise.all([...this.adapters.values()].map((adapter) => adapter.flush(timeoutMs)));
+  async flush(timeoutMs?: number): Promise<boolean> {
+    const settled = await Promise.all([...this.adapters.values()].map((adapter) => adapter.flush(timeoutMs)));
+    return settled.every(Boolean);
   }
 
   close(): void {
