@@ -240,19 +240,43 @@ function pluginDirectory(paths: StorePaths, project: string, id: string): string
   return folder;
 }
 
-export function writePluginFolder(folder: string, files: Record<string, string>): void {
+function destinationEntry(file: string): fs.Stats | undefined {
+  try { return fs.lstatSync(file); }
+  catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; return undefined; }
+}
+
+function checkDestinationDirectory(folder: string): void {
   for (let ancestor = path.resolve(folder); ; ancestor = path.dirname(ancestor)) {
-    if (fs.existsSync(ancestor) && fs.lstatSync(ancestor).isSymbolicLink()) throw new Error(`Plugin destination symlink: ${ancestor}`);
+    const entry = destinationEntry(ancestor);
+    if (entry?.isSymbolicLink()) throw new Error(`Plugin destination symlink: ${ancestor}`);
+    if (entry && !entry.isDirectory()) throw new Error(`Plugin destination is not a directory: ${ancestor}`);
     if (path.dirname(ancestor) === ancestor) break;
   }
-  // Recreate the destination rather than following pre-existing child symlinks.
-  fs.rmSync(folder, { force: true, recursive: true });
+}
+
+export function checkPluginFolderDestination(folder: string, files: Record<string, string>, overwrite = false): void {
+  checkDestinationDirectory(folder);
+  if (!overwrite && destinationEntry(folder) && fs.readdirSync(folder).length) {
+    throw new Error(`Plugin destination folder is not empty: ${folder} — pass overwrite: true to replace plugin files`);
+  }
+  for (const name of Object.keys(files)) {
+    assertPath(name);
+    const file = path.join(folder, name);
+    checkDestinationDirectory(path.dirname(file));
+    const entry = destinationEntry(file);
+    if (entry?.isSymbolicLink()) throw new Error(`Plugin destination symlink: ${file}`);
+    if (entry && !entry.isFile()) throw new Error(`Plugin destination is not a regular file: ${file}`);
+  }
+}
+
+export function writePluginFolder(folder: string, files: Record<string, string>, overwrite = false): void {
+  checkPluginFolderDestination(folder, files, overwrite);
   fs.mkdirSync(folder, { recursive: true });
   for (const [name, contents] of Object.entries(files)) {
     assertPath(name);
     const file = path.join(folder, name);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, Buffer.from(contents, 'base64'));
+    fs.writeFileSync(file, Buffer.from(contents, 'base64'), { flag: overwrite ? 'w' : 'wx' });
   }
 }
 

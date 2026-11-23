@@ -10,7 +10,7 @@ import {
   type StorePaths,
   writeFileAtomic
 } from './paths';
-import { pluginRefProblems, type ProjectPluginRef, readProjectPlugins, replaceProjectPlugins, storedPluginSnapshots, writePluginFolder } from './plugins';
+import { checkPluginFolderDestination, pluginRefProblems, type ProjectPluginRef, readProjectPlugins, replaceProjectPlugins, storedPluginSnapshots, writePluginFolder } from './plugins';
 import { type PortableDevice } from './portable';
 import { createProject, getProjectConfig, hasProject, isProjectName, type ProjectConfig } from './projects';
 import { type DeviceRecord } from './registry';
@@ -235,6 +235,8 @@ export function buildProjectFile(paths: StorePaths, project: string): BuildProje
 export interface SaveProjectFileOptions {
   /** Where to write. Default: the file the project was opened from or last saved to. */
   file?: string;
+  /** Replace conflicting plugin files at a save-as destination, preserving unrelated files. */
+  overwrite?: boolean;
 }
 
 export interface SaveProjectFileResult extends BuildProjectFileResult {
@@ -256,8 +258,9 @@ export function saveProjectFile(paths: StorePaths, project: string, opts: SavePr
     for (const snapshot of snapshots) {
       const destination = path.resolve(path.dirname(file), snapshot.path);
       if (file === destination || file.startsWith(destination + path.sep)) throw new Error('Plugin folder overlaps the target project file');
+      checkPluginFolderDestination(destination, snapshot.files, opts.overwrite);
     }
-    for (const snapshot of snapshots) writePluginFolder(path.resolve(path.dirname(file), snapshot.path), snapshot.files);
+    for (const snapshot of snapshots) writePluginFolder(path.resolve(path.dirname(file), snapshot.path), snapshot.files, opts.overwrite);
   }
   writeFileAtomic(file, JSON.stringify(result.document, null, 2) + '\n');
   writeLink(paths, project, { path: file, extra: link?.extra ?? {}, plugins: result.document.plugins });

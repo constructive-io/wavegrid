@@ -172,6 +172,59 @@ describe('project plugins', () => {
     expect(loadProjectPlugins(reopened.paths, 'venue').errors).toEqual([]);
   });
 
+  it('checks every save-as destination before writing and preserves nonempty folders by default', () => {
+    const f = fixture();
+    const second = path.join(f.folder, 'second');
+    fs.mkdirSync(second);
+    json(path.join(second, 'plugin.json'), { id: 'second', name: 'Second', version: '1.0.0', apiVersion: 1 });
+    f.doc.plugins.push({ path: 'second' });
+    f.store.openProjectFile(f.file, f.doc);
+    const target = temp(), file = path.join(target, 'copy.wavegrid');
+    const git = path.join(target, 'second', '.git');
+    fs.mkdirSync(git, { recursive: true });
+    fs.writeFileSync(path.join(git, 'config'), 'repository config');
+    fs.writeFileSync(file, 'existing project document');
+    expect(() => f.store.saveProjectFile('venue', { file })).toThrow(/not empty.*overwrite: true/);
+    expect(fs.existsSync(path.join(target, 'show'))).toBe(false);
+    expect(fs.readFileSync(path.join(git, 'config'), 'utf8')).toBe('repository config');
+    expect(fs.readFileSync(file, 'utf8')).toBe('existing project document');
+    expect(JSON.parse(fs.readFileSync(path.join(projectDir(f.store.paths, 'venue'), 'project-file.json'), 'utf8')).path).toBe(f.file);
+  });
+
+  it('copies into an existing empty plugin destination folder', () => {
+    const f = fixture();
+    f.store.openProjectFile(f.file, f.doc);
+    const target = temp();
+    fs.mkdirSync(path.join(target, 'show'));
+    f.store.saveProjectFile('venue', { file: path.join(target, 'copy.wavegrid') });
+    expect(JSON.parse(fs.readFileSync(path.join(target, 'show', 'plugin.json'), 'utf8'))).toEqual(f.manifest);
+  });
+
+  it('overwrites only plugin files when requested and retains unrelated files and .git', () => {
+    const f = fixture();
+    f.store.openProjectFile(f.file, f.doc);
+    const target = temp(), plugin = path.join(target, 'show');
+    fs.mkdirSync(path.join(plugin, '.git'), { recursive: true });
+    fs.writeFileSync(path.join(plugin, '.git', 'config'), 'repository config');
+    fs.writeFileSync(path.join(plugin, 'notes.txt'), 'user notes');
+    fs.writeFileSync(path.join(plugin, 'pattern.js'), 'old pattern');
+    f.store.saveProjectFile('venue', { file: path.join(target, 'copy.wavegrid'), overwrite: true });
+    expect(fs.readFileSync(path.join(plugin, 'pattern.js'), 'utf8')).toContain('must never execute');
+    expect(fs.readFileSync(path.join(plugin, 'notes.txt'), 'utf8')).toBe('user notes');
+    expect(fs.readFileSync(path.join(plugin, '.git', 'config'), 'utf8')).toBe('repository config');
+  });
+
+  (process.platform === 'win32' ? it.skip : it)('rejects a destination file symlink even when overwriting', () => {
+    const f = fixture();
+    f.store.openProjectFile(f.file, f.doc);
+    const target = temp(), plugin = path.join(target, 'show');
+    fs.mkdirSync(plugin);
+    fs.symlinkSync(path.join(f.plugin, 'pattern.js'), path.join(plugin, 'pattern.js'));
+    expect(() => f.store.saveProjectFile('venue', { file: path.join(target, 'copy.wavegrid'), overwrite: true })).toThrow(/symlink/);
+    expect(fs.readdirSync(plugin)).toEqual(['pattern.js']);
+    expect(fs.existsSync(path.join(target, 'copy.wavegrid'))).toBe(false);
+  });
+
   (process.platform === 'win32' ? it.skip : it)('refuses save-as through a symlink destination parent', () => {
     const f = fixture();
     f.store.openProjectFile(f.file, f.doc);

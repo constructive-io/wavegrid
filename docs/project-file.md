@@ -116,8 +116,12 @@ copies (including removal of unlisted plugins). Only regular files are copied;
 dotfiles/directories are skipped and symlinks are rejected, even hidden ones.
 Limits: **200 files**, **1 MiB per file**, **5 MiB per plugin**, **16 nested
 directories**. Manifests, tabs and other assets count toward these limits.
-Save-as to another folder copies store plugins beside the target `.wavegrid`;
-saving within the original folder leaves source folders alone. Export bundles
+Save-as to another folder copies store plugins beside the target `.wavegrid`.
+Saving refuses nonempty plugin destination folders unless the settings API's
+`SaveProjectFileOptions.overwrite` is true. Overwrite replaces plugin files only,
+never deleting unrelated files (including `.git`). All destinations are checked
+before anything is written.
+Saving within the original folder leaves source folders alone. Export bundles
 carry plugin files as base64; older bundles without plugins still import.
 
 The server loads plugins at startup and serves their files at
