@@ -21,6 +21,7 @@
     "@wavegrid/animations": "workspace:*",
     "@wavegrid/layout": "workspace:*",
     "@wavegrid/pool": "workspace:*",
+    "@wavegrid/settings": "workspace:*",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

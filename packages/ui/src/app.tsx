@@ -14,7 +14,7 @@ import { useMotion } from '@/components/motion-tab';
 import { PoolCanvas, type PoolTouchPhase } from '@/components/pool-canvas';
 import { StatusDot } from '@/components/status-dot';
 import type { GraceAudioOutput } from '@/lib/grace-audio';
-import { allTabs, tabById, type TabDef, tabsFor, type ToolContentProps } from '@/lib/tab-registry';
+import { registryFor, tabById, type TabDef, tabsFor, type ToolContentProps } from '@/lib/tab-registry';
 import { useAudio } from '@/lib/use-audio';
 import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
@@ -35,8 +35,8 @@ type TrailFadeEntry = {
   duration: number;
 };
 
-function ToolContent({ tab, ...props }: ToolContentProps & { tab: string }) {
-  return tabById(tab)?.render(props) ?? null;
+function ToolContent({ tab, registry, ...props }: ToolContentProps & { tab: string; registry: TabDef[] }) {
+  return tabById(tab, registry)?.render(props) ?? null;
 }
 
 /* ---------- Tab strip ---------- */
@@ -266,13 +266,13 @@ export default function Home() {
   const GRID_COLUMNS = config?.gridColumns ?? 7;
   const FIXTURES = config?.layout?.fixtures;
   const LAYOUT = config?.layout ?? FALLBACK_LAYOUT;
-  const tabs = useMemo(() => tabsFor(LAYOUT), [LAYOUT]);
+  const registry = useMemo(() => registryFor(config?.plugins ?? []), [config?.plugins]);
+  const tabs = useMemo(() => tabsFor(LAYOUT, registry), [LAYOUT, registry]);
 
   const [tab, setTab] = useState<string>(() => {
     if (typeof window === 'undefined') return 'paint';
     const saved = localStorage.getItem('wavegrid-tab');
-    if (saved && allTabs.some((t) => t.id === saved)) return saved;
-    return 'paint';
+    return saved || 'paint';
   });
   // Beside the grid, not under it: the parameters are read while looking at the
   // rig, and a bottom panel pushes the grid off a short window.
@@ -655,6 +655,7 @@ export default function Home() {
   };
 
   const toolContentProps = {
+    registry, pattern,
     hue, sat, bright, brushSize, softEdge, trailFade,
     setHue, setSat, setBright, setBrushSize, setSoftEdge, setTrailFade,
     gradient, dropsConfig, setDropsConfig,
@@ -925,7 +926,7 @@ export default function Home() {
               currentHue={hue}
               currentSat={sat}
               currentBright={bright}
-              mode={tab}
+              mode={tab.includes('/') ? 'patterns' : tab}
               brushSize={brushSize}
               softEdge={softEdge}
               motionPath={motion.state.path}
@@ -1088,7 +1089,7 @@ export default function Home() {
               currentHue={hue}
               currentSat={sat}
               currentBright={bright}
-              mode={tab}
+              mode={tab.includes('/') ? 'patterns' : tab}
               brushSize={brushSize}
               softEdge={softEdge}
               motionPath={motion.state.path}

@@ -1,0 +1,8 @@
+{
+  "wavegrid": "project",
+  "version": 1,
+  "name": "plugin-demo",
+  "description": "Project-folder plugin controls demo",
+  "config": { "mode": "simple", "layout": { "preset": "grid-7x7" } },
+  "plugins": [{ "path": "pulse-demo" }]
+}
