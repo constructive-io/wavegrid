@@ -49,6 +49,11 @@ describe('defensive plugin control coercion', () => {
     { type: 'color', param: 'tint', default: '#112233' },
     { type: 'button', label: 'Start', action: 'start' }
   ] }])[0].controls;
+  it.each(['__proto__', 'constructor', 'prototype'])('filters reserved parameter name %s defensively', param => {
+    expect(coerceCards([{ title: 'Unsafe', controls: [{ type: 'toggle', param, default: true }] }]))
+      .toEqual([{ title: 'Unsafe', controls: [] }]);
+  });
+
   it('uses tab defaults for initial, empty or invalid params', () => {
     const defaults = { speed: 1, enabled: true, mode: 'a', tint: '#112233' };
     expect(coercePluginParams(controls, null)).toEqual(defaults);

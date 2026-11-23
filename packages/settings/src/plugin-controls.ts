@@ -23,6 +23,7 @@ export function parsePluginControl(raw: unknown): PluginControl | null {
       ? { type: 'button', label: raw.label, action: raw.action } : null;
   }
   if (typeof raw.param !== 'string' || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(raw.param) ||
+    ['__proto__', 'constructor', 'prototype'].includes(raw.param) ||
     (raw.label !== undefined && typeof raw.label !== 'string')) return null;
   const base = { param: raw.param, ...(raw.label === undefined ? {} : { label: raw.label as string }) };
   switch (raw.type) {

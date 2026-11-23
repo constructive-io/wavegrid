@@ -114,7 +114,8 @@ An empty object always matches. Tab ids in `/api/config` are `<pluginId>/<tabId>
 
 Controls are JSON data, rendered as native Wavegrid cards; plugins never supply
 React or host-evaluated JavaScript. Each parameter name is a JavaScript-style
-identifier (`[A-Za-z_$][A-Za-z0-9_$]*`) and must be unique within a tab. Labels are
+identifier (`[A-Za-z_$][A-Za-z0-9_$]*`) and must be unique within a tab.
+`__proto__`, `constructor` and `prototype` are reserved parameter names. Labels are
 optional except on buttons. A tab's defaults form its initial pattern params.
 
 | `type` | Fields in addition to `type`, `param`, optional `label` |

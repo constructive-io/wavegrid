@@ -15,6 +15,10 @@ describe('plugin controls', () => {
       .toMatchObject({ options: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }] });
   });
 
+  it.each(['__proto__', 'constructor', 'prototype'])('rejects reserved parameter name %s', param => {
+    expect(parsePluginControl({ type: 'toggle', param, default: true })).toBeNull();
+  });
+
   it.each([
     null, {}, { type: 'future' }, { type: 'button', label: 'Bad', action: 'eval' },
     { type: 'toggle', param: 'bad-key', default: true }, { type: 'toggle', param: '1bad', default: false },

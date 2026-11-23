@@ -104,7 +104,10 @@ describe('project plugins', () => {
     expect(f.store.hasProject('venue')).toBe(false);
   });
 
-  it.each([{ type: 'unknown' }, { type: 'slider', param: 'bad-key', min: 0, max: 1, default: 0 }])('rejects invalid controls at open before writing: %j', control => {
+  it.each([
+    { type: 'unknown' }, { type: 'slider', param: 'bad-key', min: 0, max: 1, default: 0 },
+    ...['__proto__', 'constructor', 'prototype'].map(param => ({ type: 'toggle', param, default: true }))
+  ])('rejects invalid controls at open before writing: %j', control => {
     const f = fixture();
     json(path.join(f.plugin, 'tab.json'), { id: 'paint', label: 'Paint', cards: [{ title: 'Bad', controls: [control] }] });
     expect(() => f.store.openProjectFile(f.file, f.doc)).toThrow(/Invalid control/);
