@@ -56,7 +56,7 @@ export function stationExtension<LayoutSpec>(
         const policy = createStationProjectPolicy(config, layout, resolveLayout);
         const paint = new StationPaint();
         let calibrationActive = false;
-        const snapshot = () => paint.snapshot(layout.fixtures.length);
+        const snapshot = () => calibrationActive ? [] : paint.snapshot(layout.fixtures.length);
         const overlay = (): BrainMessage => ({ type: 'command', action: 'stationOverlay', cells: snapshot() });
         const publish = () => ctx.publish('receiver', overlay());
         const isCurrent = (scope: Station) => {
@@ -102,7 +102,11 @@ export function stationExtension<LayoutSpec>(
               publish();
               return true;
             }
-            if (message.type === 'calibration_mode') calibrationActive = Boolean(message.enabled);
+            if (message.type === 'calibration_mode') {
+              const wasCalibrating = calibrationActive;
+              calibrationActive = Boolean(message.enabled);
+              if (wasCalibrating && !calibrationActive) publish();
+            }
             const identify = message.type === 'physical_preview' && typeof message.physicalIndex === 'number';
             if (identify) calibrationActive = true;
             if (message.type === 'clear' || message.type === 'stopPattern' ||

@@ -40,10 +40,11 @@ export class StationPaint {
   }
 
   snapshot(count: number): StationCell[] {
-    if (this.locked || this.mode === 'show') return [];
+    if (this.mode === 'show') return [];
     const cells = this.mode === 'stations'
       ? Array.from({ length: count }, (_, idx) => ({ idx, ...black }))
       : [];
+    if (this.locked) return cells;
     for (const layer of this.layers.values()) {
       for (const [idx, color] of layer) {
         const cell = { idx, ...color };

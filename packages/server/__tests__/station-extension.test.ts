@@ -129,15 +129,24 @@ test('the brain extension host isolates station painting from other fixtures and
     full.send({ type: 'animation', name: 'stop' });
     await waitFor(() => clientA.state()?.stationOpen === false);
     clientB.send({ type: 'cannon', index: 1, ...blue });
-    expect(receiver.overlay()).toEqual([]);
+    expect(receiver.overlay()?.map((cell: { b: number }) => cell.b)).toEqual(fixtures.map(() => 0));
     full.send({ type: 'station_mode', mode: 'show' });
     await waitFor(() => full.state()?.stationMode === 'show');
     expect(clientB.state().stationOpen).toBe(false);
 
-    full.send({ type: 'station_mode', mode: 'mixed' });
+    full.send({ type: 'cannon', index: 1, ...blue });
+    await waitFor(() => full.state()?.grid[1]?.b > 0);
+    full.send({ type: 'station_mode', mode: 'stations' });
+    await waitFor(() => clientB.state()?.stationOpen === true && full.state()?.grid[1]?.b === 0);
+    full.send({ type: 'stopPattern' });
+    await waitFor(() => clientB.state()?.stationOpen === false);
+    expect(full.state().grid[1].b).toBe(0);
+    expect(receiver.overlay()?.map((cell: { b: number }) => cell.b)).toEqual(fixtures.map(() => 0));
+
+    full.send({ type: 'station_mode', mode: 'stations' });
     await waitFor(() => clientB.state()?.stationOpen === true);
     clientB.send({ type: 'cannon', index: 1, ...blue });
-    await waitFor(() => receiver.overlay()?.some((cell: { idx: number; h: number }) => cell.idx === 1 && cell.h === blue.h));
+    await waitFor(() => receiver.overlay()?.some((cell: { idx: number; h: number; b: number }) => cell.idx === 1 && cell.h === blue.h && cell.b === blue.b));
     handle.send({ type: 'physical_preview', physicalIndex: 1 });
     await waitFor(() => clientB.state()?.grid[0]?.h === 45);
     expect(clientB.state().stationOpen).toBe(false);
@@ -150,6 +159,13 @@ test('the brain extension host isolates station painting from other fixtures and
     expect(receiver.overlay()).toEqual([]);
     handle.send({ type: 'physical_preview_clear' });
     handle.send({ type: 'calibration_mode', enabled: false });
+    await waitFor(() => receiver.overlay()?.length === fixtures.length && full.state()?.grid[1]?.b === 0);
+    expect(clientB.state().stationOpen).toBe(false);
+    full.send({ type: 'station_mode', mode: 'stations' });
+    await waitFor(() => clientB.state()?.stationOpen === true);
+    full.send({ type: 'clear' });
+    await waitFor(() => clientB.state()?.stationOpen === false);
+    expect(receiver.overlay()?.map((cell: { b: number }) => cell.b)).toEqual(fixtures.map(() => 0));
     full.send({ type: 'station_mode', mode: 'mixed' });
     await waitFor(() => clientB.state()?.stationOpen === true);
 

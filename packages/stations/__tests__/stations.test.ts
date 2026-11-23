@@ -42,6 +42,9 @@ test('commands cannot cross station boundaries or re-arm an operator stop', () =
   expect(paint.snapshot(3)).toEqual([]);
   paint.setMode('stations');
   expect(paint.snapshot(3).map(cell => cell.b)).toEqual([0, 0, 0]);
+  paint.stop();
+  expect(paint.acceptsInput).toBe(false);
+  expect(compositeStationPaint([blue, blue, red], paint.snapshot(3)).map(cell => cell.b)).toEqual([0, 0, 0]);
   paint.setMode('show');
   expect(dispatchStationTool({ type: 'clear' }, right, paint)).toBe(false);
 });
