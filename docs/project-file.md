@@ -121,7 +121,9 @@ Saving refuses nonempty plugin destination folders unless the settings API's
 `SaveProjectFileOptions.overwrite` is true. Overwrite replaces plugin files only,
 never deleting unrelated files (including `.git`). All destinations are checked
 before anything is written.
-Saving within the original folder leaves source folders alone. Export bundles
+Saving within the original folder leaves existing source folders alone and
+restores missing plugin folders from the store (for example after importing a
+bundle). Export bundles
 carry plugin files as base64; older bundles without plugins still import.
 
 The server loads plugins at startup and serves their files at

@@ -1,4 +1,5 @@
 import { DEFAULT_CONFIG, resolveLayout, type WavegridConfig } from '@wavegrid/layout';
+import fs from 'fs';
 import path from 'path';
 
 import { deleteLightMap, isLightMapName, listLightMaps, readLightMap, saveLightMap, setActiveLightMap } from './light-maps';
@@ -252,16 +253,16 @@ export function saveProjectFile(paths: StorePaths, project: string, opts: SavePr
   }
   const file = path.resolve(target);
   const result = buildProjectFile(paths, project);
-  if (!link || path.dirname(file) !== path.dirname(link.path)) {
-    const { snapshots, errors } = storedPluginSnapshots(paths, project);
-    if (errors.length) throw new Error(`Cannot save plugins:\n  - ${errors.join('\n  - ')}`);
-    for (const snapshot of snapshots) {
-      const destination = path.resolve(path.dirname(file), snapshot.path);
-      if (file === destination || file.startsWith(destination + path.sep)) throw new Error('Plugin folder overlaps the target project file');
-      checkPluginFolderDestination(destination, snapshot.files, opts.overwrite);
-    }
-    for (const snapshot of snapshots) writePluginFolder(path.resolve(path.dirname(file), snapshot.path), snapshot.files, opts.overwrite);
+  const { snapshots, errors } = storedPluginSnapshots(paths, project);
+  if (errors.length) throw new Error(`Cannot save plugins:\n  - ${errors.join('\n  - ')}`);
+  const sameFolder = link && path.dirname(file) === path.dirname(link.path);
+  const copies = snapshots.map(snapshot => ({ ...snapshot, destination: path.resolve(path.dirname(file), snapshot.path) }))
+    .filter(snapshot => !sameFolder || !fs.existsSync(snapshot.destination));
+  for (const snapshot of copies) {
+    if (file === snapshot.destination || file.startsWith(snapshot.destination + path.sep)) throw new Error('Plugin folder overlaps the target project file');
+    checkPluginFolderDestination(snapshot.destination, snapshot.files, opts.overwrite);
   }
+  for (const snapshot of copies) writePluginFolder(snapshot.destination, snapshot.files, opts.overwrite);
   writeFileAtomic(file, JSON.stringify(result.document, null, 2) + '\n');
   writeLink(paths, project, { path: file, extra: link?.extra ?? {}, plugins: result.document.plugins });
   return { ...result, file };

@@ -248,6 +248,39 @@ describe('project plugins', () => {
     expect(loadProjectPlugins(target.paths, 'venue')).toEqual({ plugins: [], errors: [] });
   });
 
+  it('saves a first imported plugin beside the linked project before reopening', () => {
+    const f = fixture();
+    f.store.openProjectFile(f.file, f.doc);
+    const target = openStore({ baseDir: temp() });
+    const file = path.join(temp(), 'venue.wavegrid');
+    const doc: typeof f.doc = { ...f.doc, plugins: [] };
+    json(file, doc);
+    target.openProjectFile(file, doc);
+    target.importProject(f.store.exportProject('venue'), { overwrite: true });
+    target.saveProjectFile('venue');
+    expect(fs.existsSync(path.join(path.dirname(file), 'show', 'plugin.json'))).toBe(true);
+    const reopened = openStore({ baseDir: temp() });
+    reopened.openProjectFile(file, JSON.parse(fs.readFileSync(file, 'utf8')));
+    expect(loadProjectPlugins(reopened.paths, 'venue')).toEqual(loadProjectPlugins(target.paths, 'venue'));
+  });
+
+  it.each([false, true])('writes newly imported plugin folders but preserves existing source folders (overwrite: %s)', overwrite => {
+    const f = fixture();
+    f.store.openProjectFile(f.file, f.doc);
+    const bundle = f.store.exportProject('venue');
+    bundle.plugins!.push({ path: 'added', files: { ...bundle.plugins![0].files,
+      'plugin.json': Buffer.from(JSON.stringify({ ...f.manifest, id: 'added' })).toString('base64') } });
+    fs.writeFileSync(path.join(f.plugin, 'pattern.js'), 'external edit');
+    f.store.importProject(bundle, { overwrite: true });
+    f.store.saveProjectFile('venue', { overwrite });
+    expect(fs.readFileSync(path.join(f.plugin, 'pattern.js'), 'utf8')).toBe('external edit');
+    expect(fs.readFileSync(path.join(f.folder, 'added', 'pattern.js'), 'utf8')).toContain('must never execute');
+    const reopened = openStore({ baseDir: temp() });
+    reopened.openProjectFile(f.file, JSON.parse(fs.readFileSync(f.file, 'utf8')));
+    expect(loadProjectPlugins(reopened.paths, 'venue').errors).toEqual([]);
+    expect(loadProjectPlugins(reopened.paths, 'venue').plugins.map(plugin => plugin.id)).toEqual(['show', 'added']);
+  });
+
   it('rejects malicious bundle paths/base64 and invalidates broken store copies without crashing', () => {
     const f = fixture();
     f.store.openProjectFile(f.file, f.doc);
