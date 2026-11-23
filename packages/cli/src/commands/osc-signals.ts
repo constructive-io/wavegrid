@@ -149,29 +149,32 @@ export async function runSignalsSend(args: string[], flags: Flags): Promise<void
 function probeAdapter(
   target: Target,
   zones: number[],
-  serial: string | undefined
-): OutputAdapter & { connect: () => void } {
+  serial: string | undefined,
+  onSendError: (err: Error) => void
+): OutputAdapter & { connect: () => void; flush: (timeoutMs?: number) => Promise<boolean> } {
   if (target.kind === 'fb4') {
     if (!serial) throw new Error('FB4 addressing needs a 5-digit serial: --serial 12345');
     return new FB4OscOutput({
       host: target.host,
       port: target.port,
       serialMap: Object.fromEntries(zones.map((z) => [z, serial])),
-      sendEveryNFrames: 1
+      sendEveryNFrames: 1,
+      onSendError
     });
   }
   return new BeyondOscOutput({
     host: target.host,
     port: target.port,
     projectorMap: Object.fromEntries(zones.map((z) => [z, z])),
-    sendEveryNFrames: 1
+    sendEveryNFrames: 1,
+    onSendError
   });
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Time given to the UDP socket to flush before it is closed. */
-const FLUSH_MS = 100;
+/** Longest wait for queued UDP sends to go out or fail before the socket is closed. */
+const FLUSH_TIMEOUT_MS = 5000;
 
 /**
  * Light one fixture at a time so the operator can watch which physical laser
@@ -201,7 +204,9 @@ export async function runSignalsProbe(flags: Flags): Promise<void> {
   console.log(c.yellow('  Lasers will output. Make sure the room is safe.'));
   console.log('');
 
-  const adapter = probeAdapter(target, zones, serial);
+  let sendError: Error | undefined;
+  let flushed = false;
+  const adapter = probeAdapter(target, zones, serial, (err) => { sendError ??= err; });
   adapter.connect();
   try {
     for (const zone of zones) {
@@ -210,11 +215,18 @@ export async function runSignalsProbe(flags: Flags): Promise<void> {
       await sleep(hold);
     }
     adapter.send(probeGrid(count, null, color));
-    // UDP sends are queued on the socket; closing it immediately drops the
-    // blackout frame, which is the one frame that must not be lost.
-    await sleep(FLUSH_MS);
+    // UDP sends are queued on the socket; closing it before they settle drops
+    // the blackout frame, the one frame that must not be lost, and hides a
+    // late DNS failure.
+    flushed = await adapter.flush(FLUSH_TIMEOUT_MS);
   } finally {
     adapter.close();
+  }
+  if (sendError) {
+    throw new Error(`OSC sends to ${target.host}:${target.port} failed: ${sendError.message}`);
+  }
+  if (!flushed) {
+    throw new Error(`OSC sends to ${target.host}:${target.port} did not finish within ${FLUSH_TIMEOUT_MS}ms; the blackout frame may not have gone out`);
   }
   console.log('');
   console.log(c.green('  ✓ done — everything blacked out'));

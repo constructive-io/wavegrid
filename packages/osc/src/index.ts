@@ -22,6 +22,7 @@ export type {
 } from './osc-adapters';
 export {
   BeyondOscOutput,
+  createOscClient,
   createRoutedOutput,
   DEBUG_OSC,
   encodeBeyondCueMessage,
@@ -29,4 +30,5 @@ export {
   encodeBeyondProjectorMessages,
   encodeFB4Messages,
   FB4OscOutput,
+  flushOscClient,
   RoutedOscOutput} from './osc-adapters';
