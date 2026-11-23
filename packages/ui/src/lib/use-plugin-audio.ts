@@ -58,21 +58,31 @@ export function usePluginAudio(plugins: UIPlugin[] | undefined, pattern: Pattern
     return () => { cancelled = true; };
   }, [plugins]);
 
-  const current = useRef({ bindings, pattern, send });
-  current.current = { bindings, pattern, send };
+  const run = useRef({ active: false, sent: new Set<LoadedPluginAudio>() });
+  const current = useRef({ bindings, pattern, send, mode, playing });
+  current.current = { bindings, pattern, send, mode, playing };
   const receive = useCallback((out: GraceAudioOutput): boolean => {
     const snapshot = current.current;
     const binding = activePluginAudio(snapshot.bindings, snapshot.pattern);
     if (!binding) return false;
+    if (snapshot.mode !== 'grace' || !snapshot.playing) return true;
     for (const command of pluginAudioCommands(binding, snapshot.pattern, out)) {
       snapshot.send(command);
+      run.current.sent.add(binding);
       snapshot.pattern = { ...snapshot.pattern!, params: { ...snapshot.pattern!.params, [command.name as string]: command.value } };
     }
     return true;
   }, []);
 
   useEffect(() => {
-    if (mode !== 'grace' || !playing) receive({ hueShift: 0, satShift: 0, step: false });
-  }, [mode, playing, pattern, bindings, receive]);
+    const active = mode === 'grace' && playing;
+    const snapshot = current.current;
+    const binding = activePluginAudio(snapshot.bindings, snapshot.pattern);
+    if (run.current.active && !active && binding && run.current.sent.has(binding)) {
+      for (const command of pluginAudioCommands(binding, snapshot.pattern, { hueShift: 0, satShift: 0, step: false })) snapshot.send(command);
+    }
+    if (!active) run.current.sent.clear();
+    run.current.active = active;
+  }, [mode, playing]);
   return receive;
 }

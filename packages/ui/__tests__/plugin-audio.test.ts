@@ -32,7 +32,9 @@ function render(pattern: any = live, mode = 'grace', playing = true) {
   const effects = mockEffects; mockEffects = []; effects.forEach(effect => effect());
   return callback;
 }
-async function mount() { render(); await new Promise(resolve => setImmediate(resolve)); return render(); }
+async function mount(pattern: any = live, mode = 'grace', playing = true) {
+  render(pattern, mode, playing); await new Promise(resolve => setImmediate(resolve)); return render(pattern, mode, playing);
+}
 beforeEach(() => {
   mockSlots = []; mockEffects = []; send.mockClear();
   global.fetch = jest.fn(async (url: any) => ({ ok: true, text: async () => String(url).endsWith('pattern.js') ? binding.source
@@ -74,12 +76,52 @@ it('loads source and keyed values without mounting a plugin tab, then updates th
 });
 
 it.each(['stop', 'mode'])('resets shifts on audio %s only while the bound pattern runs', async reason => {
-  await mount(); send.mockClear();
+  (await mount())(out); send.mockClear();
   render(live, reason === 'mode' ? 'energy' : 'grace', reason !== 'stop');
   expect(send.mock.calls.map(([message]) => message)).toEqual([
     { type: 'setPatternParam', name: 'hue', value: 0 }, { type: 'setPatternParam', name: 'sat', value: 0 }
   ]);
   send.mockClear(); render({ ...live, active: false }, 'energy', false);
+  expect(send).not.toHaveBeenCalled();
+});
+
+it('leaves manual params alone on startup and pattern changes when Grace audio never ran', async () => {
+  const callback = await mount(live, 'energy', false);
+  render({ ...live, params: { ...live.params, hue: 40, sat: 15 } }, 'energy', false);
+  render(live, 'grace', false);
+  callback({ hueShift: 0, satShift: 0, step: false });
+  expect(send).not.toHaveBeenCalled();
+});
+
+it('does not reset a binding that sent no commands during the Grace audio run', async () => {
+  const callback = await mount();
+  callback({ ...out, step: false });
+  render(live, 'grace', false);
+  expect(send).not.toHaveBeenCalled();
+});
+
+it('does not reset a newly active binding when only a different pattern ran during audio', async () => {
+  const callback = await mount({ ...live, code: 'other' });
+  expect(callback(out)).toBe(false);
+  render(live, 'energy', false);
+  expect(send).not.toHaveBeenCalled();
+});
+
+it('resets once, does not follow stopped pattern changes, and clears participation for the next run', async () => {
+  (await mount())(out); send.mockClear();
+  render(live, 'grace', false);
+  expect(send).toHaveBeenCalledTimes(2);
+  send.mockClear();
+  render({ ...live, params: { ...live.params, hue: 50 } }, 'grace', false);
+  render(live, 'grace', true);
+  render(live, 'grace', false);
+  expect(send).not.toHaveBeenCalled();
+});
+
+it.each([false, true])('does not reset when the participated pattern is no longer active (foreign source: %s)', async foreign => {
+  (await mount())(out); send.mockClear();
+  render(foreign ? { ...live, code: 'other' } : { ...live, active: false }, 'grace', false);
+  render(live, 'grace', false);
   expect(send).not.toHaveBeenCalled();
 });
 
