@@ -82,6 +82,30 @@ describe('access keys', () => {
     expect(store.getSession('show', session.id)).toBeNull();
   });
 
+  it('does not resurrect a rotated key session when a touch saves an older snapshot', () => {
+    store.mintAccessKey('show', 'crew');
+    const session = store.createSession('show', { username: 'crew', role: 'operator' });
+    const other = openStore({ baseDir });
+    const readFileSync = fs.readFileSync;
+    let rotated = false;
+    const read = jest.spyOn(fs, 'readFileSync').mockImplementation((...args) => {
+      const result = readFileSync(...args);
+      if (!rotated && String(args[0]).endsWith(`${path.sep}sessions.json`)) {
+        rotated = true;
+        other.mintAccessKey('show', 'crew');
+      }
+      return result;
+    });
+    try {
+      store.touchSession('show', session.id);
+    } finally {
+      read.mockRestore();
+    }
+    expect(rotated).toBe(true);
+    expect(store.getSession('show', session.id)).toBeNull();
+    expect(store.listSessions('show')).toEqual([]);
+  });
+
   it('preserves station grants when re-minting and revokes sessions on reassignment or disable', () => {
     const { passphrase } = store.mintAccessKey('show', 'crew', 'operator', 'north');
     expect(store.authenticateAccessKey('show', passphrase)).toEqual({
