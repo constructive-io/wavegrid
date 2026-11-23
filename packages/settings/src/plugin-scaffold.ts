@@ -7,8 +7,12 @@ import { parseProjectFile } from './project-file';
 
 /** Add a new plugin without rewriting unrelated project fields or touching the store. */
 export function addProjectPlugin(file: string, plugin: PortablePlugin): void {
-  const folder = path.dirname(path.resolve(file));
+  const openedFolder = fs.realpathSync(path.dirname(path.resolve(file)));
   file = fs.realpathSync(file);
+  const folder = path.dirname(file);
+  if (openedFolder !== folder) {
+    throw new Error(`Cannot scaffold through a project-file symlink into another directory. Use the real project path: ${file}`);
+  }
   const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   const document = parseProjectFile(raw);
   const refs = [...(document.plugins ?? []), { path: plugin.path }];

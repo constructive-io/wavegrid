@@ -335,7 +335,7 @@ export function openProjectFile(
   const doc = parseProjectFile(raw);
   const resolved = path.resolve(file);
   const project = opts.name ?? doc.name;
-  const plugins = readProjectPlugins(path.dirname(resolved), doc.plugins ?? []);
+  const plugins = readProjectPlugins(fs.realpathSync(path.dirname(resolved)), doc.plugins ?? []);
   if (!isProjectName(project)) {
     throw new Error(`Invalid project name "${project}". Use letters, numbers, ".", "_" or "-".`);
   }

@@ -166,21 +166,49 @@ it('does not follow a symlinked plugins folder', () => {
   expect(document()).toEqual(original);
 });
 
-it('keeps a cross-directory project symlink intact and reopens through it', () => {
+it('refuses cross-directory project-file symlinks without writing anything', () => {
   const links = join(root, 'links');
   mkdirSync(links);
   const link = join(links, 'venue.wavegrid');
+  symlinkSync(file, link, 'file');
+  const before = readFileSync(file, 'utf8');
+  runPluginsNew({ project: link }, 'demo');
+  expect(process.exitCode).toBe(1);
+  expect(console.log).toHaveBeenLastCalledWith(expect.stringContaining('Use the real project path'));
+  expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+  expect(readFileSync(file, 'utf8')).toBe(before);
+  expect(fs.readdirSync(links)).toEqual(['venue.wavegrid']);
+  expect(existsSync(join(links, 'plugins'))).toBe(false);
+  expect(existsSync(join(root, 'plugins'))).toBe(false);
+});
+
+it('keeps a same-directory project-file symlink intact and reopens through it', () => {
+  const link = join(root, 'alias.wavegrid');
   symlinkSync(file, link, 'file');
   runPluginsNew({ project: link }, 'demo');
   expect(process.exitCode).toBeUndefined();
   expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
   expect(document().plugins).toEqual([{ path: 'plugins/demo' }]);
-  expect(existsSync(join(links, 'plugins/demo/plugin.json'))).toBe(true);
-  expect(existsSync(join(root, 'plugins'))).toBe(false);
+  expect(existsSync(join(root, 'plugins/demo/plugin.json'))).toBe(true);
   getStore().openProjectFile(link, JSON.parse(readFileSync(link, 'utf8')));
   const loaded = loadProjectPlugins(getStore().paths, 'venue');
   expect(loaded.errors).toEqual([]);
   expect(loaded.plugins[0].id).toBe('demo');
+});
+
+it('resolves directory symlinks and reopens through real and aliased paths', () => {
+  const link = join(root, 'alias');
+  symlinkSync(root, link, 'junction');
+  const aliasedFile = join(link, 'venue.wavegrid');
+  runPluginsNew({ project: aliasedFile }, 'demo');
+  expect(process.exitCode).toBeUndefined();
+  expect(document().plugins).toEqual([{ path: 'plugins/demo' }]);
+  for (const opened of [file, aliasedFile]) {
+    getStore().openProjectFile(opened, JSON.parse(readFileSync(opened, 'utf8')), { overwrite: true });
+    const loaded = loadProjectPlugins(getStore().paths, 'venue');
+    expect(loaded.errors).toEqual([]);
+    expect(loaded.plugins[0].id).toBe('demo');
+  }
 });
 
 it('wires init, state, params and the shared brush with parent source checks', () => {
