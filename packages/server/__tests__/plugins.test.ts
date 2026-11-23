@@ -57,6 +57,7 @@ describe('project plugin HTTP surface', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain(type);
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('content-security-policy')).toBe('sandbox allow-scripts');
     expect(Buffer.from(await res.arrayBuffer())).toEqual(fs.readFileSync(path.join(copy, file)));
   });
 
@@ -67,10 +68,20 @@ describe('project plugin HTTP surface', () => {
   ])('returns 404 for missing or unsafe paths: %s', async file => {
     // http.request keeps dot segments intact; fetch/URL normalizes them before sending.
     const status = await new Promise<number | undefined>((resolve, reject) => {
-      const req = http.get(base, { path: file }, res => { res.resume(); resolve(res.statusCode); });
+      const req = http.get(base, { path: file }, res => {
+        expect(res.headers['content-security-policy']).toBe('sandbox allow-scripts');
+        res.resume();
+        resolve(res.statusCode);
+      });
       req.on('error', reject);
     });
     expect(status).toBe(404);
+  });
+
+  it.each(['HEAD', 'POST'])('sandboxes %s plugin responses too', async method => {
+    const res = await fetch(`${base}/plugins/demo/page.html`, { method });
+    expect(res.status).toBe(method === 'HEAD' ? 200 : 404);
+    expect(res.headers.get('content-security-policy')).toBe('sandbox allow-scripts');
   });
 
   (process.platform === 'win32' ? it.skip : it)('refuses symlink files added to a store copy after startup', async () => {
