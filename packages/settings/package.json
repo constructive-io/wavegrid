@@ -43,6 +43,7 @@
     "secrets"
   ],
   "dependencies": {
+    "@wavegrid/animations": "workspace:*",
     "@wavegrid/layout": "workspace:*",
     "appstash": "^0.8.0"
   },

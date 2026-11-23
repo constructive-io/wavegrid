@@ -1,4 +1,16 @@
 // Store facade
+export {
+  loadProjectPlugins,
+  PLUGIN_MAX_BYTES,
+  PLUGIN_MAX_FILE_BYTES,
+  PLUGIN_MAX_FILES,
+  type PluginTab,
+  type PortablePlugin,
+  type ProjectPlugin,
+  type ProjectPluginRef,
+  readProjectPluginFile,
+  WAVEGRID_RUNTIME_VERSION
+} from './plugins';
 export { openStore, type SettingsStore, type StoreOptions } from './store';
 
 // Device identity

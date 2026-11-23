@@ -71,6 +71,7 @@ describe('createHttpApp', () => {
     expect(body.simulatorUrl).toMatch(/^ws:\/\/127\.0\.0\.1:\d+$/);
     expect(body.numCannons).toBe(layout.count);
     expect(body.layout).toBeDefined();
+    expect(body.plugins).toEqual([]);
   });
 
   it('serves index.html at / and for extensionless SPA routes', async () => {

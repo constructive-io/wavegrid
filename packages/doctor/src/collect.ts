@@ -8,6 +8,7 @@ import type { SystemStatus } from '@wavegrid/server';
 import {
   type DeviceRecord,
   type DivergentDevice,
+  loadProjectPlugins,
   projectSecretsFile,
   type SettingsStore
 } from '@wavegrid/settings';
@@ -125,6 +126,12 @@ export function localChecks({ store, project, resolved, env = process.env, oscPr
   const device = store.getDevice();
   checks.push({ name: 'Device', status: 'pass', detail: `${device.name} (${device.id.slice(0, 8)}…)` });
   checks.push({ name: 'Project', status: 'pass', detail: project });
+  const plugins = loadProjectPlugins(store.paths, project);
+  if (plugins.plugins.length || plugins.errors.length) checks.push({
+    name: 'Plugins', status: plugins.errors.length ? 'fail' : 'pass',
+    detail: plugins.errors.length ? plugins.errors.join('; ') : `${plugins.plugins.length} loaded`,
+    ...(plugins.errors.length ? { remedy: 'fix the plugin folders and reopen the .wavegrid project file' } : {})
+  });
   checks.push({ name: 'Layout', status: 'pass', detail: `${layout.name} (${layout.topology}, ${layout.count} cannons) · ${runMode}` });
   checks.push(checkShard(layout.count, config.receiver.shard));
 

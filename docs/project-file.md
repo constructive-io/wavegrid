@@ -71,6 +71,59 @@ JSON, version 1:
 - Opening validates the whole file, including that the layout resolves, before anything is written.
 - Readers ignore top-level fields they do not know, and opening then saving keeps them, so a file written by a newer Wavegrid (for example with station definitions) survives a round trip through an older one.
 
+## Plugins
+
+`"plugins": [{ "path": "programs/my-show" }]` lists plugin folders relative to the
+`.wavegrid` file. Paths use forward slashes and name a subfolder, not the project
+folder itself. Absolute paths and parent (`..`) components are rejected. Duplicate
+paths (including aliases such as `show` and `./show`), overlapping folders and
+duplicate plugin ids are rejected. The source array is preserved on save.
+
+```text
+venue.wavegrid
+programs/my-show/
+  plugin.json
+  pattern.js
+  tab.json
+  presets.json
+```
+
+`plugin.json` version 1:
+
+```json
+{
+  "id": "my-show", "name": "My show", "version": "1.0.0", "apiVersion": 1,
+  "wavegrid": "0.5.0", "pattern": "pattern.js",
+  "tabs": ["tab.json"], "presets": "presets.json"
+}
+```
+
+`id` follows the project-name rule. `wavegrid` is an optional numeric `x.y.z`
+minimum against the running brain's protocol/runtime version (currently `0.5.0`),
+not the independently versioned npm packages. `pattern`, `tabs` and `presets` are
+optional file references relative to the plugin folder; every reference must
+exist there. Presets contain arbitrary JSON.
+
+A tab JSON file contains `id`, `label`, optional `showWhen` (default `"always"`),
+optional `pattern` overriding the manifest's pattern, and `cards`:
+`[{ "title": "Color", "controls": [] }]`. Controls are carried as data; their
+schema and rendering come later. `showWhen` is `"always"`, `"never"`, or an object
+whose `fixtureKind`, `topology`, `minFixtures` and `layoutId` conditions are ANDed.
+An empty object always matches. Tab ids in `/api/config` are `<pluginId>/<tabId>`.
+
+Opening validates all plugins before changing the project, then replaces store
+copies (including removal of unlisted plugins). Only regular files are copied;
+dotfiles/directories are skipped and symlinks are rejected, even hidden ones.
+Limits: **200 files**, **1 MiB per file**, **5 MiB per plugin**, **16 nested
+directories**. Manifests, tabs and other assets count toward these limits.
+Save-as to another folder copies store plugins beside the target `.wavegrid`;
+saving within the original folder leaves source folders alone. Export bundles
+carry plugin files as base64; older bundles without plugins still import.
+
+The server loads plugins at startup and serves their files at
+`/plugins/<id>/<file>` with traversal protection and `nosniff`. Plugin JavaScript
+is never evaluated on the host. This step adds no plugin UI rendering.
+
 ## Explicit fixture layouts
 
 For a venue whose shape no generator describes, list every fixture:

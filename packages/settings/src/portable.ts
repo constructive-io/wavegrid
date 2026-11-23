@@ -1,11 +1,15 @@
+import path from 'path';
+
 import {
   projectDevicesFile,
+  projectDir,
   projectSecretsFile,
   projectUsersFile,
   readJsonFile,
   type StorePaths,
   writeFileAtomic
 } from './paths';
+import { type PortablePlugin, replaceProjectPlugins, storedPluginSnapshots, validatePortablePlugins } from './plugins';
 import { createProject, getProjectConfig, hasProject, type ProjectConfig } from './projects';
 import { type DeviceRecord } from './registry';
 import { generateSecrets, type ProjectSecrets, readSecrets } from './secrets';
@@ -45,6 +49,7 @@ export interface PortableProject {
    * default; a plain import then generates fresh secrets that must be synced.
    */
   secrets?: Partial<ProjectSecrets>;
+  plugins?: PortablePlugin[];
 }
 
 export interface ExportOptions {
@@ -60,6 +65,8 @@ export function exportProject(paths: StorePaths, project: string, opts: ExportOp
     throw new Error(`Unknown project "${project}" — cannot export.`);
   }
   const config = getProjectConfig(paths, project) ?? {};
+  const plugins = storedPluginSnapshots(paths, project);
+  if (plugins.errors.length) throw new Error(`Cannot export plugins:\n  - ${plugins.errors.join('\n  - ')}`);
   const devices = (readJsonFile<{ devices: DeviceRecord[] }>(projectDevicesFile(paths, project))?.devices ?? []).map(
     (d): PortableDevice => ({
       id: d.id,
@@ -79,6 +86,7 @@ export function exportProject(paths: StorePaths, project: string, opts: ExportOp
     config,
     devices
   };
+  if (plugins.snapshots.length) bundle.plugins = plugins.snapshots.map(({ path, files }) => ({ path, files }));
 
   if (opts.includeUsers !== false) {
     const users = readUsers(paths, project);
@@ -118,6 +126,7 @@ export function parseBundle(raw: unknown): PortableProject {
   if (typeof b.project !== 'string' || !b.config || typeof b.config !== 'object') {
     throw new Error('Malformed export: missing project name or config.');
   }
+  const plugins = validatePortablePlugins(b.plugins);
   return {
     wavegrid: 'project-export',
     version: 1,
@@ -125,6 +134,7 @@ export function parseBundle(raw: unknown): PortableProject {
     project: b.project,
     config: b.config,
     devices: Array.isArray(b.devices) ? b.devices : [],
+    plugins: b.plugins === undefined ? undefined : plugins.map(({ path, files }) => ({ path, files })),
     users: Array.isArray(b.users) ? b.users : undefined,
     secrets: b.secrets && typeof b.secrets === 'object' ? b.secrets : undefined
   };
@@ -139,6 +149,7 @@ export function parseBundle(raw: unknown): PortableProject {
  */
 export function importProject(paths: StorePaths, bundle: PortableProject, opts: ImportOptions = {}): ImportResult {
   const project = opts.name ?? bundle.project;
+  const plugins = validatePortablePlugins(bundle.plugins);
   if (hasProject(paths, project) && !opts.overwrite) {
     throw new Error(`Project "${project}" already exists — pass overwrite to replace it, or import under a new name.`);
   }
@@ -157,6 +168,10 @@ export function importProject(paths: StorePaths, bundle: PortableProject, opts: 
   }
 
   createProject(paths, project, config, { activate: opts.activate });
+  replaceProjectPlugins(paths, project, plugins);
+  const linkFile = path.join(projectDir(paths, project), 'project-file.json');
+  const link = readJsonFile<Record<string, unknown>>(linkFile);
+  if (link) writeFileAtomic(linkFile, JSON.stringify({ ...link, plugins: plugins.map(p => ({ path: p.path })) }, null, 2) + '\n');
 
   // Device-scoped configs travel; runtime facts (address/lastSeen) do not —
   // each device re-registers with its own address when it next connects.

@@ -5,7 +5,7 @@
  * — same-origin means no `ui.port` / `simulatorUrl` to keep in sync.
  */
 import { type ResolvedConfig } from '@wavegrid/layout';
-import { DEFAULT_SESSION_TTL_MS, openStore, type UserRole } from '@wavegrid/settings';
+import { DEFAULT_SESSION_TTL_MS, loadProjectPlugins, openStore, readProjectPluginFile, type UserRole } from '@wavegrid/settings';
 import * as fs from 'fs';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { extname, join, normalize, resolve } from 'path';
@@ -228,6 +228,13 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
   const sessionsRevoked = () => opts.onSessionsRevoked?.();
   const uiDir = opts.uiDir && fs.existsSync(opts.uiDir) ? opts.uiDir : null;
   const dims = { numCannons: layout.count, gridColumns: layout.cols };
+  const pluginStore = openStore();
+  const pluginProject = activeProject();
+  const projectPlugins = pluginProject ? loadProjectPlugins(pluginStore.paths, pluginProject) : { plugins: [], errors: [] };
+  for (const error of projectPlugins.errors) console.error(`Plugin load error: ${error}`);
+  const plugins = projectPlugins.plugins.map(plugin => ({
+    ...plugin, tabs: plugin.tabs.map(tab => ({ ...tab, id: `${plugin.id}/${tab.id}` }))
+  }));
 
   function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string): void {
     if (!uiDir) {
@@ -263,6 +270,27 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
     const url = new URL(req.url || '/', `http://${host}`);
     const pathname = url.pathname;
     const method = (req.method || 'GET').toUpperCase();
+    const rawPath = (req.url || '/').split('?')[0];
+    if (rawPath.startsWith('/plugins/') || pathname.startsWith('/plugins/')) {
+      let contents: Buffer | null = null;
+      let file = '';
+      try {
+        const parts = decodeURIComponent(rawPath).split('/');
+        const id = parts[2];
+        file = parts.slice(3).join('/');
+        if ((method === 'GET' || method === 'HEAD') && pluginProject && plugins.some(plugin => plugin.id === id)) {
+          contents = readProjectPluginFile(pluginStore.paths, pluginProject, id, file);
+        }
+      } catch { /* malformed URL or a broken store copy */ }
+      if (!contents) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, {
+        'Content-Type': MIME[extname(file)] || 'application/octet-stream',
+        'Content-Length': contents.length,
+        'X-Content-Type-Options': 'nosniff'
+      });
+      res.end(method === 'HEAD' ? undefined : contents);
+      return;
+    }
 
     // ── GET /api/config ─────────────────────────────────────────────
     if (pathname === '/api/config' && method === 'GET') {
@@ -276,7 +304,8 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
         runMode: resolved.runMode,
         layout,
         numCannons: layout.count,
-        gridColumns: layout.cols
+        gridColumns: layout.cols,
+        plugins
       });
       return;
     }

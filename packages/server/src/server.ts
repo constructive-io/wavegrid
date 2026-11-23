@@ -9,7 +9,7 @@ import {
   quantize,
   sameHsb
 } from '@wavegrid/pool';
-import { isValidScope, openStore } from '@wavegrid/settings';
+import { isValidScope, openStore, WAVEGRID_RUNTIME_VERSION } from '@wavegrid/settings';
 import * as fs from 'fs';
 import http from 'http';
 import { resolve } from 'path';
@@ -86,7 +86,7 @@ export function startServer(
 
   const PORT = resolved.config.server.port;
   const TICK_MS = 1000 / 60; // 60fps interpolation
-  const SERVER_VERSION = '0.5.0';
+  const SERVER_VERSION = WAVEGRID_RUNTIME_VERSION;
   const startedAt = Date.now();
 
   // Per-socket registry powering `system_status` (→ `wavegrid doctor`).
