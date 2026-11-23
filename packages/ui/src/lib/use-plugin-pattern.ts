@@ -20,6 +20,13 @@ export function parsePluginPresets(source: string): PluginPreset[] {
   return raw as PluginPreset[];
 }
 
+export function pluginParamUpdates(params: Record<string, unknown>, live: unknown) {
+  const current = isRecord(live) ? live : {};
+  return Object.entries(params)
+    .filter(([name, value]) => !Object.prototype.hasOwnProperty.call(current, name) || current[name] !== value)
+    .map(([name, value]) => ({ type: 'setPatternParam', name, value }));
+}
+
 export function usePluginPattern(
   pluginId: string,
   tab: PluginTabData,
@@ -90,10 +97,8 @@ export function usePluginPattern(
     paramsRef.current = next;
     setParams(next);
     if (!runningRef.current) { start(); return; }
-    for (const [name, value] of Object.entries(next)) {
-      if (previous[name] !== value) send({ type: 'setPatternParam', name, value });
-    }
-  }, [source, controls, send, start]);
+    for (const message of pluginParamUpdates(next, pattern?.params)) send(message);
+  }, [source, controls, send, start, pattern]);
 
   const stop = useCallback(() => { runningRef.current = false; send({ type: 'stopPattern' }); }, [send]);
   return { params, presets, running, loading: source === null && !sourceError,

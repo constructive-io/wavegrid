@@ -3,7 +3,7 @@ import { parsePluginControl } from '@wavegrid/settings/plugin-controls';
 
 import { coerceCards, coercePluginParams, coercePlugins, pluginAssetUrl } from '../src/lib/plugin-data';
 import { allTabs, registryFor, tabById, tabsFor } from '../src/lib/tab-registry';
-import { fetchPluginText, parsePluginPresets } from '../src/lib/use-plugin-pattern';
+import { fetchPluginText, parsePluginPresets, pluginParamUpdates } from '../src/lib/use-plugin-pattern';
 
 const raw = [{ id: 'demo', name: 'Demo', pattern: 'pattern.js', presetsFile: 'presets.json', tabs: [
   { id: 'demo/all', label: 'All', cards: [] },
@@ -59,6 +59,32 @@ describe('defensive plugin control coercion', () => {
       .toEqual({ speed: 4, enabled: false, mode: 'b', tint: '#abcdef' });
     expect(coercePluginParams(controls, { speed: -9 }).speed).toBe(0);
     expect(parsePluginControl({ type: 'select', param: 'n', options: [{ label: 'Two', value: 2 }], default: 2 })).not.toBeNull();
+  });
+});
+
+describe('running plugin parameter updates', () => {
+  it('sends a displayed default that the raw live pattern has never received', () => {
+    const controls = coerceCards([{ title: 'Speed', controls: [
+      { type: 'slider', param: 'speed', min: 0, max: 4, default: 1 }
+    ] }])[0].controls;
+    const live = {};
+    const displayed = coercePluginParams(controls, live);
+    const preset = coercePluginParams(controls, { ...displayed, speed: 1 });
+    expect(preset).toEqual(displayed);
+    expect(pluginParamUpdates(preset, live)).toEqual([{ type: 'setPatternParam', name: 'speed', value: 1 }]);
+  });
+
+  it('compares raw live values, not their coerced representation', () => {
+    expect(pluginParamUpdates({ speed: 1, enabled: false }, { speed: '1', enabled: false }))
+      .toEqual([{ type: 'setPatternParam', name: 'speed', value: 1 }]);
+    expect(pluginParamUpdates({ speed: 1 }, { speed: 1 })).toEqual([]);
+  });
+
+  it('handles empty desired params and missing or invalid live params', () => {
+    expect(pluginParamUpdates({}, null)).toEqual([]);
+    for (const live of [undefined, null, []]) {
+      expect(pluginParamUpdates({ enabled: false }, live)).toEqual([{ type: 'setPatternParam', name: 'enabled', value: false }]);
+    }
   });
 });
 
