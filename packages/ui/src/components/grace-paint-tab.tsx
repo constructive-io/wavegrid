@@ -6,8 +6,7 @@ import type { GracePaintControls } from '@/lib/use-grace-paint';
 
 import { ColorPicker, QuickColors } from './color-wheel';
 import { ControlGrid, ControlGroup } from './control-grid';
-import type { PreviewEasing } from './grace-tab';
-import { MiniGridPreview, type PreviewFixture } from './mini-grid-preview';
+import { MiniGridPreview, type PreviewEasing, type PreviewFixture } from './mini-grid-preview';
 
 const PILL_ACTIVE = { background: 'rgba(74,124,255,0.15)', border: '1px solid #4a7cff', color: '#4a7cff' };
 const PILL_IDLE = { background: '#12121a', border: '1px solid #1a1a25', color: '#888898' };
