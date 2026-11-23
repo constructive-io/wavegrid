@@ -6,6 +6,10 @@ import c from 'yanse';
 import { type Flags, getStore, resolveProjectName } from '../project';
 
 export function runPluginsNew(flags: Flags, id: string | undefined): void {
+  if (flags.help || flags.h) {
+    console.log('Usage: wavegrid plugins new <id> [--project <file.wavegrid>] [--view] [--audio <mode>]');
+    return;
+  }
   try {
     if (!id) throw new Error('Usage: wavegrid plugins new <id> [--project <file.wavegrid>] [--view] [--audio <mode>]');
     if (flags.project !== undefined && typeof flags.project !== 'string') throw new Error('--project needs a project file path');

@@ -74,6 +74,15 @@ it('uses the active project linked file when --project is omitted', () => {
   expect(document().plugins).toEqual([{ path: 'plugins/demo' }]);
 });
 
+it.each(['--help', '-h'])('prints usage without writing anything for %s', async help => {
+  const before = readFileSync(file, 'utf8');
+  await run(['plugins', 'new', 'demo', '--project', file, help]);
+  expect(process.exitCode).toBeUndefined();
+  expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Usage: wavegrid plugins new'));
+  expect(readFileSync(file, 'utf8')).toBe(before);
+  expect(existsSync(join(root, 'plugins'))).toBe(false);
+});
+
 it.each([undefined, '', '.', '..', '../escape', '/absolute', 'a/b', 'has space', 'has"quote'])('rejects id %j without modifying the project', id => {
   const before = readFileSync(file, 'utf8');
   runPluginsNew({ project: file }, id);
