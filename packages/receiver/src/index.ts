@@ -16,9 +16,8 @@ export { createDefaultAnimationState, handleCommand, tickCommandMode } from './c
 export type { CommandMessage, EvalPatternCommand, SetPatternParamCommand, StopPatternCommand } from './command-types';
 
 // Sandbox
-export type { PatternMeta, SandboxConfig, SandboxEngine, SandboxFrame } from './sandbox-engine';
-export { createSandboxEngine } from './sandbox-engine';
-export { buildPrelude } from './sandbox-prelude';
+export type { PatternMeta, SandboxConfig, SandboxEngine, SandboxFrame } from '@wavegrid/sandbox';
+export { buildPrelude, createSandboxEngine } from '@wavegrid/sandbox';
 
 // Receiver
 export type { ReceiverConfig, ReceiverState, ReceiverStatus, ShardConfig } from './receiver';

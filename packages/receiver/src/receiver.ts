@@ -15,6 +15,7 @@
 import { setTarget } from '@wavegrid/animations';
 import { type Layout, presets } from '@wavegrid/layout';
 import type { ProjectorControl } from '@wavegrid/osc';
+import { createSandboxEngine, SandboxEngine } from '@wavegrid/sandbox';
 
 import { ConsoleOutput, InputAdapter, OutputAdapter, WebSocketInput } from './adapters';
 import { AnimationState, applyPaint, createDefaultAnimationState, handleCommand, remapGridForOutput, tickCommandMode } from './command-engine';
@@ -28,7 +29,6 @@ import {
   resetFilteredGrid,
   tickFilter
 } from './filter';
-import { createSandboxEngine, SandboxEngine } from './sandbox-engine';
 
 export interface ShardConfig {
   /** First cannon index (inclusive). */

@@ -34,6 +34,17 @@ describe('startServer bind readiness', () => {
     handle.stop();
   });
 
+  it('prepares pattern previews before binding and queues in-process startup commands', async () => {
+    const handle = startServer(resolved(0), { advertise: false });
+    try {
+      handle.send({ type: 'evalPattern', code: '({ render(ctx) { ctx.fill(120, 100, 80); } })' });
+      await handle.ready;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(handle.grid[0].targetH).toBe(120);
+      expect(handle.grid[0].targetB).toBe(80);
+    } finally { handle.stop(); }
+  });
+
   it('rejects ready with an actionable message when the port is taken', async () => {
     const port = await freePort();
     const squatter = createServer();
