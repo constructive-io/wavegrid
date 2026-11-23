@@ -1,7 +1,7 @@
 import { resolveLayout } from '@wavegrid/layout/client';
 
 import { coercePlugins } from '../src/lib/plugin-data';
-import { initialViewLoadState, jsonEqual, nextViewLoad, pluginParamUpdates, readViewMessage, VIEW_MESSAGE_MAX_BYTES, viewLayout, viewLookCommand, viewLooks, viewMessageFits } from '../src/lib/plugin-view-bridge';
+import { initialViewLoadState, jsonEqual, nextViewLoad, pluginParamUpdates, readViewMessage, VIEW_MESSAGE_MAX_BYTES, viewLayout, viewLookCommand, viewLooks, viewLooksMessage, viewMessageFits } from '../src/lib/plugin-view-bridge';
 
 const source = {};
 const read = (data: unknown) => readViewMessage(data, source, source);
@@ -108,6 +108,38 @@ describe('plugin view bridge boundary', () => {
 });
 
 describe('view look scoping', () => {
+  it.each(['init', 'looks'])('budgets newest scoped looks without losing the %s envelope', type => {
+    const layout = viewLayout(resolveLayout({ preset: 'interleaved-12x2' }));
+    const base = { wg: 1, type, ...(type === 'init' ? { layout, pattern: { running: false, params: {} } } : {}) };
+    const large = [1, 3, 2].map(createdAt => ({ id: String(createdAt), name: 'Large', createdAt,
+      params: { plugin: 'demo/view', text: '🌊'.repeat(25000) } }));
+    const message = viewLooksMessage(base, [...looks.filter(look => look.id === 'other'), ...large], 'demo/view');
+    expect(message).toMatchObject({ ...base, looksTruncated: true });
+    expect(message.looks.map(look => look.id)).toEqual(['3', '2']);
+    expect(viewMessageFits(message)).toBe(true);
+    expect(viewMessageFits({ ...base, looks: large })).toBe(false);
+    expect(large.map(look => look.id)).toEqual(['1', '3', '2']);
+  });
+
+  it('reserves room for init layout, params and the truncation marker', () => {
+    const base = { wg: 1, type: 'init', layout: { count: 1 }, pattern: { params: { text: 'a'.repeat(100000) } } };
+    const large = [1, 2].map(createdAt => ({ id: String(createdAt), name: 'Large', createdAt,
+      params: { plugin: 'demo/view', text: 'b'.repeat(100000) } }));
+    const message = viewLooksMessage(base, large, 'demo/view');
+    expect(message).toMatchObject({ ...base, looksTruncated: true });
+    expect(message.looks.map(look => look.id)).toEqual(['2']);
+    expect(viewMessageFits(message)).toBe(true);
+  });
+
+  it('skips a single oversized look, and handles empty and all-fitting look sets', () => {
+    const base = { wg: 1, type: 'init', layout: { count: 49 } };
+    const oversized = { id: 'huge', name: 'Huge', createdAt: 9, params: { plugin: 'demo/view', text: 'a'.repeat(VIEW_MESSAGE_MAX_BYTES) } };
+    expect(viewLooksMessage(base, [oversized, ...looks], 'demo/view')).toEqual({ ...base, looks: [looks[0]], looksTruncated: true });
+    expect(viewLooksMessage(base, [oversized], 'demo/view')).toEqual({ ...base, looks: [], looksTruncated: true });
+    expect(viewLooksMessage(base, [], 'demo/view')).toEqual({ ...base, looks: [] });
+    expect(viewLooksMessage(base, looks, 'demo/view')).toEqual({ ...base, looks: [looks[0]] });
+  });
+
   it('only exposes looks carrying this tab tag', () => {
     expect(viewLooks(looks, 'demo/view').map(look => look.id)).toEqual(['mine']);
     expect(viewLooks(looks, 'absent')).toEqual([]);

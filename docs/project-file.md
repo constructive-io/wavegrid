@@ -201,6 +201,11 @@ preserves untouched values. Views retain arbitrary JSON params, while native car
 controls still display defensively coerced values. Presets on view tabs may also
 contain structured params. The bridge forwards no view-provided code or URLs.
 
+`init` and `looks` send scoped Looks newest-first. If the complete set would
+exceed the message budget, the host includes the newest Looks that fit and sets
+`looksTruncated: true`. A single oversized Look is skipped; layout and pattern
+metadata retain their budget instead of being dropped along with the Looks.
+
 ### Plugin storage
 
 Opening validates all plugins before changing the project, then replaces store

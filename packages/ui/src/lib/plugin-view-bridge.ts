@@ -94,6 +94,17 @@ export function viewLooks(looks: Look[], scope: string): Look[] {
   return looks.filter(look => look.params?.plugin === scope);
 }
 
+export function viewLooksMessage(base: Record<string, unknown>, looks: Look[], scope: string) {
+  const newest = viewLooks(looks, scope).sort((a, b) => b.createdAt - a.createdAt);
+  const full = { ...base, looks: newest };
+  if (viewMessageFits(full)) return full;
+  const message = { ...base, looks: [] as Look[], looksTruncated: true };
+  for (const look of newest) {
+    if (viewMessageFits({ ...message, looks: [...message.looks, look] })) message.looks.push(look);
+  }
+  return message;
+}
+
 export function viewLookCommand(message: ViewMessage, scope: string, looks: Look[]): Record<string, unknown> | null {
   if (message.type === 'saveLook') return { type: 'saveLook', name: message.name, params: { ...message.params, plugin: scope } };
   if ((message.type === 'renameLook' || message.type === 'deleteLook') && viewLooks(looks, scope).some(look => look.id === message.id)) {

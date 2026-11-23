@@ -2,7 +2,7 @@ import type { Layout } from '@wavegrid/layout/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { pluginAssetUrl, type PluginTabData } from '@/lib/plugin-data';
-import { initialViewLoadState, nextViewLoad, readViewMessage, type RegisterPluginPaint, viewLayout, viewLookCommand, viewLooks, viewMessageFits } from '@/lib/plugin-view-bridge';
+import { initialViewLoadState, nextViewLoad, readViewMessage, type RegisterPluginPaint, viewLayout, viewLookCommand, viewLooksMessage, viewMessageFits } from '@/lib/plugin-view-bridge';
 import type { Look, PatternState } from '@/lib/socket-state';
 import type { usePluginPattern } from '@/lib/use-plugin-pattern';
 
@@ -64,7 +64,7 @@ export function PluginView({ pluginId, tab, layout, looks, pattern, state, send,
   }, [pattern, state.running, frame.loaded, post, patternSnapshot]);
 
   useEffect(() => {
-    if (frame.loaded) post({ wg: 1, type: 'looks', looks: viewLooks(looks, scope) });
+    if (frame.loaded) post(viewLooksMessage({ wg: 1, type: 'looks' }, looks, scope));
   }, [looks, scope, frame.loaded, post]);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ export function PluginView({ pluginId, tab, layout, looks, pattern, state, send,
       if (!next.loaded) return;
       ready.current = true;
       const current = snapshot.current;
-      post({ wg: 1, type: 'init', pluginId, tabId: tab.id, layout: viewLayout(current.layout),
-        pattern: patternSnapshot(), looks: viewLooks(current.looks, scope) });
+      post(viewLooksMessage({ wg: 1, type: 'init', pluginId, tabId: tab.id, layout: viewLayout(current.layout),
+        pattern: patternSnapshot() }, current.looks, scope));
     }} />;
 }
