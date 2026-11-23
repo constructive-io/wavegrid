@@ -57,6 +57,8 @@ describe('project plugin HTTP surface', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain(type);
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(res.headers.has('access-control-allow-credentials')).toBe(false);
     expect(res.headers.get('content-security-policy')).toBe("sandbox allow-scripts; form-action 'none'");
     expect(Buffer.from(await res.arrayBuffer())).toEqual(fs.readFileSync(path.join(copy, file)));
   });
