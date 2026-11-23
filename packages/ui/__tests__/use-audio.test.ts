@@ -1,3 +1,4 @@
+import { AudioTab } from '../src/components/audio-tab';
 import { useAudio } from '../src/lib/use-audio';
 
 let mockSlots: any[] = [], mockCursor = 0, mockEffects: (() => void)[] = [];
@@ -25,7 +26,7 @@ const globals = ['AudioContext', 'requestAnimationFrame', 'cancelAnimationFrame'
 let descriptors: (PropertyDescriptor | undefined)[];
 function render() {
   mockCursor = 0;
-  const audio = useAudio(send, 4, 2, 40);
+  const audio = useAudio(4, 2, [], send, 40);
   const effects = mockEffects; mockEffects = []; effects.forEach(effect => effect());
   return audio;
 }
@@ -48,6 +49,7 @@ beforeEach(() => {
       sources.push(source); return source;
     }
     createAnalyser() { return { frequencyBinCount: 128, connect: jest.fn(), getByteFrequencyData: (data: Uint8Array) => data.fill(80) }; }
+    createMediaStreamSource() { return { connect: jest.fn(), disconnect: jest.fn() }; }
   }, (callback: FrameRequestCallback) => { frames.set(++frameId, callback); return frameId; },
   (id: number) => frames.delete(id), { mediaDevices: { getUserMedia: jest.fn() } }];
   globals.forEach((key, i) => Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: values[i] }));
@@ -73,4 +75,32 @@ it('does not clear an overlay for an unchanged mode or when leaving Grace', () =
   let audio = render(); audio.setMode('energy'); expect(send).not.toHaveBeenCalled();
   audio.setMode('grace'); audio = render(); send.mockClear();
   audio.setMode('energy'); expect(send).not.toHaveBeenCalled();
+});
+
+function elements(node: any): any[] {
+  if (Array.isArray(node)) return node.flatMap(elements);
+  return node?.props ? [node, ...elements(node.props.children)] : [];
+}
+
+it('disables Live Mic and explains missing mediaDevices without stopping file playback', async () => {
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {} });
+  let audio = render(); await audio.loadFile(file()); audio.play(); audio = render();
+  expect(audio.micUnavailableReason).toMatch(/HTTPS or localhost/);
+  const nodes = elements(AudioTab({ audio }));
+  expect(nodes.find(node => node.type === 'button' && node.props['aria-describedby'] === 'mic-source-help').props.disabled).toBe(true);
+  expect(nodes.find(node => node.props.id === 'mic-source-help').props.children).toBe(audio.micUnavailableReason);
+  await audio.startMic(); audio = render();
+  expect(audio.state.playing).toBe(true); expect(audio.state.micActive).toBe(false);
+  expect(audio.micError).toBe(audio.micUnavailableReason);
+});
+
+it('shows microphone rejection errors and clears them after a successful retry', async () => {
+  const getUserMedia = navigator.mediaDevices.getUserMedia as jest.Mock;
+  getUserMedia.mockRejectedValueOnce(new Error('Permission denied'));
+  let audio = render(); await audio.startMic(); audio = render();
+  expect(audio.state.micActive).toBe(false); expect(audio.micError).toContain('Permission denied');
+  expect(elements(AudioTab({ audio })).some(node => node.props.role === 'alert' && node.props.children.includes('Permission denied'))).toBe(true);
+  getUserMedia.mockResolvedValue({ getTracks: () => [] });
+  await audio.startMic(); audio = render();
+  expect(audio.micUnavailableReason).toBeNull(); expect(audio.micError).toBeNull(); expect(audio.state.micActive).toBe(true);
 });
