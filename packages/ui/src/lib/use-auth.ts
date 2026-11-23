@@ -22,6 +22,10 @@ function decodePayload(token: string): ({ sub: string } & StationGrant) | null {
   }
 }
 
+export function stationToken(token: string | null, station: string): string | null {
+  return token && decodePayload(token)?.station === station ? token : null;
+}
+
 /**
  * A session handed to us in the address fragment by a trusted embedder (the
  * desktop app, which owns the store this token was minted from). Consumed once

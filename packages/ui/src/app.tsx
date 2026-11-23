@@ -18,7 +18,7 @@ import type { GraceAudioOutput } from '@/lib/grace-audio';
 import type { PluginPaint, RegisterPluginPaint } from '@/lib/plugin-view-bridge';
 import { registryFor, tabById, type TabDef, tabsFor, type ToolContentProps } from '@/lib/tab-registry';
 import { useAudio } from '@/lib/use-audio';
-import { useAuth } from '@/lib/use-auth';
+import { stationToken, useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
 import { type GracePaintControls, useGracePaint } from '@/lib/use-grace-paint';
 import { useIsPhone } from '@/lib/use-media-query';
@@ -258,8 +258,9 @@ export default function Home() {
   const slug = new URLSearchParams(window.location.search).get('station') || auth.station;
   if (!slug) return <OperatorView auth={auth} />;
   if (!auth.checked) return <div style={{ background: '#050508', height: '100dvh' }} />;
-  if (!auth.token) return <LoginScreen station={slug} onLogin={auth.login} notice={auth.endedSession ? 'Your station session ended.' : undefined} />;
-  return <StationView slug={slug} token={auth.token} logout={auth.logout} sessionEnded={auth.sessionEnded} />;
+  const token = stationToken(auth.token, slug);
+  if (!token) return <LoginScreen station={slug} onLogin={auth.login} notice={auth.endedSession ? 'Your station session ended.' : undefined} />;
+  return <StationView slug={slug} token={token} logout={auth.logout} sessionEnded={auth.sessionEnded} />;
 }
 
 function OperatorView({ auth }: { auth: ReturnType<typeof useAuth> }) {

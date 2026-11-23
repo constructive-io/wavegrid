@@ -5,7 +5,16 @@ import {
   readToken,
   saveCredentials
 } from '../src/lib/auth-storage';
-import { endSessionOnServer } from '../src/lib/use-auth';
+import { endSessionOnServer, stationToken } from '../src/lib/use-auth';
+
+describe('station credentials', () => {
+  it.each(['south', undefined, 'north'])('only reuses a saved %s credential for North when its grant matches', station => {
+    const token = `header.${Buffer.from(JSON.stringify({ sub: 'artist', station })).toString('base64url')}.signature`;
+    const store = fakeStore({ wg_token: token });
+    expect(stationToken(readToken(store), 'north')).toBe(station === 'north' ? token : null);
+    expect(readToken(store)).toBe(token);
+  });
+});
 
 /** An in-memory stand-in for `localStorage`. */
 function fakeStore(initial: Record<string, string> = {}): CredentialStore & {
