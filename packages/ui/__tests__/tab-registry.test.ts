@@ -52,6 +52,15 @@ describe('built-in tab registry', () => {
     expect(tabsFor(projectors, registry).filter(tab => tab.label === 'Palace').map(tab => tab.id)).toEqual(['palace/palace']);
     expect(tabsFor(grid, registry).some(tab => tab.label === 'Palace')).toBe(false);
   });
+  it('registers Pride only from the project plugin, with no built-in duplicate', () => {
+    const registry = registryFor(coercePlugins([{ id: 'pride', pattern: 'pattern.js', tabs: [
+      { id: 'pride', label: 'Pride', view: 'view/index.html', showWhen: 'always' }
+    ] }]));
+    const prideLayout = presets['grid-7x2']();
+    expect(tabById('pride')).toBeUndefined();
+    expect(tabsFor(prideLayout).some(tab => tab.label === 'Pride')).toBe(false);
+    expect(tabsFor(prideLayout, registry).filter(tab => tab.label === 'Pride').map(tab => tab.id)).toEqual(['pride/pride']);
+  });
   it.each([
     [grid, ['paint', 'pool', 'gradient']],
     [projectors, ['paint', 'pool', 'gradient']],
@@ -63,7 +72,7 @@ describe('built-in tab registry', () => {
   it('keeps all built-ins in their original order, including hidden renderers', () => {
     expect(allTabs.map(tab => [tab.id, tab.label])).toEqual([
       ['paint', 'Paint'], ['pool', 'Pool'], ['gradient', 'Gradient'],
-      ['scenes', 'Scenes'], ['animations', 'Anim'], ['pride', 'Pride'], ['usa', 'USA'],
+      ['scenes', 'Scenes'], ['animations', 'Anim'], ['usa', 'USA'],
       ['grace', 'Grace'], ['gracepaint', 'GracePaint'], ['looks', 'Looks'],
       ['patterns', 'Patterns'], ['sequences', 'Sequences'], ['playlist', 'Playlist'],
       ['flags', 'Flags'], ['drops', 'Drops'], ['audio', 'Audio'], ['video', 'Video']
