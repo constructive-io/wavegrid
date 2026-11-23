@@ -139,7 +139,13 @@ export function startReceiver(resolved: ResolvedConfig = loadWavegridConfig()): 
         projectorMap[i] = i;
       }
     }
-    const beyond = new BeyondOscOutput({ host, port, projectorMap });
+    const outputCount = shard ? layout.fixtures.slice(shard.start, shard.end + 1).length : NUM_CANNONS;
+    const beyond = new BeyondOscOutput({
+      host,
+      port,
+      projectorMap,
+      directCalibrationZoneCount: canColumnOrder && !savedPhysicalMap ? outputCount : undefined
+    });
     beyond.connect();
     outputs.push(beyond);
     outputLabels.push(`BEYOND OSC → ${host}:${port} (${savedPhysicalMap ? 'light-map' : `${gridOrder}-major`}, rgb)`);

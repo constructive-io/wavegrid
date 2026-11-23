@@ -31,7 +31,7 @@ export type AddressMapping = (index: number) => string;
  */
 export interface OutputAdapter {
   /** Called every tick (~60fps) with the full filtered grid state. */
-  send(grid: CannonState[]): void;
+  send(grid: CannonState[], calibration?: boolean): void;
   /** Projector-only controls (BEYOND zone livecontrol), keyed by shard-local index. Optional. */
   sendProjector?(controls: Record<number, ProjectorControl>): void;
   /** Show-level BEYOND cue command. Optional. */
@@ -149,9 +149,9 @@ export class MultiOutput implements OutputAdapter {
     for (const out of this.outputs) out.sendCue?.(command);
   }
 
-  send(grid: CannonState[]): void {
+  send(grid: CannonState[], calibration = false): void {
     for (const out of this.outputs) {
-      out.send(grid);
+      out.send(grid, calibration);
     }
   }
 

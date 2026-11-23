@@ -128,6 +128,8 @@ export interface BeyondOscConfig {
    * Only mapped cannons are sent; unmapped indices are skipped.
    */
   projectorMap: Record<number, number>;
+  /** Number of shard-local zones addressable directly during calibration. */
+  directCalibrationZoneCount?: number;
   /**
    * Send rate throttle — only send every N frames.
    * At 60fps tick rate, sendEveryNFrames=2 gives 30Hz output.
@@ -244,6 +246,7 @@ export class BeyondOscOutput implements OutputAdapter {
   private frameCount = 0;
   private sendInterval: number;
   private prevGrid: CannonState[] | undefined;
+  private wasDirectCalibration = false;
 
   constructor(config: BeyondOscConfig) {
     this.config = config;
@@ -255,15 +258,35 @@ export class BeyondOscOutput implements OutputAdapter {
     this.client = new Client(this.config.host, this.config.port);
   }
 
-  send(grid: CannonState[]): void {
+  send(grid: CannonState[], calibration = false): void {
     this.frameCount++;
     if (this.frameCount % this.sendInterval !== 0) return;
     if (!this.client) return;
 
-    const messages = encodeBeyondMessages(grid, this.config.projectorMap, this.prevGrid);
+    const zoneCount = this.config.directCalibrationZoneCount;
+    const direct = calibration && zoneCount !== undefined;
+    let projectorMap = this.config.projectorMap;
+    if (zoneCount !== undefined && (direct || this.wasDirectCalibration)) {
+      const previousMap = projectorMap;
+      projectorMap = { ...previousMap };
+      const black = { h: 0, s: 0, b: 0 };
+      const boundedGrid = Array.from({ length: zoneCount }, (_, i) => grid[i] ?? black);
+      const mappedZones = new Set(boundedGrid.map((_, i) => previousMap[i]));
+      const frame = boundedGrid.map((cell, i) => direct ? (boundedGrid[previousMap[i]] ?? black) : cell);
+      // A sliced column-major show may not address every shard-local zone.
+      // Keep extra slots stable through the return to show so they receive black.
+      for (let zone = 0; zone < zoneCount; zone++) {
+        if (mappedZones.has(zone)) continue;
+        projectorMap[frame.length] = zone;
+        frame.push(direct ? boundedGrid[zone] : black);
+      }
+      grid = frame;
+    }
+    const messages = encodeBeyondMessages(grid, projectorMap, this.prevGrid);
 
     // Snapshot current state for next-frame diff
     this.prevGrid = grid.map(c => ({ h: c.h, s: c.s, b: c.b }));
+    this.wasDirectCalibration = direct;
 
     if (messages.length === 0) return;
 
