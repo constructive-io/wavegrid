@@ -38,6 +38,27 @@ describe('Receiver', () => {
     expect(r.status).toBe('reconnecting');
   });
 
+  it('applies station overlay after orientation and before sharding without interrupting animation', () => {
+    const input = new WebSocketInput({ url: 'ws://example.com:9999' });
+    jest.spyOn(input, 'connect').mockImplementation(() => {});
+    const r = new Receiver({ input, output: new CallbackOutput(() => {}), shard: { start: 3, end: 4 } });
+    r.start();
+    try {
+      input.emit('command', { type: 'command', action: 'setAnimation', name: 'rainbow' });
+      input.emit('command', { type: 'command', action: 'setOrientation', rotation: 180, flipH: false, flipV: false });
+      input.emit('command', { type: 'command', action: 'setBrightness', value: 50 });
+      input.emit('command', { type: 'command', action: 'stationOverlay', cells: [
+        { idx: 3, h: 240, s: 75, b: 80 }, { idx: 45, h: 120, s: 100, b: 100 }
+      ] });
+      expect(r.getOutputState()[0]).toEqual({ h: 240, s: 75, b: 40 });
+      expect(r.animationState.currentAnimation).toBe('rainbow');
+      input.emit('disconnected');
+      expect(r.getOutputState()[0]).not.toEqual({ h: 240, s: 75, b: 40 });
+    } finally {
+      r.stop();
+    }
+  });
+
   describe('sharding', () => {
     it('should return full grid when no shard config', () => {
       const r = new Receiver();

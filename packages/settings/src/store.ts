@@ -1,3 +1,5 @@
+import type { StationGrant } from '@wavegrid/stations';
+
 import {
   type AccessKeyInfo,
   authenticateAccessKey,
@@ -163,12 +165,12 @@ export interface SettingsStore {
   getAccessKeyRole(project: string, name: string): UserRole | null;
   /** Mint (or re-mint) a key. The cleartext comes back exactly once — only its
    *  hash is persisted, so a forgotten key is replaced, not recovered. */
-  mintAccessKey(project: string, name: string, role?: UserRole): MintedAccessKey;
+  mintAccessKey(project: string, name: string, role?: UserRole, station?: string | null): MintedAccessKey;
   setAccessKeyEnabled(project: string, name: string, enabled: boolean): AccessKeyInfo | null;
   setAccessKeyRole(project: string, name: string, role: UserRole): AccessKeyInfo | null;
   removeAccessKey(project: string, name: string): boolean;
   removeAllAccessKeys(project: string): number;
-  authenticateAccessKey(project: string, passphrase: string): UserInfo | null;
+  authenticateAccessKey(project: string, passphrase: string): (UserInfo & StationGrant) | null;
 
   // UI sessions (cheap server-visible login records; sockets untouched)
   createSession(project: string, input: CreateSessionInput): Session;
@@ -277,14 +279,22 @@ export function openStore(opts: StoreOptions = {}): SettingsStore {
 
     listAccessKeys: (project) => listAccessKeys(paths, project),
     getAccessKeyRole: (project, name) => getAccessKeyRole(paths, project, name),
-    mintAccessKey: (project, name, role) => {
+    mintAccessKey: (project, name, role, station) => {
       if (listUsernames(paths, project).includes(name)) {
         throw new Error(`"${name}" is already a user account in ${project}; pick another name.`);
       }
-      return mintAccessKey(paths, project, name, role);
+      const existing = listAccessKeys(paths, project).find((key) => key.name === name);
+      const minted = mintAccessKey(paths, project, name, role, station);
+      if (existing?.station !== minted.key.station || existing?.station !== undefined) {
+        revokeUserSessions(paths, project, name);
+      }
+      return minted;
     },
-    setAccessKeyEnabled: (project, name, enabled) =>
-      setAccessKeyEnabled(paths, project, name, enabled),
+    setAccessKeyEnabled: (project, name, enabled) => {
+      const key = setAccessKeyEnabled(paths, project, name, enabled);
+      if (!enabled && key?.station !== undefined) revokeUserSessions(paths, project, name);
+      return key;
+    },
     setAccessKeyRole: (project, name, role) => setAccessKeyRole(paths, project, name, role),
     removeAccessKey: (project, name) => removeAccessKey(paths, project, name),
     removeAllAccessKeys: (project) => removeAllAccessKeys(paths, project),

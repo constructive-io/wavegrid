@@ -72,6 +72,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@wavegrid/stations':
+        specifier: workspace:*
+        version: link:../stations/dist
       '@wavegrid/discovery':
         specifier: workspace:*
         version: link:../discovery/dist
@@ -130,6 +133,9 @@ importers:
 
   packages/desktop:
     dependencies:
+      '@wavegrid/stations':
+        specifier: workspace:*
+        version: link:../stations/dist
       '@base-ui/react':
         specifier: ^1.4.1
         version: 1.7.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -288,6 +294,9 @@ importers:
 
   packages/layout:
     dependencies:
+      '@wavegrid/stations':
+        specifier: workspace:*
+        version: link:../stations/dist
       confstash:
         specifier: ^0.1.2
         version: 0.1.2
@@ -320,6 +329,9 @@ importers:
 
   packages/receiver:
     dependencies:
+      '@wavegrid/stations':
+        specifier: workspace:*
+        version: link:../stations/dist
       '@wavegrid/animations':
         specifier: workspace:*
         version: link:../animations/dist
@@ -360,6 +372,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@wavegrid/stations':
+        specifier: workspace:*
+        version: link:../stations/dist
       '@wavegrid/sandbox':
         specifier: workspace:*
         version: link:../sandbox/dist
@@ -395,6 +410,9 @@ importers:
 
   packages/settings:
     dependencies:
+      '@wavegrid/stations':
+        specifier: workspace:*
+        version: link:../stations/dist
       '@wavegrid/animations':
         specifier: workspace:*
         version: link:../animations/dist
@@ -410,8 +428,18 @@ importers:
         version: 0.3.1
     publishDirectory: dist
 
+  packages/stations:
+    devDependencies:
+      makage:
+        specifier: ^0.3.0
+        version: 0.3.1
+    publishDirectory: dist
+
   packages/ui:
     dependencies:
+      '@wavegrid/stations':
+        specifier: workspace:*
+        version: link:../stations/dist
       '@wavegrid/animations':
         specifier: workspace:*
         version: link:../animations/dist

@@ -16,6 +16,7 @@ import { setTarget } from '@wavegrid/animations';
 import { type Layout, presets } from '@wavegrid/layout';
 import type { ProjectorControl } from '@wavegrid/osc';
 import { createSandboxEngine, SandboxEngine } from '@wavegrid/sandbox';
+import { compositeStationPaint, type StationCell } from '@wavegrid/stations';
 
 import { ConsoleOutput, InputAdapter, OutputAdapter, WebSocketInput } from './adapters';
 import { AnimationState, applyPaint, createDefaultAnimationState, handleCommand, remapGridForOutput, tickCommandMode } from './command-engine';
@@ -92,6 +93,7 @@ export class Receiver {
   private _fallbackActive = false;
   private _running = false;
   private _animState: AnimationState = createDefaultAnimationState();
+  private stationOverlay: StationCell[] = [];
   private _sandbox: SandboxEngine | null = null;
   private _sandboxReady: Promise<SandboxEngine> | null = null;
   private _patternTime = 0;
@@ -125,7 +127,10 @@ export class Receiver {
       s: c.s,
       b: c.b
     }));
-    const remapped = remapGridForOutput(full, this.config.layout.cols, this.config.layout.rows, this._animState);
+    const remapped = compositeStationPaint(
+      remapGridForOutput(full, this.config.layout.cols, this.config.layout.rows, this._animState),
+      this.stationOverlay.map(cell => ({ ...cell, b: cell.b * this._animState.brightness / 100 }))
+    );
     const shard = this.config.shard;
     if (!shard) return remapped;
     return remapped.slice(shard.start, shard.end + 1);
@@ -156,6 +161,7 @@ export class Receiver {
     const input = this.config.input;
 
     input.on('connected', () => {
+      this.stationOverlay = [];
       this._status = 'connected';
       this.lastDataAt = Date.now();
       console.log('  \u25C8 Input connected');
@@ -171,6 +177,11 @@ export class Receiver {
       // Config-only commands: update state but do NOT create the grid.
       // The receiver must produce zero output until a visual command arrives.
       if (cmd.action === 'keepalive') return;
+      if (cmd.action === 'stationOverlay') {
+        this.stationOverlay = cmd.cells;
+        if (cmd.cells.length) this.ensureGrid();
+        return;
+      }
       // Projector controls bypass the HSB grid entirely: re-base global
       // indices to this shard and hand them to the output adapters.
       if (cmd.action === 'projector') {
@@ -242,6 +253,7 @@ export class Receiver {
     });
 
     input.on('disconnected', () => {
+      this.stationOverlay = [];
       this._status = 'reconnecting';
       console.log('\n  \u25C8 Input disconnected');
     });
@@ -271,6 +283,7 @@ export class Receiver {
           this._animState.patternActive;
 
         if (timeSinceData > this.config.fallbackDelay && !this._fallbackActive) {
+          this.stationOverlay = [];
           if (!hasLocalContent) {
             this._fallbackActive = true;
             this._status = 'fallback';

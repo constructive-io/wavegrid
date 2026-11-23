@@ -7,6 +7,7 @@
  */
 
 import type { ProjectorControl, ProjectorCueCommand } from '@wavegrid/osc';
+import type { StationCell } from '@wavegrid/stations';
 
 export interface SetAnimationCommand {
   type: 'command';
@@ -117,6 +118,7 @@ export interface ProjectorCueRelayCommand {
 }
 
 export type CommandMessage =
+  | { type: 'command'; action: 'stationOverlay'; cells: StationCell[] }
   | ProjectorCommand
   | ProjectorCueRelayCommand
   | SetAnimationCommand

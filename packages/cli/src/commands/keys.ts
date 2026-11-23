@@ -1,3 +1,5 @@
+import { DEFAULT_CONFIG, resolveLayout } from '@wavegrid/layout';
+import { resolveStations } from '@wavegrid/stations';
 import c from 'yanse';
 
 import { type Flags, getStore, resolveProjectName } from '../project';
@@ -23,7 +25,7 @@ export function runKeysList(flags: Flags): void {
     for (const k of keys) {
       const state = k.enabled ? c.green('enabled ') : c.yellow('disabled');
       const used = k.lastUsedAt ? relative(k.lastUsedAt) : 'never used';
-      console.log(`  ${state}  ${c.bold(k.name.padEnd(20))} ${k.role.padEnd(9)} ${c.gray(used)}`);
+      console.log(`  ${state}  ${c.bold(k.name.padEnd(20))} ${k.role.padEnd(9)} ${c.gray(used)}${k.station ? ` · station ${k.station}` : ''}`);
     }
   }
   console.log('');
@@ -46,8 +48,16 @@ export function runKeysNew(flags: Flags, name: string | undefined): void {
 
   const role = flags.admin === true ? 'admin' : 'operator';
   try {
+    const station = flags.station === undefined ? undefined : String(flags.station);
+    if (station !== undefined) {
+      const config = store.getProjectConfig(project);
+      const layout = resolveLayout(config?.layout ?? DEFAULT_CONFIG.layout);
+      if (flags.station === true || !resolveStations(config?.stations, layout).some(s => s.slug === station)) {
+        throw new Error('Choose an enabled station slug with --station <slug>.');
+      }
+    }
     const existed = store.listAccessKeys(project).some((k) => k.name === name);
-    const { passphrase } = store.mintAccessKey(project, name, role);
+    const { passphrase } = store.mintAccessKey(project, name, role, station);
 
     console.log('');
     console.log(c.green(`  ✓ ${existed ? 'Re-minted' : 'Minted'} ${role} key "${name}" in ${project}`));

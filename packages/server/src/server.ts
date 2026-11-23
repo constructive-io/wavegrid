@@ -10,6 +10,7 @@ import {
   sameHsb
 } from '@wavegrid/pool';
 import { isValidScope, openStore, WAVEGRID_RUNTIME_VERSION } from '@wavegrid/settings';
+import { type BrainExtensionHooks, projectStationLayout, registerStations, type Station } from '@wavegrid/stations';
 import * as fs from 'fs';
 import http from 'http';
 import { resolve } from 'path';
@@ -38,6 +39,7 @@ import type {
   SystemStatus
 } from './protocol';
 import { applyScene, scenes } from './scenes';
+import { projectStations } from './station-project';
 
 export interface ServerHandle {
   server: http.Server;
@@ -228,7 +230,7 @@ function poolPayload(withCurrent = true): string {
 }
 
 function broadcastPool(withCurrent = true) {
-  fanoutLossy(wss.clients, poolPayload(withCurrent), dropClient);
+  fanoutLossy(fullClients(), poolPayload(withCurrent), dropClient);
 }
 
 /** One 60 fps step: run the field, sample the fixtures, write grid targets. */
@@ -310,7 +312,48 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ noServer: true });
 const verifiedPayloads = new WeakMap<http.IncomingMessage, JwtPayload>();
+const requestedScopes = new WeakMap<http.IncomingMessage, Station>();
+const socketScopes = new WeakMap<WebSocket, Station>();
+const socketPayloads = new WeakMap<WebSocket, JwtPayload>();
 const liveness = new Map<WebSocket, LivenessState>();
+const messagePolicies: Parameters<BrainExtensionHooks['onOperatorMessage']>[0][] = [];
+const scopedPolicies: Parameters<BrainExtensionHooks['onScopedMessage']>[0][] = [];
+const projections: Parameters<BrainExtensionHooks['projectState']>[0][] = [];
+const compositors: Parameters<BrainExtensionHooks['compositeOutput']>[0][] = [];
+const stations = registerStations(resolved.config.stations, layout, {
+  onScopedMessage: handler => scopedPolicies.push(handler),
+  onOperatorMessage: handler => messagePolicies.push(handler),
+  projectState: handler => projections.push(handler),
+  compositeOutput: handler => compositors.push(handler),
+  publishOutput: cells => {
+    const payload = JSON.stringify({ type: 'command', action: 'stationOverlay', cells });
+    fanout([...wss.clients].filter(ws => !socketPayloads.has(ws)), payload, dropClient);
+  }
+});
+
+function stationScopeCurrent(scope: Station): boolean {
+  const target = resolveSyncTarget();
+  if (!target) return false;
+  const config = target.store.getProjectConfig(target.project);
+  const current = projectStations(resolved, config).find(station => station.slug === scope.slug);
+  return current !== undefined && JSON.stringify(current.fixtures) === JSON.stringify(scope.fixtures);
+}
+
+function validStationPrincipal(payload: JwtPayload, scope?: Station): boolean {
+  if (scope && !stationScopeCurrent(scope)) return false;
+  if (!payload.station && !stations.stations.length) return true;
+  const target = resolveSyncTarget();
+  if (!target) return payload.station === undefined && !scope;
+  const key = target.store.listAccessKeys(target.project).find(item => item.name === payload.sub);
+  if (payload.station === undefined) return key?.station === undefined;
+  const session = payload.sid && target.store.getSession(target.project, payload.sid);
+  return !!session && session.username === payload.sub && session.station === payload.station &&
+    key?.enabled === true && key.station === payload.station && scope?.slug === payload.station;
+}
+
+function* fullClients() {
+  for (const ws of wss.clients) if (!socketScopes.has(ws)) yield ws;
+}
 
 const RECEIVER_KEY = process.env.WG_RECEIVER_KEY || '';
 
@@ -336,6 +379,15 @@ server.on('upgrade', (req, socket, head) => {
         return;
       }
     }
+    const requested = reqUrl.searchParams.get('station');
+    const slug = requested ?? payload.station;
+    const scope = stations.stations.find(station => station.slug === slug);
+    if ((slug !== undefined && !scope) || !validStationPrincipal(payload, scope)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    if (scope) requestedScopes.set(req, scope);
     verifiedPayloads.set(req, payload);
   } else if (key && RECEIVER_KEY && key === RECEIVER_KEY) {
     // valid receiver key — allow
@@ -391,6 +443,12 @@ function disconnectRevokedSessions(): void {
   try {
     const live = new Set(target.store.listSessions(target.project).map((session) => session.id));
     for (const ws of selectRevokedSockets(clients, (sid) => live.has(sid))) revokeClient(ws);
+    if (stations.stations.some(scope => !stationScopeCurrent(scope)) && stations.acceptsInput()) stations.suspend();
+    for (const ws of wss.clients) {
+      const scope = socketScopes.get(ws);
+      const payload = socketPayloads.get(ws);
+      if (payload && !validStationPrincipal(payload, scope)) revokeClient(ws);
+    }
   } catch {
     // Session checks are best-effort when the project store is unavailable.
   }
@@ -412,11 +470,19 @@ function broadcastState() {
       })(),
       GRID_COLUMNS, GRID_ROWS, orientation
     );
-  const payload = JSON.stringify({ type: 'state', grid: output });
+  const composite = calibrationMode ? output : compositors.reduce((frame, apply) => apply(frame), output);
+  const payload = JSON.stringify({ type: 'state', grid: composite,
+    ...(stations.stations.length ? { stationMode: stations.mode(), stationOpen: stations.acceptsInput() } : {}) });
   // Lossy: this goes out 60 times a second and each frame replaces the last, so
   // a client that cannot keep up must skip frames rather than build a backlog
   // that leaves it rendering the past while the rig runs on the present.
-  fanoutLossy(wss.clients, payload, dropClient);
+  fanoutLossy(fullClients(), payload, dropClient);
+  for (const ws of wss.clients) {
+    const scope = socketScopes.get(ws);
+    if (!scope) continue;
+    const scopedGrid = projections.reduce((frame, project) => project(frame, scope), composite);
+    fanoutLossy([ws], JSON.stringify({ type: 'state', grid: scopedGrid, stationOpen: stations.acceptsInput() }), dropClient);
+  }
 }
 
 function getCalibrationOutput(): CannonState[] {
@@ -455,12 +521,12 @@ function loadPhysicalLightMap(): number[] {
 
 function broadcastOrientation() {
   const payload = JSON.stringify({ type: 'orientation', ...orientation });
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 function broadcastCommand(cmd: Record<string, unknown>) {
   const payload = JSON.stringify({ type: 'command', ...cmd });
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 // What UIs need to keep in step with the running pattern (e.g. GracePaint on a
@@ -479,7 +545,7 @@ function looksPayload(): string {
 }
 
 function broadcastLooks() {
-  fanout(wss.clients, looksPayload(), dropClient);
+  fanout(fullClients(), looksPayload(), dropClient);
 }
 
 let lastPatternState = '';
@@ -487,7 +553,7 @@ function broadcastPatternStateIfChanged() {
   const payload = patternStatePayload();
   if (payload === lastPatternState) return;
   lastPatternState = payload;
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 function broadcastPlaylistState() {
@@ -497,7 +563,7 @@ function broadcastPlaylistState() {
     playlist: activePlaylist,
     currentStep: playlistCurrentStep
   });
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 /** Cancel any active playlist when another visual command arrives. */
@@ -568,7 +634,7 @@ function isSecretScope(scope: string): boolean {
 /** Broadcast an accepted config revision to every connected client. */
 function broadcastSync(update: SyncUpdateMessage): void {
   const payload = JSON.stringify(update);
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 /** Serialize + persist a client's config push, then broadcast the revision. */
@@ -663,7 +729,7 @@ function filterSecretScopes<T>(entries: Record<string, T>): Record<string, T> {
 /** Broadcast the full replicated document to every client (post-merge convergence). */
 function broadcastSyncStateTo(state: { revision: number; entries: unknown }): void {
   const payload = JSON.stringify({ type: 'sync_state', revision: state.revision, entries: state.entries });
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 /** Sync summary for `system_status` (revision + devices that lag it). */
@@ -712,6 +778,9 @@ function buildSystemStatus(): SystemStatus {
 wss.on('connection', (ws, req: http.IncomingMessage) => {
   const remote = req.socket.remoteAddress ?? 'unknown';
   const payload = verifiedPayloads.get(req);
+  const scope = requestedScopes.get(req);
+  if (scope) socketScopes.set(ws, scope);
+  if (payload) socketPayloads.set(ws, payload);
   const isUi = payload !== undefined;
   const now = Date.now();
   clients.set(ws, {
@@ -738,6 +807,28 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     const state = liveness.get(ws);
     if (state) state.alive = true;
   });
+
+  if (scope) {
+    sendToClient(ws, JSON.stringify({ type: 'station_layout', layout: projectStationLayout(layout, scope) }));
+    ws.on('message', raw => {
+      if (!payload || !validStationPrincipal(payload, scope)) {
+        revokeClient(ws);
+        return;
+      }
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (!msg || typeof msg !== 'object') return;
+        scopedPolicies.some(handler => handler(msg, scope));
+      } catch {
+        // ignore malformed messages
+      }
+    });
+    return;
+  }
+
+  if (!payload && stations.stations.length) {
+    sendToClient(ws, JSON.stringify({ type: 'command', action: 'stationOverlay', cells: stations.snapshot() }));
+  }
 
   // Send the resolved layout first — the single source of truth for geometry —
   // so UI and receiver render/route from the same fixtures the server uses.
@@ -784,6 +875,10 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       const msg = JSON.parse(raw.toString());
       const info = clients.get(ws);
       if (info) info.lastSeen = Date.now();
+      if (payload && !validStationPrincipal(payload)) {
+        revokeClient(ws);
+        return;
+      }
 
       if (msg.type === 'hello' && msg.role === 'receiver' && info) {
         const hello = msg as HelloMessage;
@@ -838,6 +933,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
 });
 
 function handleMessage(msg: any, ws?: WebSocket) {
+  if ((!ws || socketPayloads.has(ws)) && messagePolicies.some(handler => handler(msg))) return;
   switch (msg.type) {
   case 'pool_touch': {
     if (typeof msg.x !== 'number' || typeof msg.y !== 'number') break;

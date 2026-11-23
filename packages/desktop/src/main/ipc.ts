@@ -1,6 +1,7 @@
 import { browse } from '@wavegrid/discovery';
-import { autoMap, resolveLayout } from '@wavegrid/layout';
+import { autoMap, DEFAULT_CONFIG, resolveLayout } from '@wavegrid/layout';
 import { openStore } from '@wavegrid/settings';
+import { resolveStations } from '@wavegrid/stations';
 import { ipcMain } from 'electron';
 
 import {
@@ -210,12 +211,15 @@ export function registerAllIpc(): void {
     const store = openStore();
     return store.hasProject(project) ? store.listAccessKeys(project) : [];
   });
-  ipcMain.handle('keys:mint', (_e, project: string, name: string, role: UserRole) => {
+  ipcMain.handle('keys:mint', (_e, project: string, name: string, role: UserRole, station?: string) => {
     const store = openStore();
     if (!store.hasProject(project)) return { passphrase: '', keys: [] };
     // The cleartext is returned exactly once for the admin to copy and hand
     // over; only its scrypt hash is persisted. It is never logged.
-    const minted = store.mintAccessKey(project, name, role);
+    const config = store.getProjectConfig(project);
+    if (station !== undefined && !resolveStations(config?.stations, resolveLayout(config?.layout ?? DEFAULT_CONFIG.layout))
+      .some(item => item.slug === station)) throw new Error('Unknown station.');
+    const minted = store.mintAccessKey(project, name, role, station);
     return { passphrase: minted.passphrase, keys: store.listAccessKeys(project) };
   });
   ipcMain.handle('keys:setEnabled', (_e, project: string, name: string, enabled: boolean) => {

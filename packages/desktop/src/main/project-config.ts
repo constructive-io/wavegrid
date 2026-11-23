@@ -11,6 +11,7 @@ import {
   type WavegridConfig
 } from '@wavegrid/layout';
 import type { ProjectConfig } from '@wavegrid/settings';
+import { resolveStations } from '@wavegrid/stations';
 
 import type { EditableConfig, LayoutChoice, NewProjectInput } from '@/types/ipc';
 
@@ -96,6 +97,7 @@ export function configForNewProject(input: NewProjectInput): ProjectConfig {
 export function toEditable(stored: ProjectConfig | null): EditableConfig {
   const layoutSpec = stored?.layout ?? DEFAULT_CONFIG.layout;
   const resolved = resolveLayout(layoutSpec);
+  const stations = resolveStations(stored?.stations, resolved);
   return {
     layout: specToChoice(layoutSpec),
     mode: stored?.mode ?? DEFAULT_CONFIG.mode,
@@ -107,7 +109,8 @@ export function toEditable(stored: ProjectConfig | null): EditableConfig {
     fallbackDelay: stored?.receiver?.fallbackDelay ?? DEFAULT_CONFIG.receiver.fallbackDelay,
     receiverServer: stored?.receiver?.server ?? '',
     layoutLabel: resolved.name,
-    cannonCount: resolved.count
+    cannonCount: resolved.count,
+    ...(stations.length ? { stations } : {})
   };
 }
 

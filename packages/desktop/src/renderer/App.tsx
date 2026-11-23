@@ -463,7 +463,8 @@ export function App() {
           onRevokeSession={(id) => runAction(() => revokeSession(id))}
           onRefreshSessions={() => void refreshSessions()}
           keys={keys}
-          onMintKey={(name, role) => withBusy(() => mintKey(name, role))}
+          stations={config?.stations}
+          onMintKey={(name, role, station) => withBusy(() => mintKey(name, role, station))}
           onSetKeyEnabled={(name, enabled) => runAction(() => setKeyEnabled(name, enabled))}
           onSetKeyRole={(name, role) => runAction(() => setKeyRole(name, role))}
           onRemoveKey={(name) => runAction(() => removeKey(name))}

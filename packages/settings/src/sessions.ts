@@ -1,3 +1,4 @@
+import type { StationGrant } from '@wavegrid/stations';
 import { randomBytes } from 'crypto';
 import path from 'path';
 
@@ -11,7 +12,7 @@ import type { UserRole } from './users';
  * revoke access. Deleting the row is what revocation means: the server rejects
  * requests carrying the matching `sid` and closes the socket opened with it.
  */
-export interface Session {
+export interface Session extends StationGrant {
   /** Opaque session id; also carried as the JWT `sid` claim. */
   id: string;
   username: string;
@@ -53,7 +54,7 @@ export function pruneSessions(paths: StorePaths, project: string, now = Date.now
   return live;
 }
 
-export interface CreateSessionInput {
+export interface CreateSessionInput extends StationGrant {
   username: string;
   role: UserRole;
   ip?: string;
@@ -74,7 +75,8 @@ export function createSession(paths: StorePaths, project: string, input: CreateS
     userAgent: input.userAgent ?? 'unknown',
     issuedAt: now,
     lastSeen: now,
-    expiresAt: now + ttl
+    expiresAt: now + ttl,
+    ...(input.station !== undefined ? { station: input.station } : {})
   };
   const live = readAll(paths, project).filter(notExpired(now));
   live.push(session);

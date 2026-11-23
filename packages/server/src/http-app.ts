@@ -6,11 +6,13 @@
  */
 import { type ResolvedConfig } from '@wavegrid/layout';
 import { DEFAULT_SESSION_TTL_MS, loadProjectPlugins, openStore, readProjectPluginFile, type UserRole } from '@wavegrid/settings';
+import type { StationGrant } from '@wavegrid/stations';
 import * as fs from 'fs';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { extname, join, normalize, resolve } from 'path';
 
 import { signJwt, verifyJwt } from './jwt';
+import { projectStations } from './station-project';
 
 export interface HttpAppOptions {
   /** Directory of the built UI (Vite `dist`). Static serving is skipped if unset/missing. */
@@ -149,7 +151,7 @@ interface AuthedCaller {
 function requireAdmin(req: IncomingMessage, url: URL, res: ServerResponse): AuthedCaller | null {
   const token = bearerToken(req, url);
   const payload = token ? verifyJwt(token) : null;
-  if (!payload) {
+  if (!payload || payload.station !== undefined) {
     sendJson(res, 401, { ok: false, error: 'Authentication required' });
     return null;
   }
@@ -315,7 +317,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
 
     // ── POST /api/login ─────────────────────────────────────────────
     if (pathname === '/api/login' && method === 'POST') {
-      let body: { username?: string; password?: string };
+      let body: { username?: string; password?: string; station?: string };
       try {
         body = JSON.parse((await readBody(req)) || '{}');
       } catch {
@@ -338,11 +340,20 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
       // Try a real account first, then the project's access keys. A key is
       // handed around as a passphrase alone, so it matches regardless of the
       // username typed, and logs in as the key's own name and role.
-      const user =
+      const user: ({ username: string; role: UserRole } & StationGrant) | null =
         store.authenticate(project, username, password) ??
         store.authenticateAccessKey(project, password);
       if (!user) {
         sendJson(res, 401, { ok: false, error: 'Invalid username or password' });
+        return;
+      }
+      if (body.station !== undefined && user.station !== body.station) {
+        sendJson(res, 403, { ok: false, error: 'This passcode does not grant access to that station' });
+        return;
+      }
+      if (user.station !== undefined && !projectStations(resolved, store.getProjectConfig(project))
+        .some(station => station.slug === user.station)) {
+        sendJson(res, 403, { ok: false, error: 'Station unavailable' });
         return;
       }
       // Record a cheap server-side session and bind the JWT to it, so admins
@@ -351,6 +362,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
       const session = store.createSession(project, {
         username: user.username,
         role: user.role,
+        station: user.station,
         ip: clientIp(req),
         userAgent: String(req.headers['user-agent'] ?? 'unknown'),
         ttlMs: DEFAULT_SESSION_TTL_MS
@@ -358,6 +370,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
       const token = signJwt(user.username, {
         sid: session.id,
         role: user.role,
+        station: user.station,
         ttlSec: Math.floor(DEFAULT_SESSION_TTL_MS / 1000)
       });
       sendJson(res, 200, {
@@ -396,8 +409,18 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
         return;
       }
       const store = openStore();
-      if (payload.sid && !store.getSession(project, payload.sid)) {
+      const session = payload.sid ? store.getSession(project, payload.sid) : null;
+      if (payload.sid && !session) {
         sendJson(res, 401, { ok: false, error: 'Session expired or revoked' });
+        return;
+      }
+      const key = store.listAccessKeys(project).find(key => key.name === payload.sub);
+      if ((key?.station !== undefined || payload.station !== undefined || session?.station !== undefined) &&
+          (!key?.enabled || !session || session.username !== payload.sub ||
+            key.station !== payload.station || key.station !== session.station ||
+            !projectStations(resolved, store.getProjectConfig(project))
+              .some(station => station.slug === key.station))) {
+        sendJson(res, 401, { ok: false, error: 'Station session expired or revoked' });
         return;
       }
       // An access-key holder isn't a stored user — the key itself carries the
@@ -518,7 +541,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
     if (pathname === '/api/admin/keys' && method === 'POST') {
       const caller = requireAdmin(req, url, res);
       if (!caller) return;
-      let body: { name?: string; role?: UserRole };
+      let body: { name?: string; role?: UserRole; station?: string };
       try {
         body = JSON.parse((await readBody(req)) || '{}');
       } catch {
@@ -533,11 +556,18 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
       // to copy and hand over; only its hash is persisted.
       const store = openStore();
       try {
+        if (body.station !== undefined && !projectStations(resolved, store.getProjectConfig(caller.project))
+          .some(station => station.slug === body.station)) {
+          sendJson(res, 400, { ok: false, error: 'Unknown station' });
+          return;
+        }
         const minted = store.mintAccessKey(
           caller.project,
           body.name,
-          body.role === 'admin' ? 'admin' : 'operator'
+          body.role === 'admin' ? 'admin' : 'operator',
+          body.station
         );
+        sessionsRevoked();
         sendJson(res, 200, {
           ok: true,
           passphrase: minted.passphrase,
@@ -599,6 +629,11 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
           return;
         }
         const store = openStore();
+        if (body.role === 'admin' && store.listAccessKeys(caller.project)
+          .some(key => key.name === decodeURIComponent(m[1]) && key.station !== undefined)) {
+          sendJson(res, 400, { ok: false, error: 'A station key cannot grant admin access' });
+          return;
+        }
         const key = store.setAccessKeyRole(caller.project, decodeURIComponent(m[1]), body.role);
         if (!key) {
           sendJson(res, 404, { ok: false, error: 'No such key' });
@@ -629,6 +664,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
 
     // ── GET/POST /api/light-map ─────────────────────────────────────
     if (pathname === '/api/light-map') {
+      if ((method === 'GET' || method === 'POST') && !requireAdmin(req, url, res)) return;
       const file = lightMapFile();
       if (method === 'GET') {
         let cfg: LightMapConfig;

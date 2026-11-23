@@ -75,6 +75,21 @@ describe('access keys', () => {
     expect(store.authenticateAccessKey('show', admin.passphrase)?.role).toBe('admin');
   });
 
+  it('preserves station grants when re-minting and revokes sessions on reassignment or disable', () => {
+    const { passphrase } = store.mintAccessKey('show', 'crew', 'operator', 'north');
+    expect(store.authenticateAccessKey('show', passphrase)).toEqual({
+      username: 'crew', role: 'operator', station: 'north'
+    });
+    expect(() => store.setAccessKeyRole('show', 'crew', 'admin')).toThrow('cannot grant admin');
+    expect(store.mintAccessKey('show', 'crew').key.station).toBe('north');
+    const first = store.createSession('show', { username: 'crew', role: 'operator', station: 'north' });
+    store.mintAccessKey('show', 'crew', 'operator', 'south');
+    expect(store.getSession('show', first.id)).toBeNull();
+    const second = store.createSession('show', { username: 'crew', role: 'operator', station: 'south' });
+    store.setAccessKeyEnabled('show', 'crew', false);
+    expect(store.getSession('show', second.id)).toBeNull();
+  });
+
   it('stamps lastUsedAt on a successful login', () => {
     const { passphrase } = store.mintAccessKey('show', 'crew');
     expect(store.listAccessKeys('show')[0].lastUsedAt).toBeNull();
