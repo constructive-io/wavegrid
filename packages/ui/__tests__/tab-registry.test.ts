@@ -61,6 +61,16 @@ describe('built-in tab registry', () => {
     expect(tabsFor(prideLayout).some(tab => tab.label === 'Pride')).toBe(false);
     expect(tabsFor(prideLayout, registry).filter(tab => tab.label === 'Pride').map(tab => tab.id)).toEqual(['pride/pride']);
   });
+  it('registers USA only from the project plugin, with no hidden built-in renderer', () => {
+    const registry = registryFor(coercePlugins([{ id: 'usa', pattern: 'pattern.js', tabs: [
+      { id: 'usa', label: 'USA', view: 'view/index.html', showWhen: 'always' }
+    ] }]));
+    expect(tabById('usa')).toBeUndefined();
+    for (const layout of [grid, rings, projectors]) {
+      expect(tabsFor(layout).some(tab => tab.label === 'USA')).toBe(false);
+      expect(tabsFor(layout, registry).filter(tab => tab.label === 'USA').map(tab => tab.id)).toEqual(['usa/usa']);
+    }
+  });
   it('shows Grace and GracePaint only as plugins while preserving hidden Audio', () => {
     const registry = registryFor(coercePlugins([{ id: 'grace', pattern: 'pattern.js', tabs: [
       { id: 'grace', label: 'Grace', view: 'view/index.html', showWhen: { topology: 'rings' } },
@@ -88,7 +98,7 @@ describe('built-in tab registry', () => {
   it('keeps all built-ins in their original order, including hidden renderers', () => {
     expect(allTabs.map(tab => [tab.id, tab.label])).toEqual([
       ['paint', 'Paint'], ['pool', 'Pool'], ['gradient', 'Gradient'],
-      ['scenes', 'Scenes'], ['animations', 'Anim'], ['usa', 'USA'],
+      ['scenes', 'Scenes'], ['animations', 'Anim'],
       ['patterns', 'Patterns'], ['sequences', 'Sequences'], ['playlist', 'Playlist'],
       ['flags', 'Flags'], ['drops', 'Drops'], ['audio', 'Audio'], ['video', 'Video']
     ]);
