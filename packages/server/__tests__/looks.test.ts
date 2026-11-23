@@ -33,6 +33,36 @@ describe('LookStore', () => {
     expect(store.save('one too many', params)).toBeNull();
   });
 
+  it('migrates legacy Palace Looks once, preserving recall params, IDs, order and timestamps', () => {
+    const file = join(dir, 'looks.json');
+    const legacy = { ...params, kind: 'palace', who: 'projector', cannon: 37, projector: 81, span: .5, hueShift: 17, paint: [220, 90, -1, 0] };
+    const entries = [
+      { id: 'old', name: 'Legacy Palace', params: legacy, createdAt: 123 },
+      { id: 'scoped', name: 'Other scope', params: { ...legacy, plugin: 'other/tab' }, createdAt: 456 },
+      { id: 'grace', name: 'Grace', params, createdAt: 789 }
+    ];
+    fs.writeFileSync(file, JSON.stringify({ looks: entries }));
+    const store = new LookStore(file);
+    const expected = [{ ...entries[0], params: { ...legacy, plugin: 'palace/palace' } }, ...entries.slice(1)];
+    expect(store.list()).toEqual(expected);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).looks).toEqual(expected);
+    fs.utimesSync(file, 1234, 1234);
+    const modified = fs.statSync(file).mtimeMs;
+    expect(new LookStore(file).list()).toEqual(expected);
+    expect(fs.statSync(file).mtimeMs).toBe(modified);
+  });
+
+  it('tags new unscoped Palace saves without changing caller params or existing scope values', () => {
+    const store = new LookStore(null);
+    const legacy = { ...params, kind: 'palace' };
+    expect(store.save('Legacy', legacy)?.params).toEqual({ ...legacy, plugin: 'palace/palace' });
+    expect(legacy).not.toHaveProperty('plugin');
+    for (const plugin of ['palace/palace', 'other/tab', '', null]) {
+      expect(store.save('Scoped', { ...legacy, plugin })?.params.plugin).toBe(plugin);
+    }
+    expect(store.save('Grace', params)?.params).toEqual(params);
+  });
+
   it('renames (trimmed, capped), deletes and reorders by id', () => {
     const store = new LookStore(null);
     const a = store.save('A', params)!;

@@ -29,7 +29,7 @@ One package: `pnpm --filter @wavegrid/<pkg> build` / `test` / `lint`, or `npx je
 | `osc` | OSC encoder plus the BEYOND / FB4 adapters and routing (per-fixture `kind`, zones) |
 | `server` | The brain: WebSocket relay, state, the pattern engine (`evalPattern` preview), REST API, serves the UI |
 | `receiver` | Connects to a brain, computes frames at 60fps, sends OSC. Runs JS patterns in QuickJS |
-| `ui` | React artist UI (Vite). Tabs: Paint, Palace (only if the layout has projectors), Pool, Gradient, Grace/GracePaint (only for ring layouts) |
+| `ui` | React artist UI (Vite). Built-in tabs: Paint, Pool, Gradient, Grace/GracePaint (only for ring layouts); project plugins add tabs such as Palace |
 | `cli` | The `wavegrid` command (`projects`, `start`, `server`, `receiver`, `doctor`, `signals`) |
 | `desktop` | Electron app; serves `packages/ui/dist` |
 | `doctor`, `discovery`, `settings`, `pool`, `webgl`, `debug` | Diagnostics, mDNS, the store, Pool mode, renderers, debug UI |

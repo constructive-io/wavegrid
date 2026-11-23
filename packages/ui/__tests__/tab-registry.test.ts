@@ -1,7 +1,8 @@
 import { matchesShowWhen, type ShowWhen } from '@wavegrid/animations';
 import { type Layout, presets } from '@wavegrid/layout/client';
 
-import { allTabs, tabById, tabsFor } from '../src/lib/tab-registry';
+import { coercePlugins } from '../src/lib/plugin-data';
+import { allTabs, registryFor, tabById, tabsFor } from '../src/lib/tab-registry';
 
 const grid = presets['grid-7x7']();
 const projectors = presets['interleaved-12x2']();
@@ -43,9 +44,17 @@ describe('showWhen matcher', () => {
 });
 
 describe('built-in tab registry', () => {
+  it('shows Palace only once, from the project plugin, and never as a built-in', () => {
+    const registry = registryFor(coercePlugins([{ id: 'palace', pattern: 'pattern.js', tabs: [
+      { id: 'palace', label: 'Palace', view: 'view/index.html', paint: true, showWhen: { fixtureKind: 'projector' } }
+    ] }]));
+    expect(tabById('palace')).toBeUndefined();
+    expect(tabsFor(projectors, registry).filter(tab => tab.label === 'Palace').map(tab => tab.id)).toEqual(['palace/palace']);
+    expect(tabsFor(grid, registry).some(tab => tab.label === 'Palace')).toBe(false);
+  });
   it.each([
     [grid, ['paint', 'pool', 'gradient']],
-    [projectors, ['paint', 'palace', 'pool', 'gradient']],
+    [projectors, ['paint', 'pool', 'gradient']],
     [rings, ['paint', 'pool', 'gradient', 'grace', 'gracepaint']]
   ] as const)('keeps the visible tab order for $0.id', (layout, ids) => {
     expect(tabsFor(layout).map(tab => tab.id)).toEqual(ids);
@@ -53,7 +62,7 @@ describe('built-in tab registry', () => {
 
   it('keeps all built-ins in their original order, including hidden renderers', () => {
     expect(allTabs.map(tab => [tab.id, tab.label])).toEqual([
-      ['paint', 'Paint'], ['palace', 'Palace'], ['pool', 'Pool'], ['gradient', 'Gradient'],
+      ['paint', 'Paint'], ['pool', 'Pool'], ['gradient', 'Gradient'],
       ['scenes', 'Scenes'], ['animations', 'Anim'], ['pride', 'Pride'], ['usa', 'USA'],
       ['grace', 'Grace'], ['gracepaint', 'GracePaint'], ['looks', 'Looks'],
       ['patterns', 'Patterns'], ['sequences', 'Sequences'], ['playlist', 'Playlist'],

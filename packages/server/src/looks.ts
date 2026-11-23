@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { dirname } from 'path';
 
 /**
- * A saved GracePaint state: everything the pattern needs to be recalled
+ * A saved pattern state: everything the pattern needs to be recalled
  * (gradient, motion, paint, animation). Stored on the brain so every UI sees
  * the same list; the receiver never sees Looks, only the live pattern.
  */
@@ -25,6 +25,10 @@ function isParams(p: unknown): p is Record<string, unknown> {
   return !!p && typeof p === 'object' && !Array.isArray(p);
 }
 
+function migrateParams(params: Record<string, unknown>): Record<string, unknown> {
+  return params.kind === 'palace' && params.plugin === undefined ? { ...params, plugin: 'palace/palace' } : params;
+}
+
 export class LookStore {
   private looks: Look[] = [];
 
@@ -43,7 +47,7 @@ export class LookStore {
     const look: Look = {
       id: `look-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       name: cleanName(name, `Look ${this.looks.length + 1}`),
-      params: JSON.parse(JSON.stringify(params)) as Record<string, unknown>,
+      params: migrateParams(JSON.parse(JSON.stringify(params)) as Record<string, unknown>),
       createdAt: Date.now()
     };
     this.looks.push(look);
@@ -83,15 +87,21 @@ export class LookStore {
     try {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8')) as { looks?: unknown };
       if (!Array.isArray(raw.looks)) return;
+      let migrated = false;
       this.looks = raw.looks.filter(
         (l): l is Look =>
           !!l && typeof l === 'object' && typeof (l as Look).id === 'string' && isParams((l as Look).params)
-      ).map((l) => ({
-        id: l.id,
-        name: cleanName(l.name, 'Look'),
-        params: l.params,
-        createdAt: typeof l.createdAt === 'number' ? l.createdAt : 0
-      }));
+      ).map((l) => {
+        const params = migrateParams(l.params);
+        if (params !== l.params) migrated = true;
+        return {
+          id: l.id,
+          name: cleanName(l.name, 'Look'),
+          params,
+          createdAt: typeof l.createdAt === 'number' ? l.createdAt : 0
+        };
+      });
+      if (migrated) this.persist();
     } catch (e) {
       console.error('  ◈ Looks load error:', e instanceof Error ? e.message : String(e));
     }

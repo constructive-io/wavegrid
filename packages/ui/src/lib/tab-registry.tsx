@@ -14,7 +14,6 @@ import { GraceTab, type PreviewEasing } from '@/components/grace-tab';
 import { GradientBar, useGradient } from '@/components/gradient-tab';
 import { LooksTab } from '@/components/looks-tab';
 import type { PreviewFixture } from '@/components/mini-grid-preview';
-import { PalaceTab } from '@/components/palace-tab';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
 import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
@@ -30,7 +29,6 @@ import type { RegisterPluginPaint } from '@/lib/plugin-view-bridge';
 import type { PatternState } from '@/lib/socket-state';
 import { useAudio } from '@/lib/use-audio';
 import type { GracePaintControls } from '@/lib/use-grace-paint';
-import type { PalaceControls } from '@/lib/use-palace';
 import type { Look, PlaylistState } from '@/lib/use-socket';
 
 export interface ToolContentProps {
@@ -67,7 +65,6 @@ export interface ToolContentProps {
   playlistState: PlaylistState | null;
   easing: PreviewEasing;
   gracePaint: GracePaintControls;
-  palace: PalaceControls;
   looks: Look[];
   pattern: PatternState | null;
   registerPluginPaint: RegisterPluginPaint;
@@ -97,25 +94,6 @@ export const allTabs: TabDef[] = [
         onBrushSizeChange={setBrushSize}
         onSoftEdgeChange={setSoftEdge}
         onTrailFadeChange={setTrailFade}
-        compact={isPhone}
-      />
-    )
-  },
-  {
-    id: 'palace', label: 'Palace', showWhen: { fixtureKind: 'projector' },
-    render: ({ hue, sat, bright, setHue, setSat, setBright, animSpeed, isPhone, fixtures, easing, palace, looks }) => (
-      <PalaceTab
-        controls={palace}
-        looks={looks}
-        hue={hue}
-        sat={sat}
-        bright={bright}
-        onHue={setHue}
-        onSat={setSat}
-        onBright={setBright}
-        animSpeed={animSpeed}
-        easing={easing}
-        fixtures={fixtures}
         compact={isPhone}
       />
     )

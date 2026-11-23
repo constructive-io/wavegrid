@@ -1,14 +1,6 @@
 import { GRADIENTS, PAIRS } from './grace-rings';
 
-/**
- * Palace: the show tab for the Palace of Fine Arts rig (a cannon row zippered
- * with a projector row). One receiver pattern, GracePaint's model: colour (a
- * gradient and how it flows along the line) and brightness (a motion) are
- * separate layers, every control is a pattern parameter, and touching a
- * fixture paints its hue without stopping the motion. Colour and brightness
- * only: no projector size/position/cue controls.
- */
-export const PALACE_ID = 'palace';
+/** Legacy pattern and catalogs retained for server/plugin parity tests, not the UI. */
 
 export interface PalaceFixture {
   x: number;
@@ -67,11 +59,6 @@ export const SPINS: { key: number; name: string }[] = [
 ];
 
 export type Who = 'both' | 'cannon' | 'projector';
-export const WHO: { key: Who; name: string }[] = [
-  { key: 'both', name: 'Both' },
-  { key: 'cannon', name: 'Cannons' },
-  { key: 'projector', name: 'Projectors' }
-];
 
 export interface Duo {
   name: string;
@@ -141,81 +128,8 @@ export function emptyPaint(count: number): number[] {
   return p;
 }
 
-export function hasPaint(paint: number[]): boolean {
-  for (let i = 0; i < paint.length; i += 2) if (paint[i] >= 0) return true;
-  return false;
-}
-
-export function paintFixture(paint: number[], index: number, hue: number, sat: number): number[] {
-  if (index < 0 || index * 2 >= paint.length) return paint;
-  const next = paint.slice();
-  next[index * 2] = hue;
-  next[index * 2 + 1] = sat;
-  return next;
-}
-
-/** `paint` with every fixture of `kind` set to hue/sat; others untouched. */
-export function kindPaint(paint: number[], fixtures: PalaceFixture[], kind: 'cannon' | 'projector', hue: number, sat: number): number[] {
-  let next = paint;
-  fixtures.forEach((f, i) => {
-    if ((f.kind ?? 'cannon') === kind) next = paintFixture(next, i, hue, sat);
-  });
-  return next;
-}
-
 export function defaultParams(count: number): PalaceParams {
   return { kind: 'palace', ...SCENES[0].params, level: 100, cannon: 100, projector: 100, paint: emptyPaint(count) };
-}
-
-/** Params with a scene applied: paint cleared, trims kept. */
-export function withScene(p: PalaceParams, s: Scene): PalaceParams {
-  return { ...p, ...s.params, stops: s.params.stops.map(([h, sat]) => [h, sat] as [number, number]), paint: emptyPaint(p.paint.length / 2) };
-}
-
-function sameStops(a: [number, number][], b: [number, number][]): boolean {
-  return a.length === b.length && a.every(([h, s], k) => b[k][0] === h && b[k][1] === s);
-}
-
-/** The scene the live params still equal, if any. */
-export function activeScene(p: PalaceParams): Scene | undefined {
-  if (hasPaint(p.paint)) return undefined;
-  return SCENES.find(
-    (s) =>
-      sameStops(s.params.stops, p.stops) &&
-      s.params.flow === p.flow &&
-      s.params.anim === p.anim &&
-      s.params.who === p.who &&
-      s.params.spin === p.spin &&
-      (s.params.span === p.span || !['scroll', 'mirror', 'counter', 'weave', 'pendulum', 'still'].includes(p.flow))
-  );
-}
-
-/** A Palace param set from loosely-typed JSON (the brain's `ctx.p`, a saved Look), or null. */
-export function coercePalaceParams(p: Record<string, unknown>, count: number): PalaceParams | null {
-  if (p.kind !== 'palace') return null;
-  if (typeof p.anim !== 'string' || typeof p.flow !== 'string' || !Array.isArray(p.stops)) return null;
-  const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
-  const paint = emptyPaint(count);
-  if (Array.isArray(p.paint)) for (let i = 0; i < Math.min(paint.length, p.paint.length); i++) paint[i] = num(p.paint[i], paint[i]);
-  for (let i = 0; i < paint.length; i += 2) if (paint[i] >= 360) paint[i] %= 360;
-  const who: Who = p.who === 'cannon' || p.who === 'projector' ? p.who : 'both';
-  const stops = (p.stops as unknown[]).filter(
-    (st): st is [number, number] => Array.isArray(st) && st.length >= 2 && Number.isFinite(st[0]) && Number.isFinite(st[1])
-  ).map(([h, sat]) => [h, sat] as [number, number]);
-  if (stops.length === 0) return null;
-  return {
-    kind: 'palace',
-    stops,
-    flow: p.flow,
-    span: num(p.span, 1),
-    spin: num(p.spin, 1),
-    anim: p.anim,
-    who,
-    level: num(p.level, 100),
-    cannon: num(p.cannon, 100),
-    projector: num(p.projector, 100),
-    paint
-  };
 }
 
 /**
