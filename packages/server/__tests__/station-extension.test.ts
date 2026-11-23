@@ -134,6 +134,25 @@ test('the brain extension host isolates station painting from other fixtures and
     await waitFor(() => full.state()?.stationMode === 'show');
     expect(clientB.state().stationOpen).toBe(false);
 
+    full.send({ type: 'station_mode', mode: 'mixed' });
+    await waitFor(() => clientB.state()?.stationOpen === true);
+    clientB.send({ type: 'cannon', index: 1, ...blue });
+    await waitFor(() => receiver.overlay()?.some((cell: { idx: number; h: number }) => cell.idx === 1 && cell.h === blue.h));
+    handle.send({ type: 'physical_preview', physicalIndex: 1 });
+    await waitFor(() => clientB.state()?.grid[0]?.h === 45);
+    expect(clientB.state().stationOpen).toBe(false);
+    expect(receiver.overlay()).toEqual([]);
+    full.send({ type: 'station_mode', mode: 'mixed' });
+    clientB.send({ type: 'cannon', index: 1, ...blue });
+    full.send({ type: 'system_status' });
+    await waitFor(() => full.frames.some(frame => frame.type === 'system_status'));
+    expect(clientB.state().stationOpen).toBe(false);
+    expect(receiver.overlay()).toEqual([]);
+    handle.send({ type: 'physical_preview_clear' });
+    handle.send({ type: 'calibration_mode', enabled: false });
+    full.send({ type: 'station_mode', mode: 'mixed' });
+    await waitFor(() => clientB.state()?.stationOpen === true);
+
     store.setAccessKeyEnabled('demo', 'north-key', false);
     await waitFor(() => clientA.ws.readyState === WebSocket.CLOSED);
     expect(clientB.ws.readyState).toBe(WebSocket.OPEN);

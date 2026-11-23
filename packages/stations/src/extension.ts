@@ -55,6 +55,7 @@ export function stationExtension<LayoutSpec>(
         if (!stations.length) return {};
         const policy = createStationProjectPolicy(config, layout, resolveLayout);
         const paint = new StationPaint();
+        let calibrationActive = false;
         const snapshot = () => paint.snapshot(layout.fixtures.length);
         const overlay = (): BrainMessage => ({ type: 'command', action: 'stationOverlay', cells: snapshot() });
         const publish = () => ctx.publish('receiver', overlay());
@@ -96,13 +97,17 @@ export function stationExtension<LayoutSpec>(
           },
           onOperatorMessage(message) {
             if (message.type === 'station_mode' && isStationMode(message.mode)) {
+              if (calibrationActive) return true;
               paint.setMode(message.mode);
               publish();
               return true;
             }
+            if (message.type === 'calibration_mode') calibrationActive = Boolean(message.enabled);
+            const identify = message.type === 'physical_preview' && typeof message.physicalIndex === 'number';
+            if (identify) calibrationActive = true;
             if (message.type === 'clear' || message.type === 'stopPattern' ||
-                (message.type === 'animation' && message.name === 'stop') ||
-                (message.type === 'calibration_mode' && message.enabled === true)) {
+                (message.type === 'animation' && message.name === 'stop') || identify ||
+                (message.type === 'calibration_mode' && calibrationActive)) {
               paint.stop();
               publish();
             }
