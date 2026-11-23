@@ -132,6 +132,8 @@ export function localChecks({ store, project, resolved, env = process.env, oscPr
     detail: plugins.errors.length ? plugins.errors.join('; ') : `${plugins.plugins.length} loaded`,
     ...(plugins.errors.length ? { remedy: 'fix the plugin folders and reopen the .wavegrid project file' } : {})
   });
+  for (const warning of plugins.warnings ?? []) checks.push({ name: 'Plugin audio', status: 'warn', detail: warning,
+    remedy: 'keep only one audio binding per mode across project tabs' });
   checks.push({ name: 'Layout', status: 'pass', detail: `${layout.name} (${layout.topology}, ${layout.count} cannons) · ${runMode}` });
   checks.push(checkShard(layout.count, config.receiver.shard));
 

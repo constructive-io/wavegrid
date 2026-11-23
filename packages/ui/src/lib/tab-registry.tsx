@@ -309,9 +309,14 @@ export const allTabs: TabDef[] = [
 export function registryFor(plugins: UIPlugin[]): TabDef[] {
   return [...allTabs, ...plugins.flatMap(plugin => plugin.tabs.map(tab => ({
     id: tab.id, label: tab.label, showWhen: tab.showWhen,
-    render: ({ send, pattern, onPatternSelect, layout, looks, registerPluginPaint }: ToolContentProps) => (
+    render: ({ send, pattern, onPatternSelect, layout, looks, registerPluginPaint, hue, sat, bright, setHue, setSat, setBright }: ToolContentProps) => (
       <PluginTab key={tab.id} pluginId={plugin.id} tab={tab} presetsFile={plugin.presetsFile} send={send} pattern={pattern}
-        onPatternSelect={onPatternSelect} layout={layout} looks={looks} registerPluginPaint={registerPluginPaint} />
+        onPatternSelect={onPatternSelect} layout={layout} looks={looks} registerPluginPaint={registerPluginPaint}
+        brush={{ h: hue, s: sat, b: bright }} setBrush={brush => {
+          if (brush.h !== undefined) setHue(brush.h);
+          if (brush.s !== undefined) setSat(brush.s);
+          if (brush.b !== undefined) setBright(brush.b);
+        }} />
     )
   })))];
 }

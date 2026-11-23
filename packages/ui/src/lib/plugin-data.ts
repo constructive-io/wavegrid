@@ -1,9 +1,9 @@
 import type { ShowWhen } from '@wavegrid/animations';
-import { isRecord, parsePluginControl, type PluginControl } from '@wavegrid/settings/plugin-controls';
+import { isRecord, parsePluginAudio, parsePluginControl, type PluginAudioBinding, type PluginControl } from '@wavegrid/settings/plugin-controls';
 
 export type { PluginControl } from '@wavegrid/settings/plugin-controls';
 export interface PluginCard { title: string; controls: PluginControl[] }
-export interface PluginTabData { id: string; label: string; showWhen: ShowWhen; pattern?: string; view?: string; paint?: boolean; cards: PluginCard[] }
+export interface PluginTabData { id: string; label: string; showWhen: ShowWhen; pattern?: string; view?: string; paint?: boolean; audio?: PluginAudioBinding; cards: PluginCard[] }
 export interface UIPlugin { id: string; name: string; tabs: PluginTabData[]; presetsFile?: string }
 
 function assetPath(raw: unknown): string | undefined {
@@ -40,6 +40,7 @@ export function coerceCards(raw: unknown): PluginCard[] {
 export function coercePlugins(raw: unknown): UIPlugin[] {
   if (!Array.isArray(raw)) return [];
   const ids = new Set<string>();
+  const audioModes = new Set<string>();
   return raw.flatMap(plugin => {
     if (!isRecord(plugin) || typeof plugin.id !== 'string' || !/^[\w.-]+$/.test(plugin.id) ||
       plugin.id === '.' || plugin.id === '..' || !Array.isArray(plugin.tabs)) return [];
@@ -49,7 +50,11 @@ export function coercePlugins(raw: unknown): UIPlugin[] {
       const tabId = tab.id.startsWith(id + '/') ? tab.id : `${id}/${tab.id}`;
       if (ids.has(tabId)) return [];
       ids.add(tabId);
+      const audio = parsePluginAudio(tab.audio);
+      const useAudio = audio && !audioModes.has(audio.mode);
+      if (useAudio) audioModes.add(audio.mode);
       return [{ id: tabId, label: tab.label, showWhen: condition(tab.showWhen),
+        ...(useAudio ? { audio } : {}),
         view: assetPath(tab.view), paint: tab.paint === true,
         pattern: assetPath(tab.pattern ?? plugin.pattern), cards: coerceCards(tab.cards) }];
     });

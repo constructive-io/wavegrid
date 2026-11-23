@@ -21,6 +21,7 @@ import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
 import { type GracePaintControls, useGracePaint } from '@/lib/use-grace-paint';
 import { useIsPhone } from '@/lib/use-media-query';
+import { usePluginAudio } from '@/lib/use-plugin-audio';
 import { useSocket } from '@/lib/use-socket';
 
 // Stands in only until /api/config answers, and matches useConfig's own fallback.
@@ -386,13 +387,17 @@ export default function Home() {
 
   // Grace Audio steers GracePaint's colour; the pattern hook is created below.
   const gracePaintRef = useRef<GracePaintControls | null>(null);
+  const pluginAudioRef = useRef<((out: GraceAudioOutput) => boolean) | null>(null);
   const onGraceAudio = useCallback((out: GraceAudioOutput) => {
+    const pluginHandled = pluginAudioRef.current?.(out) ?? false;
     const gp = gracePaintRef.current;
     if (!gp) return;
     gp.setColourShift(out.hueShift, out.satShift);
-    if (out.step) gp.nextGradient();
+    if (out.step && !pluginHandled) gp.nextGradient();
   }, []);
   const audio = useAudio(NUM_CANNONS, GRID_COLUMNS, gridData, send, smoothness, onGraceAudio);
+  const pluginAudio = usePluginAudio(config?.plugins, pattern, send, audio.mode, audio.state.playing || audio.state.micActive);
+  pluginAudioRef.current = pluginAudio;
   const { addDrop } = useDrops(NUM_CANNONS, GRID_COLUMNS, dropsConfig, send);
   const motion = useMotion(hue, sat, bright, send);
   const gradient = useGradient();

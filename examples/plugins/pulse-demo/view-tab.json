@@ -2,5 +2,10 @@
   "id": "view",
   "label": "Pulse View",
   "view": "view.html",
-  "paint": true
+  "paint": true,
+  "audio": {
+    "mode": "grace",
+    "params": { "hueShift": "hueShift", "satShift": "satShift" },
+    "step": { "param": "stops", "values": { "file": "gradients.json", "key": "stops" }, "set": { "paint": [] } }
+  }
 }

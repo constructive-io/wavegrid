@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { projectDir, type StorePaths, writeFileAtomic } from './paths';
-import { parsePluginControl, type PluginControl } from './plugin-controls';
+import { parsePluginAudio, parsePluginAudioValues, parsePluginControl, type PluginAudioBinding, type PluginControl } from './plugin-controls';
 import { isProjectName } from './projects';
 
 export const WAVEGRID_RUNTIME_VERSION = '0.5.0';
@@ -21,6 +21,7 @@ export interface PluginTab {
   pattern?: string;
   view?: string;
   paint?: boolean;
+  audio?: PluginAudioBinding;
 }
 export interface ProjectPlugin {
   id: string;
@@ -180,6 +181,10 @@ export function validatePlugin(ref: PortablePlugin): PluginSnapshot {
         throw new Error(`Tab ${tab.id} view must end in lowercase .html`);
       }
       const view = tab.view === undefined ? undefined : requireFile(tab.view);
+      const audio = tab.audio === undefined ? undefined : parsePluginAudio(tab.audio);
+      if (audio === null) throw new Error(`Tab ${tab.id} has an invalid audio binding`);
+      if (audio && tab.pattern === undefined && pattern === undefined) throw new Error(`Tab ${tab.id} audio needs a pattern`);
+      if (audio?.step) parsePluginAudioValues(json(audio.step.values.file), audio.step.values.key);
       const paint = tab.paint;
       if (paint !== undefined && typeof paint !== 'boolean') throw new Error(`Tab ${tab.id} paint must be a boolean`);
       if (tab.cards === undefined && view === undefined) throw new Error(`Tab ${tab.id} needs cards or a view`);
@@ -202,6 +207,7 @@ export function validatePlugin(ref: PortablePlugin): PluginSnapshot {
       });
       return { id: tab.id, label: tab.label, showWhen: condition, cards,
         ...(view === undefined ? {} : { view }), ...(typeof paint === 'boolean' ? { paint } : {}),
+        ...(audio === undefined ? {} : { audio }),
         ...(tab.pattern !== undefined || pattern !== undefined ? { pattern: tab.pattern === undefined ? pattern : requireFile(tab.pattern) } : {}) };
     });
     if (tab) tabs.push(tab);
@@ -347,9 +353,19 @@ export function storedPluginSnapshots(paths: StorePaths, project: string): { sna
   return { snapshots, errors };
 }
 
-export function loadProjectPlugins(paths: StorePaths, project: string): { plugins: ProjectPlugin[]; errors: string[] } {
+export function loadProjectPlugins(paths: StorePaths, project: string): { plugins: ProjectPlugin[]; errors: string[]; warnings?: string[] } {
   const { snapshots, errors } = storedPluginSnapshots(paths, project);
-  return { plugins: snapshots.map(s => s.plugin), errors };
+  const modes = new Map<string, string>(), warnings: string[] = [];
+  const plugins = snapshots.map(({ plugin }) => ({ ...plugin, tabs: plugin.tabs.map(tab => {
+    if (!tab.audio) return tab;
+    const first = modes.get(tab.audio.mode), owner = `${plugin.id}/${tab.id}`;
+    if (!first) { modes.set(tab.audio.mode, owner); return tab; }
+    warnings.push(`Audio mode ${tab.audio.mode}: ignoring ${owner}; first binding ${first} wins`);
+    const rest = { ...tab };
+    delete rest.audio;
+    return rest;
+  }) }));
+  return { plugins, errors, ...(warnings.length ? { warnings } : {}) };
 }
 
 export function readProjectPluginFile(paths: StorePaths, project: string, id: string, file: string): Buffer | null {

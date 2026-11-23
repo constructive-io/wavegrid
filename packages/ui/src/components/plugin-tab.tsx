@@ -1,7 +1,7 @@
 import type { Layout } from '@wavegrid/layout/client';
 
 import { coercePluginParams, type PluginTabData } from '@/lib/plugin-data';
-import type { RegisterPluginPaint } from '@/lib/plugin-view-bridge';
+import type { PluginBrush, RegisterPluginPaint } from '@/lib/plugin-view-bridge';
 import type { Look, PatternState } from '@/lib/socket-state';
 import { usePluginPattern } from '@/lib/use-plugin-pattern';
 
@@ -11,7 +11,7 @@ import { PluginView } from './plugin-view';
 
 const BUTTON = { background: '#12121a', border: '1px solid #292938', borderRadius: 8, padding: '8px 12px', color: '#d0d0df', fontSize: 13 };
 
-export function PluginTab({ pluginId, tab, presetsFile, send, pattern, onPatternSelect, layout, looks, registerPluginPaint }: {
+export function PluginTab({ pluginId, tab, presetsFile, send, pattern, onPatternSelect, layout, looks, registerPluginPaint, brush, setBrush }: {
   pluginId: string;
   tab: PluginTabData;
   presetsFile?: string;
@@ -21,6 +21,8 @@ export function PluginTab({ pluginId, tab, presetsFile, send, pattern, onPattern
   layout: Layout;
   looks: Look[];
   registerPluginPaint: RegisterPluginPaint;
+  brush: PluginBrush;
+  setBrush: (brush: Partial<PluginBrush>) => void;
 }) {
   const state = usePluginPattern(pluginId, tab, presetsFile, send, pattern, onPatternSelect);
   const displayed = coercePluginParams(tab.cards.flatMap(card => card.controls), state.params);
@@ -31,7 +33,7 @@ export function PluginTab({ pluginId, tab, presetsFile, send, pattern, onPattern
       </p>
       {state.errors.map(error => <p key={error} role="alert" className="text-sm" style={{ color: '#ff8888' }}>{error}</p>)}
       {tab.view && <PluginView pluginId={pluginId} tab={tab} layout={layout} looks={looks} pattern={pattern}
-        state={state} send={send} registerPluginPaint={registerPluginPaint} />}
+        state={state} send={send} registerPluginPaint={registerPluginPaint} brush={brush} setBrush={setBrush} />}
       <ControlGrid minCellWidth={260} gap={16}>
         {tab.cards.map((card, index) => (
           <fieldset key={index} disabled={!state.ready} className="space-y-3 rounded-xl p-4" style={{ background: '#101018', border: '1px solid #1a1a25', minWidth: 0 }}>
