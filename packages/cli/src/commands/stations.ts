@@ -3,7 +3,13 @@ import { stationLayoutKey, validateStations } from '@wavegrid/stations';
 
 import { type Flags, getStore, resolveProjectName } from '../project';
 
+const USAGE = 'Usage: wavegrid stations list|disable|remove <slug>|add|set <slug> <zero-based-index,...> ["name"]';
+
 export function runStations(args: string[], flags: Flags): void {
+  if (flags.help || flags.h) {
+    console.log(USAGE);
+    return;
+  }
   const store = getStore();
   const project = resolveProjectName(store, flags);
   const config = store.getProjectConfig(project) ?? {};
@@ -21,7 +27,7 @@ export function runStations(args: string[], flags: Flags): void {
     return;
   }
   if (!slug || !['add', 'set', 'remove'].includes(verb)) {
-    throw new Error('Usage: wavegrid stations list|disable|remove <slug>|add|set <slug> <zero-based-index,...> ["name"]');
+    throw new Error(USAGE);
   }
   const old = existing.find(station => station.slug === slug);
   if (verb === 'add' && old) throw new Error(`Station "${slug}" already exists.`);
