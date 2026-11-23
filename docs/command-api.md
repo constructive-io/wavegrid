@@ -193,6 +193,7 @@ The sandbox assigns the result of `evalCode(code)` to `__pattern`, so as long as
 | `ctx.index(x, y)` | `number` | Cell index for column/row |
 | `ctx.uv(i)` | `[u, v]` | Normalized 0-1 coordinates |
 | `ctx.polar(i)` | `[r, theta]` | Polar coords from grid center (r normalized 0-1) |
+| `ctx.kind(i)` | `'cannon'` or `'projector'` | Fixture kind from the resolved layout; missing kinds and out-of-range indices return `'cannon'` |
 
 #### Color Output (HSB)
 

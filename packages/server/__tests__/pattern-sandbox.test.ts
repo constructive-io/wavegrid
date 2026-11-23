@@ -54,6 +54,21 @@ describe('QuickJS brain preview', () => {
     } finally { receiver.dispose(); }
   });
 
+  it('matches receiver fixture kinds on the interleaved layout', async () => {
+    const receiver = await createSandboxEngine(layout);
+    const code = `({ render(ctx) {
+      for (var i = 0; i < ctx.count; i++) ctx.set(i, ctx.kind(i) === 'projector' ? 240 : 120, 100, 80);
+    } })`;
+    try {
+      expect(engine.load(code)).toBe(true);
+      receiver.loadPattern(code);
+      const grid = layout.fixtures.map(() => ({ h: 0, s: 0, b: 0 }));
+      expect(engine.render(grid)).toBe(true);
+      expect(grid).toEqual(receiver.renderFrame(0, 0, 1));
+      expect(grid).toEqual(layout.fixtures.map(f => ({ h: f.kind === 'projector' ? 240 : 120, s: 100, b: 80 })));
+    } finally { receiver.dispose(); }
+  });
+
   it('isolates host globals in the brain too', () => {
     expect(engine.load(`({ render(ctx) {
       var g = Function('return this')();
