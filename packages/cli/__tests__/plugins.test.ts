@@ -61,6 +61,10 @@ it('dispatches the command and retains existing plugin references', async () => 
   expect(document().plugins).toEqual([{ path: 'plugins/first' }, { path: 'plugins/second' }]);
   getStore().openProjectFile(file, document());
   expect(loadProjectPlugins(getStore().paths, 'venue').plugins.map(plugin => plugin.id)).toEqual(['first', 'second']);
+  const source = (id: string) => readFileSync(join(root, `plugins/${id}/pattern.js`), 'utf8');
+  expect(source('first')).not.toBe(source('second'));
+  expect(vm.runInNewContext(source('first')).meta.name).toBe('first');
+  expect(vm.runInNewContext(source('second')).meta.name).toBe('second');
 });
 
 it('uses the active project linked file when --project is omitted', () => {

@@ -1,4 +1,5 @@
 ({
+  meta: { name: __PLUGIN_ID__ },
   render(ctx) {
     const p = ctx.p;
     const hue = ((p.hue ?? 210) + (p.hueShift || 0) + 360) % 360;

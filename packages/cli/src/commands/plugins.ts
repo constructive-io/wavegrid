@@ -22,7 +22,7 @@ export function runPluginsNew(flags: Flags, id: string | undefined): void {
     const contents: Record<string, string> = {
       'plugin.json': JSON.stringify(manifest, null, 2) + '\n',
       'tab.json': '',
-      'pattern.js': template('pattern.js.tpl'),
+      'pattern.js': template('pattern.js.tpl').replace('__PLUGIN_ID__', () => JSON.stringify(id)),
       'presets.json': template('presets.json')
     };
     if (flags.view === true) {
