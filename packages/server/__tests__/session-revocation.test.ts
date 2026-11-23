@@ -148,6 +148,32 @@ describe('session revocation', () => {
     expect(closed?.code).toBe(4001);
   });
 
+  it.each(['admin API', 'shared store'])('re-minting a plain key through the %s revokes its live session', async (source) => {
+    const store = openStore();
+    const { passphrase } = store.mintAccessKey('demo', 'crew');
+    const token = await login('crew', passphrase);
+    const client = await connect(port, token);
+
+    let replacement: string;
+    if (source === 'admin API') {
+      const admin = await login('boss', 'bosspw');
+      const res = await fetch(`${base}/api/admin/keys`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${admin}` },
+        body: JSON.stringify({ name: 'crew' })
+      });
+      expect(res.status).toBe(200);
+      replacement = (await res.json()).passphrase;
+    } else {
+      replacement = openStore().mintAccessKey('demo', 'crew').passphrase;
+    }
+
+    expect((await closeWithin(client, 500))?.code).toBe(4001);
+    expect((await fetch(`${base}/api/me`, { headers: { Authorization: `Bearer ${token}` } })).status).toBe(401);
+    const newToken = await login('crew', replacement);
+    expect((await fetch(`${base}/api/me`, { headers: { Authorization: `Bearer ${newToken}` } })).status).toBe(200);
+  });
+
   it('signing out ends the session, so the token is dead everywhere', async () => {
     const token = await login('alice', 'alicepw');
     const client = await connect(port, token);

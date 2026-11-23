@@ -285,7 +285,7 @@ export function openStore(opts: StoreOptions = {}): SettingsStore {
       }
       const existing = listAccessKeys(paths, project).find((key) => key.name === name);
       const minted = mintAccessKey(paths, project, name, role, station);
-      if (existing?.station !== minted.key.station || existing?.station !== undefined) {
+      if (existing || minted.key.station !== undefined) {
         revokeUserSessions(paths, project, name);
       }
       return minted;

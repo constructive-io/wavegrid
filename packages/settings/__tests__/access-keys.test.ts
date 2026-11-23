@@ -75,6 +75,13 @@ describe('access keys', () => {
     expect(store.authenticateAccessKey('show', admin.passphrase)?.role).toBe('admin');
   });
 
+  it.each([undefined, 'north'])('re-minting revokes sessions for a key with station %s', station => {
+    store.mintAccessKey('show', 'crew', 'operator', station);
+    const session = store.createSession('show', { username: 'crew', role: 'operator', station });
+    expect(store.mintAccessKey('show', 'crew').key.station).toBe(station);
+    expect(store.getSession('show', session.id)).toBeNull();
+  });
+
   it('preserves station grants when re-minting and revokes sessions on reassignment or disable', () => {
     const { passphrase } = store.mintAccessKey('show', 'crew', 'operator', 'north');
     expect(store.authenticateAccessKey('show', passphrase)).toEqual({
