@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse View</title>
+<style>
+  :root { color-scheme: dark; font: 13px system-ui, sans-serif; color: #d0d0df; background: #101018; }
+  body { margin: 0; padding: 14px; }
+  h2 { margin: 0 0 8px; font-size: 16px; }
+  button, input[type=text] { background: #191924; color: inherit; border: 1px solid #35354a; border-radius: 7px; padding: 7px 10px; }
+  button { cursor: pointer; }
+  label { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
+  input[type=range] { flex: 1; min-width: 0; accent-color: #4a7cff; }
+  #fixtures { display: flex; flex-wrap: wrap; gap: 4px; margin: 12px 0; }
+  .fixture { width: 20px; height: 20px; border-radius: 50%; background: #294582; }
+  .projector { border-radius: 3px; }
+  #status, #paint { color: #a1b8ed; }
+  #looks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  #look-name { width: 105px; }
+</style>
+<h2>Pulse iframe view</h2>
+<p id="status">Waiting for init…</p>
+<div id="fixtures" aria-label="Fixture swatches"></div>
+<label>Speed <input id="speed" aria-label="View speed" type="range" min="0.1" max="4" step="0.1" value="1"><output id="speed-value">1</output></label>
+<p><button id="start">Start</button> <button id="stop">Stop</button></p>
+<p id="paint">Touch the main grid to send paint here.</p>
+<label>Look <input id="look-name" type="text" value="View look" aria-label="Look name"><button id="save">Save look</button></label>
+<div id="looks"></div>
+<script>
+  const $ = id => document.getElementById(id);
+  let params = { speed: 1, hue: 210, enabled: true, mode: 'Hue', tint: '#ff6633' };
+  let scope = '', count = 0;
+  const send = (type, data = {}) => parent.postMessage({ wg: 1, type, ...data }, '*');
+  function state(pattern) {
+    params = { ...params, ...pattern.params };
+    $('speed').value = params.speed;
+    $('speed-value').textContent = params.speed;
+    $('status').textContent = `Init received: ${count} fixtures · ${scope} · ${pattern.running ? 'Running' : 'Ready'}`;
+  }
+  function showLooks(looks) {
+    $('looks').replaceChildren();
+    for (const look of looks) {
+      const button = document.createElement('button');
+      button.textContent = look.name;
+      button.title = look.params.plugin;
+      button.onclick = () => send('setParams', { params: look.params });
+      $('looks').append(button);
+    }
+  }
+  addEventListener('message', event => {
+    if (event.source !== parent || event.data?.wg !== 1) return;
+    const message = event.data;
+    if (message.type === 'init') {
+      scope = message.tabId;
+      count = message.layout.count;
+      $('fixtures').replaceChildren(...message.layout.fixtures.map(fixture => {
+        const swatch = document.createElement('span');
+        swatch.className = `fixture ${fixture.kind}`;
+        swatch.title = `${fixture.index}: ${fixture.kind}`;
+        return swatch;
+      }));
+      state(message.pattern);
+      showLooks(message.looks);
+      send('resize', { height: 420 });
+    } else if (message.type === 'state') state(message);
+    else if (message.type === 'looks') showLooks(message.looks);
+    else if (message.type === 'paint') {
+      console.log('Plugin paint received', message);
+      $('paint').textContent = `Paint received: fixture ${message.index}, H ${message.h}, S ${message.s}, B ${message.b}`;
+      const swatch = $('fixtures').children[message.index];
+      if (swatch) swatch.style.background = `hsl(${message.h} ${message.s}% 55%)`;
+    }
+  });
+  $('speed').oninput = () => {
+    params.speed = Number($('speed').value);
+    $('speed-value').textContent = params.speed;
+    send('setParams', { params: { ...params, speed: params.speed } });
+  };
+  $('start').onclick = () => send('start', { params });
+  $('stop').onclick = () => send('stop');
+  $('save').onclick = () => send('saveLook', { name: $('look-name').value, params });
+</script>
+</html>

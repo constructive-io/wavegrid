@@ -272,7 +272,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
     const method = (req.method || 'GET').toUpperCase();
     const rawPath = (req.url || '/').split('?')[0];
     if (rawPath.startsWith('/plugins/') || pathname.startsWith('/plugins/')) {
-      res.setHeader('Content-Security-Policy', 'sandbox allow-scripts');
+      res.setHeader('Content-Security-Policy', "sandbox allow-scripts; form-action 'none'");
       let contents: Buffer | null = null;
       let file = '';
       try {

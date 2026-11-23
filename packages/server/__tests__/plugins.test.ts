@@ -18,7 +18,7 @@ describe('project plugin HTTP surface', () => {
     fs.mkdirSync(source);
     const files: Record<string, string | Buffer> = {
       'plugin.json': JSON.stringify({ id: 'demo', name: 'Demo', version: '1.0.0', apiVersion: 1, tabs: ['tab.json'], pattern: 'pattern.js' }),
-      'tab.json': JSON.stringify({ id: 'paint', label: 'Plugin paint', cards: [] }),
+      'tab.json': JSON.stringify({ id: 'paint', label: 'Plugin paint', cards: [], view: 'page.html', paint: true }),
       'pattern.js': 'globalThis.__pluginHostExecution = true; throw new Error("do not evaluate");',
       'page.html': '<h1>Plugin</h1>', 'style.css': 'body{}', 'image.svg': '<svg/>', 'image.png': Buffer.from([0, 255, 128])
     };
@@ -44,7 +44,7 @@ describe('project plugin HTTP surface', () => {
     expect(res.status).toBe(200);
     expect((await res.json()).plugins).toEqual([{
       id: 'demo', name: 'Demo', version: '1.0.0',
-      tabs: [{ id: 'demo/paint', label: 'Plugin paint', showWhen: 'always', cards: [], pattern: 'pattern.js' }]
+      tabs: [{ id: 'demo/paint', label: 'Plugin paint', showWhen: 'always', cards: [], pattern: 'pattern.js', view: 'page.html', paint: true }]
     }]);
     expect((globalThis as Record<string, unknown>).__pluginHostExecution).toBeUndefined();
   });
@@ -57,7 +57,7 @@ describe('project plugin HTTP surface', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain(type);
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
-    expect(res.headers.get('content-security-policy')).toBe('sandbox allow-scripts');
+    expect(res.headers.get('content-security-policy')).toBe("sandbox allow-scripts; form-action 'none'");
     expect(Buffer.from(await res.arrayBuffer())).toEqual(fs.readFileSync(path.join(copy, file)));
   });
 
@@ -69,7 +69,7 @@ describe('project plugin HTTP surface', () => {
     // http.request keeps dot segments intact; fetch/URL normalizes them before sending.
     const status = await new Promise<number | undefined>((resolve, reject) => {
       const req = http.get(base, { path: file }, res => {
-        expect(res.headers['content-security-policy']).toBe('sandbox allow-scripts');
+        expect(res.headers['content-security-policy']).toBe("sandbox allow-scripts; form-action 'none'");
         res.resume();
         resolve(res.statusCode);
       });
@@ -81,7 +81,7 @@ describe('project plugin HTTP surface', () => {
   it.each(['HEAD', 'POST'])('sandboxes %s plugin responses too', async method => {
     const res = await fetch(`${base}/plugins/demo/page.html`, { method });
     expect(res.status).toBe(method === 'HEAD' ? 200 : 404);
-    expect(res.headers.get('content-security-policy')).toBe('sandbox allow-scripts');
+    expect(res.headers.get('content-security-policy')).toBe("sandbox allow-scripts; form-action 'none'");
   });
 
   (process.platform === 'win32' ? it.skip : it)('refuses symlink files added to a store copy after startup', async () => {

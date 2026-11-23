@@ -26,6 +26,7 @@ import { ShiftDial } from '@/components/shift-dial';
 import { UsaTab } from '@/components/usa-tab';
 import { VideoTab } from '@/components/video-tab';
 import type { UIPlugin } from '@/lib/plugin-data';
+import type { RegisterPluginPaint } from '@/lib/plugin-view-bridge';
 import type { PatternState } from '@/lib/socket-state';
 import { useAudio } from '@/lib/use-audio';
 import type { GracePaintControls } from '@/lib/use-grace-paint';
@@ -69,6 +70,7 @@ export interface ToolContentProps {
   palace: PalaceControls;
   looks: Look[];
   pattern: PatternState | null;
+  registerPluginPaint: RegisterPluginPaint;
 }
 
 export interface TabDef {
@@ -357,8 +359,9 @@ export const allTabs: TabDef[] = [
 export function registryFor(plugins: UIPlugin[]): TabDef[] {
   return [...allTabs, ...plugins.flatMap(plugin => plugin.tabs.map(tab => ({
     id: tab.id, label: tab.label, showWhen: tab.showWhen,
-    render: ({ send, pattern, onPatternSelect }: ToolContentProps) => (
-      <PluginTab key={tab.id} pluginId={plugin.id} tab={tab} presetsFile={plugin.presetsFile} send={send} pattern={pattern} onPatternSelect={onPatternSelect} />
+    render: ({ send, pattern, onPatternSelect, layout, looks, registerPluginPaint }: ToolContentProps) => (
+      <PluginTab key={tab.id} pluginId={plugin.id} tab={tab} presetsFile={plugin.presetsFile} send={send} pattern={pattern}
+        onPatternSelect={onPatternSelect} layout={layout} looks={looks} registerPluginPaint={registerPluginPaint} />
     )
   })))];
 }
