@@ -193,7 +193,7 @@ export function AudioTab({ audio }: AudioTabProps) {
         {audio.mode === 'grace' ? (
           <div className="flex flex-col gap-2">
             <p className="text-xs" style={{ color: 'rgba(136,136,152,0.7)' }}>
-              Grace steers the colour of the running GracePaint look; brightness stays with its animation.
+              Grace steers the running plugin pattern through its audio binding; brightness stays with its animation.
             </p>
             <div className="flex gap-2 flex-wrap">
               {([

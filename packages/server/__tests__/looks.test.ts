@@ -16,7 +16,7 @@ describe('LookStore', () => {
     const store = new LookStore(file);
     const look = store.save('', params)!;
     expect(look.name).toBe('Look 1');
-    expect(look.params).toEqual(params);
+    expect(look.params).toEqual({ ...params, plugin: 'grace/gracepaint' });
     expect(look.params).not.toBe(params);
     expect(store.list()).toHaveLength(1);
     expect(fs.existsSync(file)).toBe(true);
@@ -77,7 +77,7 @@ describe('LookStore', () => {
     const entries = [
       { id: 'old', name: 'Legacy Palace', params: legacy, createdAt: 123 },
       { id: 'scoped', name: 'Other scope', params: { ...legacy, plugin: 'other/tab' }, createdAt: 456 },
-      { id: 'grace', name: 'Grace', params, createdAt: 789 }
+      { id: 'custom', name: 'Custom', params: { ...params, kind: 'custom' }, createdAt: 789 }
     ];
     fs.writeFileSync(file, JSON.stringify({ looks: entries }));
     const store = new LookStore(file);
@@ -98,7 +98,7 @@ describe('LookStore', () => {
     for (const plugin of ['palace/palace', 'other/tab', '', null]) {
       expect(store.save('Scoped', { ...legacy, plugin })?.params.plugin).toBe(plugin);
     }
-    expect(store.save('Grace', params)?.params).toEqual(params);
+    expect(store.save('Other', { anim: 'custom' })?.params).toEqual({ anim: 'custom' });
   });
 
   it('changes only legacy params.plugin bytes, preserving long names, raw records and document metadata', () => {
@@ -128,6 +128,95 @@ describe('LookStore', () => {
     expect(new LookStore(file).list()).toEqual(store.list());
     expect(fs.readFileSync(file, 'utf8')).toBe(expected);
     expect(fs.statSync(file).mtimeMs).toBe(1234000);
+  });
+
+  it('migrates mixed GracePaint and Palace records atomically, preserving all other raw bytes, once', () => {
+    const file = join(dir, 'looks.json');
+    const grace = String.raw`{ "anim":"unknown", "flow":"", "stops":[[1e2, 50]], "paint":[12], "extra":"\u0061 }" }`;
+    const palace = '{ "kind":"palace", "paint":[1e2, 50] }';
+    const source = `{
+  "revision": 1e+3,
+  "looks": [
+    {"id":"grace", "name":"Legacy", "params":${grace}, "createdAt":123, "extra":true},
+    {"id":"palace", "name":"Palace", "params":${palace}, "createdAt":456},
+    {"id":"scoped", "params":{"plugin":"other/tab","anim":"still","flow":"cw","stops":[],"paint":[]}},
+    null, {"id":5,"params":${grace}}
+  ],
+  "metadata": {"params":${grace}}
+}\n`;
+    const expected = source.replace(grace, `${grace.slice(0, -1)},"plugin":"grace/gracepaint"}`)
+      .replace(palace, `${palace.slice(0, -1)},"plugin":"palace/palace"}`);
+    fs.writeFileSync(file, source);
+    const original = fs.renameSync;
+    const rename = jest.spyOn(fs, 'renameSync').mockImplementation((temporary, target) => {
+      expect(dirname(String(temporary))).toBe(dirname(file));
+      expect(target).toBe(file);
+      expect(fs.readFileSync(file, 'utf8')).toBe(source);
+      expect(fs.readFileSync(temporary, 'utf8')).toBe(expected);
+      original(temporary, target);
+    });
+    try {
+      const store = new LookStore(file);
+      expect(rename).toHaveBeenCalledTimes(1);
+      expect(fs.readFileSync(file, 'utf8')).toBe(expected);
+      expect(store.list().map(l => l.params.plugin)).toEqual(['grace/gracepaint', 'palace/palace', 'other/tab']);
+      expect(store.list()[0]).toEqual({ id: 'grace', name: 'Legacy', params: { ...JSON.parse(grace), plugin: 'grace/gracepaint' }, createdAt: 123 });
+      expect(fs.readdirSync(dir)).toEqual(['looks.json']);
+      fs.utimesSync(file, 1234, 1234);
+      expect(new LookStore(file).list()).toEqual(store.list());
+      expect(rename).toHaveBeenCalledTimes(1);
+      expect(fs.readFileSync(file, 'utf8')).toBe(expected);
+      expect(fs.statSync(file).mtimeMs).toBe(1234000);
+    } finally { rename.mockRestore(); }
+  });
+
+  it('leaves already-scoped GracePaint Looks and every near-miss unchanged', () => {
+    const file = join(dir, 'looks.json');
+    const untouched: Record<string, unknown>[] = [
+      ...['grace/gracepaint', 'palace/palace', 'other/tab', '', null].map(plugin => ({ ...params, plugin })),
+      ...['other', '', null].map(kind => ({ ...params, kind })),
+      {}, { anim: 'still' }
+    ];
+    for (const key of ['anim', 'flow', 'stops', 'paint']) {
+      const missing: Record<string, unknown> = { ...params };
+      delete missing[key];
+      untouched.push(missing, { ...params, [key]: null }, { ...params, [key]: 123 });
+    }
+    const looks = untouched.map((p, i) => ({ id: `l${i}`, name: `Keep ${i}`, params: p, createdAt: i }));
+    const source = JSON.stringify({ looks }, null, 3);
+    fs.writeFileSync(file, source);
+    fs.utimesSync(file, 1234, 1234);
+    expect(new LookStore(file).list()).toEqual(looks);
+    expect(fs.readFileSync(file, 'utf8')).toBe(source);
+    expect(fs.statSync(file).mtimeMs).toBe(1234000);
+  });
+
+  it('scopes new unscoped GracePaint saves, accepting empty arrays and any paint length without mutating callers', () => {
+    const store = new LookStore(null);
+    const cases: Partial<typeof params>[] = [params, { anim: '', flow: '', stops: [], paint: [] }, { ...params, paint: [1] }];
+    for (const p of cases) {
+      expect(store.save('Legacy', p)?.params).toEqual({ ...p, plugin: 'grace/gracepaint' });
+      expect(p).not.toHaveProperty('plugin');
+    }
+  });
+
+  it.each(['write', 'rename'])('preserves the legacy file on migration %s failure and retries on next load', step => {
+    const file = join(dir, 'looks.json');
+    const source = JSON.stringify({ looks: [{ id: 'legacy', name: 'Legacy', params, createdAt: 1 }] });
+    fs.writeFileSync(file, source);
+    const original = fs.writeFileSync;
+    const failure = step === 'write'
+      ? jest.spyOn(fs, 'writeFileSync').mockImplementation(temporary => { original(temporary, 'partial'); throw new Error('disk full'); })
+      : jest.spyOn(fs, 'renameSync').mockImplementation(() => { throw new Error('rename denied'); });
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      new LookStore(file);
+      expect(fs.readFileSync(file, 'utf8')).toBe(source);
+      expect(fs.readdirSync(dir)).toEqual(['looks.json']);
+      expect(error).toHaveBeenCalled();
+    } finally { failure.mockRestore(); error.mockRestore(); }
+    expect(new LookStore(file).list()[0].params).toEqual({ ...params, plugin: 'grace/gracepaint' });
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).looks[0].params.plugin).toBe('grace/gracepaint');
   });
 
   it.each(['{"looks":[]}', '{"looks":[{"id":"other","params":{}}]}'])('does not rewrite a file without legacy Looks: %s', source => {

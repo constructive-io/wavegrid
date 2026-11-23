@@ -9,9 +9,7 @@ import { ColorWheel } from '@/components/color-wheel';
 import { ControlGrid, ControlGroup } from '@/components/control-grid';
 import { DropsControls } from '@/components/drops-tab';
 import { FlagsTab, useFlagAnimation } from '@/components/flags-tab';
-import { GracePaintTab } from '@/components/grace-paint-tab';
 import { GradientBar, useGradient } from '@/components/gradient-tab';
-import { LooksTab } from '@/components/looks-tab';
 import type { PreviewEasing, PreviewFixture } from '@/components/mini-grid-preview';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
 import { PatternsTab } from '@/components/patterns-tab';
@@ -26,7 +24,6 @@ import type { UIPlugin } from '@/lib/plugin-data';
 import type { RegisterPluginPaint } from '@/lib/plugin-view-bridge';
 import type { PatternState } from '@/lib/socket-state';
 import { useAudio } from '@/lib/use-audio';
-import type { GracePaintControls } from '@/lib/use-grace-paint';
 import type { Look, PlaylistState } from '@/lib/use-socket';
 
 export interface ToolContentProps {
@@ -62,7 +59,6 @@ export interface ToolContentProps {
   onPatternSelect: (id: string) => void;
   playlistState: PlaylistState | null;
   easing: PreviewEasing;
-  gracePaint: GracePaintControls;
   looks: Look[];
   pattern: PatternState | null;
   registerPluginPaint: RegisterPluginPaint;
@@ -214,40 +210,6 @@ export const allTabs: TabDef[] = [
         onPatternSelect={onPatternSelect}
         animSpeed={animSpeed}
         onAnimSpeed={onAnimSpeed}
-      />
-    )
-  },
-  {
-    id: 'gracepaint', label: 'GracePaint', showWhen: { topology: 'rings' },
-    render: ({ hue, sat, bright, setHue, setSat, setBright, animSpeed, isPhone, fixtures, easing, gracePaint }) => (
-      <GracePaintTab
-        controls={gracePaint}
-        hue={hue}
-        sat={sat}
-        bright={bright}
-        onHue={setHue}
-        onSat={setSat}
-        onBright={setBright}
-        animSpeed={animSpeed}
-        easing={easing}
-        fixtures={fixtures}
-        compact={isPhone}
-      />
-    )
-  },
-  {
-    id: 'looks', label: 'Looks', showWhen: 'never',
-    render: ({ animSpeed, fixtures, easing, gracePaint, looks }) => (
-      <LooksTab
-        looks={looks}
-        current={gracePaint.params}
-        speed={animSpeed}
-        easing={easing}
-        fixtures={fixtures}
-        onSave={gracePaint.saveLook}
-        onApply={gracePaint.applyLook}
-        onRename={gracePaint.renameLook}
-        onDelete={gracePaint.deleteLook}
       />
     )
   },

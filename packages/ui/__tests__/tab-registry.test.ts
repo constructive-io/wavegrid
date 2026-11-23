@@ -61,20 +61,26 @@ describe('built-in tab registry', () => {
     expect(tabsFor(prideLayout).some(tab => tab.label === 'Pride')).toBe(false);
     expect(tabsFor(prideLayout, registry).filter(tab => tab.label === 'Pride').map(tab => tab.id)).toEqual(['pride/pride']);
   });
-  it('shows Grace only as a plugin while preserving GracePaint and hidden Audio', () => {
+  it('shows Grace and GracePaint only as plugins while preserving hidden Audio', () => {
     const registry = registryFor(coercePlugins([{ id: 'grace', pattern: 'pattern.js', tabs: [
-      { id: 'grace', label: 'Grace', view: 'view/index.html', showWhen: { topology: 'rings' } }
+      { id: 'grace', label: 'Grace', view: 'view/index.html', showWhen: { topology: 'rings' } },
+      { id: 'gracepaint', label: 'GracePaint', pattern: 'paint/pattern.js', view: 'view/paint.html', showWhen: 'always', paint: true }
     ] }]));
     expect(tabById('grace')).toBeUndefined();
     expect(tabsFor(rings, registry).filter(tab => tab.label === 'Grace').map(tab => tab.id)).toEqual(['grace/grace']);
     expect(tabsFor(grid, registry).some(tab => tab.label === 'Grace')).toBe(false);
-    expect(tabsFor(rings, registry).some(tab => tab.id === 'gracepaint')).toBe(true);
+    expect(tabById('gracepaint')).toBeUndefined();
+    expect(tabById('looks')).toBeUndefined();
+    for (const layout of [rings, grid, projectors]) {
+      expect(tabsFor(layout).some(tab => tab.label === 'GracePaint' || tab.label === 'Looks')).toBe(false);
+      expect(tabsFor(layout, registry).filter(tab => tab.label === 'GracePaint').map(tab => tab.id)).toEqual(['grace/gracepaint']);
+    }
     expect(tabById('audio', registry)?.label).toBe('Audio');
   });
   it.each([
     [grid, ['paint', 'pool', 'gradient']],
     [projectors, ['paint', 'pool', 'gradient']],
-    [rings, ['paint', 'pool', 'gradient', 'gracepaint']]
+    [rings, ['paint', 'pool', 'gradient']]
   ] as const)('keeps the visible tab order for $0.id', (layout, ids) => {
     expect(tabsFor(layout).map(tab => tab.id)).toEqual(ids);
   });
@@ -83,7 +89,6 @@ describe('built-in tab registry', () => {
     expect(allTabs.map(tab => [tab.id, tab.label])).toEqual([
       ['paint', 'Paint'], ['pool', 'Pool'], ['gradient', 'Gradient'],
       ['scenes', 'Scenes'], ['animations', 'Anim'], ['usa', 'USA'],
-      ['gracepaint', 'GracePaint'], ['looks', 'Looks'],
       ['patterns', 'Patterns'], ['sequences', 'Sequences'], ['playlist', 'Playlist'],
       ['flags', 'Flags'], ['drops', 'Drops'], ['audio', 'Audio'], ['video', 'Video']
     ]);

@@ -248,10 +248,19 @@ needed.
 A beat never starts a plugin pattern. The transition from playing Grace audio to
 stopped audio or another mode resets mapped shifts to zero only if the binding
 sent an update during that run and its pattern is still active. Manual params
-are left alone when Grace audio has not controlled the pattern. The existing
-built-in GracePaint consumer remains; a running bound plugin takes priority over
-its legacy beat auto-start behavior. These updates need neither an iframe nor
-its message bridge.
+are left alone when Grace audio has not controlled the pattern. Audio → Grace
+dispatches only through plugin audio bindings; there is no built-in pattern
+consumer or beat auto-start. These updates need neither an iframe nor its
+message bridge.
+
+GracePaint is provided by the project's `grace/gracepaint` plugin tab, not a
+built-in tab. Plugin views own their scoped Looks; the hidden legacy Looks tab
+has been removed. On load or save, the brain scopes legacy GracePaint Looks to
+`grace/gracepaint` only when `params.plugin` and `params.kind` are both absent,
+`anim` and `flow` are strings, and `stops` and `paint` are arrays. Paint length is
+not checked, so the plugin can resize it on recall. The Palace migration stays
+independent and existing scopes are never replaced. File migration is atomic,
+idempotent, and inserts only the scope property, preserving all other raw bytes.
 
 Brush messages, unlike audio bindings, are only available to the trusted mounted
 view of the active tab, under the same source, navigation and size checks as all

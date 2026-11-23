@@ -1,8 +1,6 @@
 import { resolveLayout } from '@wavegrid/layout';
 import { createSandboxEngine } from '@wavegrid/sandbox';
 
-import { gracePaintPattern, defaultParams as graceParams } from '../../ui/src/lib/grace-paint';
-import { GRADIENTS } from '../../ui/src/lib/grace-rings';
 import { palacePattern, defaultParams as palaceParams } from '../../ui/src/lib/palace';
 import { ServerPatternEngine } from '../src/pattern-engine';
 import { compilePlaylist } from '../src/playlist-compiler';
@@ -28,7 +26,6 @@ describe('QuickJS brain preview', () => {
   it.each([
     ['Palace', palacePattern(layout.fixtures), palaceParams(layout.count)],
     ['mixed Pride', mixedPride, { level: 70 }],
-    ['GracePaint', gracePaintPattern(), graceParams(layout.count, GRADIENTS[0])],
     ['compiled playlist', compilePlaylist({
       steps: [{ type: 'animation', name: 'rainbow', duration: 5 }, { type: 'scene', name: 'civic', duration: 5 }],
       loop: true, transition: 'fade', transitionDuration: 1
