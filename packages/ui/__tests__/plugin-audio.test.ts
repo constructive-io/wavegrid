@@ -50,13 +50,22 @@ it('cycles nested values by JSON equality, wraps, and chooses first for an unkno
   expect(pluginAudioCommands(binding, live, { ...out, step: false })).toEqual([]);
 });
 
-it('never starts a pattern or writes to an inactive, foreign-source or foreign-tab pattern', () => {
-  for (const pattern of [null, { ...live, active: false }, { ...live, code: 'other' }, { ...live, params: {} },
-    { ...live, params: { ...live.params, plugin: 'demo/other' } }]) {
+it('never starts a pattern or writes to an inactive or foreign-source pattern', () => {
+  for (const pattern of [null, { ...live, active: false }, { ...live, code: 'other' }]) {
     expect(activePluginAudio([binding], pattern)).toBeUndefined();
     expect(pluginAudioCommands(binding, pattern, out)).toEqual([]);
   }
   expect(pluginAudioCommands({ ...binding, values: [] }, live, out)).toEqual([]);
+});
+
+it.each([undefined, 'demo/other'])('controls a shared-source pattern started by another tab (tag: %s)', async plugin => {
+  const pattern = { ...live, params: { ...live.params, plugin } };
+  render(pattern); await new Promise(resolve => setImmediate(resolve));
+  const callback = render(pattern);
+  expect(activePluginAudio([binding], pattern)).toBe(binding);
+  expect(callback(out)).toBe(true);
+  expect(send).toHaveBeenCalledWith({ type: 'setPatternParam', name: 'stops', value: binding.values[1] });
+  expect(send.mock.calls.every(([message]) => message.type === 'setPatternParam')).toBe(true);
 });
 
 it('maps output fields, suppresses unchanged params, and ignores non-finite shifts', () => {

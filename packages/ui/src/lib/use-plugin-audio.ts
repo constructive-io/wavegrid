@@ -10,7 +10,7 @@ import { fetchPluginText } from './use-plugin-pattern';
 export interface LoadedPluginAudio { tabId: string; source: string; audio: PluginAudioBinding; values: unknown[] }
 
 export function activePluginAudio(bindings: LoadedPluginAudio[], pattern: PatternState | null): LoadedPluginAudio | undefined {
-  return pattern?.active ? bindings.find(binding => binding.source === pattern.code && pattern.params.plugin === binding.tabId) : undefined;
+  return pattern?.active ? bindings.find(binding => binding.source === pattern.code) : undefined;
 }
 
 export function pluginAudioCommands(binding: LoadedPluginAudio, pattern: PatternState | null, out: GraceAudioOutput): Record<string, unknown>[] {

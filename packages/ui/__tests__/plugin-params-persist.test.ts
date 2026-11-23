@@ -76,8 +76,8 @@ it('recoerces cached card params against the current schema', async () => {
   expect((await mount(changed)).params).toEqual({ speed: 3 });
 });
 
-it('tags audio-bound pattern starts with the owning tab, not a view-supplied scope', async () => {
+it('starts audio-bound patterns without injecting a tab tag into their params', async () => {
   const def = { ...tab('demo/audio'), audio: { mode: 'grace' as const, params: { hueShift: 'hueShift' } } };
-  (await mount(def)).startWithParams({ plugin: 'forged', hueShift: 12 });
-  expect(send).toHaveBeenCalledWith({ type: 'evalPattern', code: 'pattern source', params: { plugin: def.id, hueShift: 12 } });
+  (await mount(def)).startWithParams({ hueShift: 12 });
+  expect(send).toHaveBeenCalledWith({ type: 'evalPattern', code: 'pattern source', params: { hueShift: 12 } });
 });

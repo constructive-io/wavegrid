@@ -92,8 +92,8 @@ export function usePluginPattern(
     }
     onPatternSelect(tab.id);
     runningRef.current = true;
-    send({ type: 'evalPattern', code: source, params: tab.audio ? { ...paramsRef.current, plugin: tab.id } : paramsRef.current });
-  }, [source, send, onPatternSelect, tab.id, tab.audio, normalize, rememberParams]);
+    send({ type: 'evalPattern', code: source, params: paramsRef.current });
+  }, [source, send, onPatternSelect, tab.id, normalize, rememberParams]);
   const start = useCallback(() => startWithParams(), [startWithParams]);
 
   const apply = useCallback((patch: Record<string, unknown>) => {

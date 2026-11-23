@@ -242,14 +242,16 @@ control identifier rules; `__proto__`, `constructor`, and `prototype` are reject
 
 The first binding for each mode wins in plugin/tab load order; later bindings
 are ignored with a doctor warning. A binding requires a configured pattern.
-The host tags audio-bound starts with `params.plugin = "<pluginId>/<tabId>"` and
-only updates an active brain pattern with that tag and the exact fetched source.
+The host only updates an active brain pattern with the exact fetched source,
+including when another tab sharing that source started it; no plugin tag is
+needed.
 A beat never starts a plugin pattern. The transition from playing Grace audio to
 stopped audio or another mode resets mapped shifts to zero only if the binding
 sent an update during that run and its pattern is still active. Manual params
-are left alone when Grace audio has not controlled the pattern. The existing built-in GracePaint
-consumer remains; a running bound plugin takes priority over its legacy beat
-auto-start behavior. These updates need neither an iframe nor its message bridge.
+are left alone when Grace audio has not controlled the pattern. The existing
+built-in GracePaint consumer remains; a running bound plugin takes priority over
+its legacy beat auto-start behavior. These updates need neither an iframe nor
+its message bridge.
 
 Brush messages, unlike audio bindings, are only available to the trusted mounted
 view of the active tab, under the same source, navigation and size checks as all
