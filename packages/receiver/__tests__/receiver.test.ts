@@ -59,6 +59,34 @@ describe('Receiver', () => {
     }
   });
 
+  it('applies replayed brightness once to station and operator paint without changing stored targets', () => {
+    jest.useFakeTimers();
+    const input = new WebSocketInput({ url: 'ws://example.com:9999' });
+    jest.spyOn(input, 'connect').mockImplementation(() => {});
+    const levels: number[][] = [];
+    const r = new Receiver({ input, output: new CallbackOutput(grid => levels.push(grid.slice(0, 2).map(c => c.b))), alpha: 1 });
+    r.start();
+    try {
+      input.emit('connected');
+      input.emit('command', { type: 'command', action: 'setBrightness', value: 20 });
+      jest.advanceTimersByTime(100);
+      expect(levels).toEqual([]);
+      input.emit('command', { type: 'command', action: 'stationOverlay', cells: [{ idx: 0, h: 240, s: 100, b: 80 }] });
+      jest.advanceTimersByTime(100);
+      expect(levels.at(-1)).toEqual([16, 0]);
+      input.emit('command', { type: 'command', action: 'paint', cells: [{ idx: 1, h: 60, s: 100, b: 75 }] });
+      jest.advanceTimersByTime(1000);
+      expect(levels.at(-1)).toEqual([16, 15]);
+      expect(r.rawGrid?.[1].targetB).toBe(75);
+      input.emit('command', { type: 'command', action: 'setBrightness', value: 100 });
+      jest.advanceTimersByTime(100);
+      expect(levels.at(-1)).toEqual([80, 75]);
+    } finally {
+      r.stop();
+      jest.useRealTimers();
+    }
+  });
+
   it.each([false, true])('restores the station snapshot on keepalive after a signal timeout (local animation: %s)', localAnimation => {
     jest.useFakeTimers();
     const input = new WebSocketInput({ url: 'ws://example.com:9999' });

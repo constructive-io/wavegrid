@@ -144,14 +144,6 @@ export function tickCommandMode(
       state.shiftAccY -= stepsY;
     }
   }
-
-  // Apply brightness cap
-  if (state.brightness < 100) {
-    const scale = state.brightness / 100;
-    for (let i = 0; i < grid.length; i++) {
-      grid[i].targetB *= scale;
-    }
-  }
 }
 
 /**
