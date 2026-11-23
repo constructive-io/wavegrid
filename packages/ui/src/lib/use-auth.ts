@@ -1,3 +1,4 @@
+import type { StationGrant } from '@wavegrid/stations';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -7,7 +8,7 @@ import {
   saveCredentials
 } from '@/lib/auth-storage';
 
-function decodePayload(token: string): { sub: string } | null {
+function decodePayload(token: string): ({ sub: string } & StationGrant) | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -19,6 +20,10 @@ function decodePayload(token: string): { sub: string } | null {
   } catch {
     return null;
   }
+}
+
+export function stationToken(token: string | null, station: string): string | null {
+  return token && decodePayload(token)?.station === station ? token : null;
 }
 
 /**
@@ -115,5 +120,6 @@ export function useAuth() {
 
   const lastUser = readLastUser();
 
-  return { user, token, checked, endedSession, lastUser, login, logout, sessionEnded };
+  const station = token ? decodePayload(token)?.station : undefined;
+  return { user, token, checked, endedSession, lastUser, login, logout, sessionEnded, station };
 }

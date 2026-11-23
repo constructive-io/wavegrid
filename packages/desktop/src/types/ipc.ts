@@ -1,6 +1,8 @@
 // Types shared across the IPC boundary (main ⇄ preload ⇄ renderer). These stay
 // framework-neutral: no store objects, no secret values ever cross the wire.
 
+import type { StationGrant } from '@wavegrid/stations';
+
 export type RunMode = 'simple' | 'distributed' | 'auto';
 
 export interface BrainStatus {
@@ -65,6 +67,7 @@ export interface NewProjectInput {
  *  to. Fields the editor does not own (osc, sync, receiver.shard/lightMap,
  *  debug) are preserved untouched by main on save. */
 export interface EditableConfig {
+  stations?: import('@wavegrid/stations').Station[];
   layout: LayoutChoice;
   mode: 'auto' | 'simple' | 'distributed';
   simpleModeMax: number;
@@ -161,7 +164,7 @@ export interface SessionInfo {
 
 /** A named access key. The passphrase itself is never included — it is returned
  *  only once, from a mint action, for the admin to copy and hand over. */
-export interface AccessKeyInfo {
+export interface AccessKeyInfo extends StationGrant {
   name: string;
   role: UserRole;
   enabled: boolean;
@@ -432,7 +435,8 @@ export interface WavegridApi {
     mint(
       project: string,
       name: string,
-      role: UserRole
+      role: UserRole,
+      station?: string
     ): Promise<{ passphrase: string; keys: AccessKeyInfo[] }>;
     /** Turn one key on/off without changing its passphrase. */
     setEnabled(project: string, name: string, enabled: boolean): Promise<AccessKeyInfo[]>;

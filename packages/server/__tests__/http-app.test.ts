@@ -306,19 +306,22 @@ describe('createHttpApp', () => {
   });
 
   it('round-trips the light map through per-project state', async () => {
-    const initial = await (await fetch(`${base}/api/light-map`)).json();
+    expect((await fetch(`${base}/api/light-map`)).status).toBe(401);
+    const admin = await login('admin', 'secretpw');
+    const authz = { authorization: `Bearer ${admin.token}` };
+    const initial = await (await fetch(`${base}/api/light-map`, { headers: authz })).json();
     expect(initial.physicalLights).toHaveLength(layout.count);
 
     const swapped = initial.physicalLights.slice();
     [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
     const post = await fetch(`${base}/api/light-map`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { ...authz, 'content-type': 'application/json' },
       body: JSON.stringify({ ...initial, physicalLights: swapped })
     });
     expect(post.status).toBe(200);
 
-    const reread = await (await fetch(`${base}/api/light-map`)).json();
+    const reread = await (await fetch(`${base}/api/light-map`, { headers: authz })).json();
     expect(reread.physicalLights[0]).toBe(swapped[0]);
     expect(reread.physicalLights[1]).toBe(swapped[1]);
     const onDisk = JSON.parse(readFileSync(join(process.env.WG_STATE_DIR!, 'light-map.json'), 'utf8'));

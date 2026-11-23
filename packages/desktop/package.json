@@ -26,6 +26,7 @@
     "constructive-blocks"
   ],
   "dependencies": {
+    "@wavegrid/stations": "workspace:*",
     "@base-ui/react": "^1.4.1",
     "@wavegrid/animations": "workspace:*",
     "@wavegrid/discovery": "workspace:*",

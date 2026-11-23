@@ -377,11 +377,13 @@ function SessionsTab({
 /** Name a new key and pick the role it grants. */
 function MintKeyDialog({
   existing,
+  stations,
   onMint,
   busy
 }: {
   existing: string[];
-  onMint: (name: string, role: UserRole) => Promise<void>;
+  stations?: import('@wavegrid/stations').Station[];
+  onMint: (name: string, role: UserRole, station?: string) => Promise<void>;
   busy: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -390,13 +392,15 @@ function MintKeyDialog({
 
   const wellFormed = /^[a-z0-9][a-z0-9-]{0,30}$/.test(name);
   const duplicate = existing.includes(name);
+  const [station, setStation] = React.useState('');
   const valid = wellFormed && !duplicate;
 
   const submit = async () => {
     if (!valid) return;
-    await onMint(name, role);
+    await onMint(name, role, role === 'operator' && station ? station : undefined);
     setName('');
     setRole('operator');
+    setStation('');
     setOpen(false);
   };
 
@@ -431,6 +435,12 @@ function MintKeyDialog({
             <option value='operator'>operator — drive the show</option>
             <option value='admin'>admin — also manage access</option>
           </select>
+          {!!stations?.length && role === 'operator' && (
+            <select aria-label='Station grant' className={ROLE_STYLE} value={station} onChange={e => setStation(e.target.value)}>
+              <option value=''>Full rig</option>
+              {stations.map(item => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+            </select>
+          )}
           {name && !wellFormed && (
             <span className='text-destructive text-xs'>
               Lowercase letters, numbers and dashes only.
@@ -457,6 +467,7 @@ function MintKeyDialog({
 
 function KeysTab({
   keys,
+  stations,
   onMint,
   onSetEnabled,
   onSetRole,
@@ -465,7 +476,8 @@ function KeysTab({
   busy
 }: {
   keys: AccessKeyInfo[];
-  onMint: (name: string, role: UserRole) => Promise<string>;
+  stations?: import('@wavegrid/stations').Station[];
+  onMint: (name: string, role: UserRole, station?: string) => Promise<string>;
   onSetEnabled: (name: string, enabled: boolean) => void;
   onSetRole: (name: string, role: UserRole) => void;
   onRemove: (name: string) => void;
@@ -476,8 +488,8 @@ function KeysTab({
   const [revealed, setRevealed] = React.useState<{ name: string; passphrase: string } | null>(null);
   const [copied, setCopied] = React.useState(false);
 
-  const mint = async (name: string, role: UserRole) => {
-    const passphrase = await onMint(name, role);
+  const mint = async (name: string, role: UserRole, station?: string) => {
+    const passphrase = await onMint(name, role, station);
     if (passphrase) {
       setRevealed({ name, passphrase });
       setCopied(false);
@@ -525,7 +537,7 @@ function KeysTab({
               </AlertDialogContent>
             </AlertDialog>
           )}
-          <MintKeyDialog existing={keys.map((k) => k.name)} onMint={mint} busy={busy} />
+          <MintKeyDialog existing={keys.map((k) => k.name)} stations={stations} onMint={mint} busy={busy} />
         </div>
       </div>
 
@@ -557,12 +569,12 @@ function KeysTab({
           <TableBody>
             {keys.map((k) => (
               <TableRow key={k.name} className={k.enabled ? undefined : 'opacity-60'}>
-                <TableCell className='font-medium'>{k.name}</TableCell>
+                <TableCell className='font-medium'>{k.name}{k.station && <div className='text-muted-foreground text-xs'>Station: {k.station}</div>}</TableCell>
                 <TableCell>
                   <select
                     className={ROLE_STYLE}
                     value={k.role}
-                    disabled={busy}
+                    disabled={busy || k.station !== undefined}
                     onChange={(e) => onSetRole(k.name, e.target.value as UserRole)}
                   >
                     <option value='operator'>operator</option>
@@ -741,7 +753,8 @@ interface AccessRouteProps {
   onSetUserRole: (username: string, role: UserRole) => void;
   onRevokeSession: (id: string) => void;
   onRefreshSessions: () => void;
-  onMintKey: (name: string, role: UserRole) => Promise<string>;
+  stations?: import('@wavegrid/stations').Station[];
+  onMintKey: (name: string, role: UserRole, station?: string) => Promise<string>;
   onSetKeyEnabled: (name: string, enabled: boolean) => void;
   onSetKeyRole: (name: string, role: UserRole) => void;
   onRemoveKey: (name: string) => void;
@@ -761,6 +774,7 @@ export function AccessRoute({
   sessions,
   secrets,
   keys,
+  stations,
   onAddUser,
   onRemoveUser,
   onSetUserRole,
@@ -822,6 +836,7 @@ export function AccessRoute({
         <TabsContent value='keys'>
           <KeysTab
             keys={keys}
+            stations={stations}
             onMint={onMintKey}
             onSetEnabled={onSetKeyEnabled}
             onSetRole={onSetKeyRole}

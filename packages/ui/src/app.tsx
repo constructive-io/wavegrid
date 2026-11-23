@@ -12,12 +12,13 @@ import { LoginScreen } from '@/components/login-screen';
 import type { PreviewEasing } from '@/components/mini-grid-preview';
 import { useMotion } from '@/components/motion-tab';
 import { PoolCanvas, type PoolTouchPhase } from '@/components/pool-canvas';
+import { StationModeControl, StationView } from '@/components/station-view';
 import { StatusDot } from '@/components/status-dot';
 import type { GraceAudioOutput } from '@/lib/grace-audio';
 import type { PluginPaint, RegisterPluginPaint } from '@/lib/plugin-view-bridge';
 import { registryFor, tabById, type TabDef, tabsFor, type ToolContentProps } from '@/lib/tab-registry';
 import { useAudio } from '@/lib/use-audio';
-import { useAuth } from '@/lib/use-auth';
+import { stationToken, useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
 import { useIsPhone } from '@/lib/use-media-query';
 import { usePluginAudio } from '@/lib/use-plugin-audio';
@@ -252,10 +253,20 @@ function MasterSliders({
 /* ---------- Main page ---------- */
 
 export default function Home() {
+  const auth = useAuth();
+  const slug = new URLSearchParams(window.location.search).get('station') || auth.station;
+  if (!slug) return <OperatorView auth={auth} />;
+  if (!auth.checked) return <div style={{ background: '#050508', height: '100dvh' }} />;
+  const token = stationToken(auth.token, slug);
+  if (!token) return <LoginScreen station={slug} onLogin={auth.login} notice={auth.endedSession ? 'Your station session ended.' : undefined} />;
+  return <StationView slug={slug} token={token} logout={auth.logout} sessionEnded={auth.sessionEnded} />;
+}
+
+function OperatorView({ auth }: { auth: ReturnType<typeof useAuth> }) {
   const [configRev, setConfigRev] = useState(0);
   const config = useConfig(configRev);
-  const { user, token, checked, endedSession, lastUser, login, logout, sessionEnded } = useAuth();
-  const { connection, grid, orientation, playlistState, settings, pool, pattern, looks, epoch, send } = useSocket(
+  const { user, token, checked, endedSession, lastUser, login, logout, sessionEnded } = auth;
+  const { connection, grid, orientation, playlistState, settings, pool, pattern, looks, epoch, send, stationMode, stationOpen } = useSocket(
     config?.simulatorUrl ?? null,
     token,
     useCallback(() => setConfigRev((n) => n + 1), [])
@@ -764,6 +775,7 @@ export default function Home() {
         </div>
 
         {/* Expandable master sliders */}
+        <StationModeControl mode={stationMode} open={stationOpen} send={send} />
         {showMasterSliders && (
           <div style={{ background: '#0c0c12', borderBottom: '1px solid #1a1a25' }}>
             <MasterSliders
@@ -1038,6 +1050,7 @@ export default function Home() {
         </div>
 
         {/* Row 2: master sliders (full width, always visible) */}
+        <StationModeControl mode={stationMode} open={stationOpen} send={send} />
         <div
           className="flex items-center gap-4 px-5"
           style={{ paddingTop: 2, paddingBottom: 10 }}

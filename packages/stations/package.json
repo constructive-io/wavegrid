@@ -1,0 +1,19 @@
+{
+  "name": "@wavegrid/stations",
+  "version": "1.2.0",
+  "description": "Station configuration, policy and paint compositing for WaveGrid",
+  "main": "index.js",
+  "module": "esm/index.js",
+  "types": "index.d.ts",
+  "publishConfig": { "access": "public", "directory": "dist" },
+  "scripts": {
+    "clean": "makage clean",
+    "build": "makage build",
+    "build:dev": "makage build --dev",
+    "prepack": "npm run build",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --fix",
+    "test": "jest --passWithNoTests"
+  },
+  "dependencies": { "@wavegrid/extensions": "workspace:*" },
+  "devDependencies": { "makage": "^0.3.0" }
+}

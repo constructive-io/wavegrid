@@ -16,6 +16,7 @@ import { setTarget } from '@wavegrid/animations';
 import { type Layout, presets } from '@wavegrid/layout';
 import type { ProjectorControl } from '@wavegrid/osc';
 import { createSandboxEngine, SandboxEngine } from '@wavegrid/sandbox';
+import { compositeStationPaint, type StationCell } from '@wavegrid/stations';
 
 import { ConsoleOutput, InputAdapter, OutputAdapter, WebSocketInput } from './adapters';
 import { AnimationState, applyPaint, createDefaultAnimationState, handleCommand, remapGridForOutput, tickCommandMode } from './command-engine';
@@ -92,6 +93,8 @@ export class Receiver {
   private _fallbackActive = false;
   private _running = false;
   private _animState: AnimationState = createDefaultAnimationState();
+  private stationOverlay: StationCell[] = [];
+  private stationBrightness = this._animState.brightness;
   private _sandbox: SandboxEngine | null = null;
   private _sandboxReady: Promise<SandboxEngine> | null = null;
   private _patternTime = 0;
@@ -117,7 +120,7 @@ export class Receiver {
     return this.grid;
   }
 
-  /** Get the current output state (after filtering, orientation remap, and sharding). */
+  /** Get the current output state (after filtering, orientation remap, station compositing, and sharding). */
   getOutputState(): CannonState[] {
     const g = this.ensureGrid();
     const full = g.map(c => ({
@@ -125,10 +128,15 @@ export class Receiver {
       s: c.s,
       b: c.b
     }));
-    const remapped = remapGridForOutput(full, this.config.layout.cols, this.config.layout.rows, this._animState);
+    const brightnessScale = this.stationBrightness / 100;
+    const remapped = compositeStationPaint(
+      remapGridForOutput(full, this.config.layout.cols, this.config.layout.rows, this._animState),
+      Date.now() - this.lastDataAt > this.config.fallbackDelay
+        ? []
+        : this.stationOverlay.map(cell => ({ ...cell, b: cell.b * brightnessScale }))
+    );
     const shard = this.config.shard;
-    if (!shard) return remapped;
-    return remapped.slice(shard.start, shard.end + 1);
+    return shard ? remapped.slice(shard.start, shard.end + 1) : remapped;
   }
 
   /** Start the receiver — connects input and begins the tick loop. */
@@ -156,6 +164,7 @@ export class Receiver {
     const input = this.config.input;
 
     input.on('connected', () => {
+      this.stationOverlay = [];
       this._status = 'connected';
       this.lastDataAt = Date.now();
       console.log('  \u25C8 Input connected');
@@ -171,6 +180,12 @@ export class Receiver {
       // Config-only commands: update state but do NOT create the grid.
       // The receiver must produce zero output until a visual command arrives.
       if (cmd.action === 'keepalive') return;
+      if (cmd.action === 'stationOverlay') {
+        if (!this.stationOverlay.length) this.stationBrightness = this._animState.brightness;
+        this.stationOverlay = cmd.cells;
+        if (cmd.cells.length) this.ensureGrid();
+        return;
+      }
       // Projector controls bypass the HSB grid entirely: re-base global
       // indices to this shard and hand them to the output adapters.
       if (cmd.action === 'projector') {
@@ -193,7 +208,8 @@ export class Receiver {
         this.config.alpha = Math.max(0.01, Math.min(1, cmd.value));
         return;
       }
-      if (cmd.action === 'setAttack' || cmd.action === 'setOrientation' || cmd.action === 'setShift' || cmd.action === 'setSpeed') {
+      if (cmd.action === 'setAttack' || cmd.action === 'setOrientation' || cmd.action === 'setShift' ||
+          cmd.action === 'setSpeed' || cmd.action === 'setBrightness') {
         handleCommand(this._animState, cmd);
         return;
       }
@@ -242,6 +258,7 @@ export class Receiver {
     });
 
     input.on('disconnected', () => {
+      this.stationOverlay = [];
       this._status = 'reconnecting';
       console.log('\n  \u25C8 Input disconnected');
     });
@@ -292,7 +309,11 @@ export class Receiver {
 
         // Always tick the low-pass filter — this ensures smooth output
         // whether receiving data, transitioning to fallback, or in fallback
-        tickFilter(this.grid, this.config.alpha);
+        tickFilter(this.grid, this.config.alpha, this._fallbackActive ? 1 : this._animState.brightness / 100);
+        const brightnessDelta = this._animState.brightness - this.stationBrightness;
+        this.stationBrightness = Math.abs(brightnessDelta) > 0.3
+          ? this.stationBrightness + brightnessDelta * this.config.alpha
+          : this._animState.brightness;
 
         // Send filtered output to the output adapter
         this.config.output.send(this.getOutputState());

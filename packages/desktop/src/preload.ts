@@ -51,8 +51,8 @@ const api: WavegridApi = {
   },
   keys: {
     list: (project) => ipcRenderer.invoke('keys:list', project) as Promise<AccessKeyInfo[]>,
-    mint: (project, name, role: UserRole) =>
-      ipcRenderer.invoke('keys:mint', project, name, role) as Promise<{
+    mint: (project, name, role: UserRole, station) =>
+      ipcRenderer.invoke('keys:mint', project, name, role, station) as Promise<{
         passphrase: string;
         keys: AccessKeyInfo[];
       }>,

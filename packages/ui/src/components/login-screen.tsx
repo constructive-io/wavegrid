@@ -6,9 +6,10 @@ interface LoginScreenProps {
   notice?: string;
   /** Prefilled username — whoever was signed in on this device last. */
   defaultUsername?: string;
+  station?: string;
 }
 
-export function LoginScreen({ onLogin, notice, defaultUsername = '' }: LoginScreenProps) {
+export function LoginScreen({ onLogin, notice, defaultUsername = '', station }: LoginScreenProps) {
   const [username, setUsername] = useState(defaultUsername);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,7 +17,7 @@ export function LoginScreen({ onLogin, notice, defaultUsername = '' }: LoginScre
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) return;
+    if ((!station && !username.trim()) || !password.trim()) return;
 
     setError('');
     setLoading(true);
@@ -25,7 +26,7 @@ export function LoginScreen({ onLogin, notice, defaultUsername = '' }: LoginScre
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password: password.trim() })
+        body: JSON.stringify({ username: station ?? username.trim(), password: password.trim(), station })
       });
       const data = await res.json();
 
@@ -71,7 +72,7 @@ export function LoginScreen({ onLogin, notice, defaultUsername = '' }: LoginScre
         )}
 
         {/* Username */}
-        <input
+        {!station && <input
           type="text"
           placeholder="Username"
           value={username}
@@ -85,12 +86,12 @@ export function LoginScreen({ onLogin, notice, defaultUsername = '' }: LoginScre
             color: '#eee',
             fontSize: 16
           }}
-        />
+        />}
 
         {/* Password */}
         <input
           type="password"
-          placeholder="Password"
+          placeholder={station ? 'Station passcode' : 'Password'}
           value={password}
           onChange={e => setPassword(e.target.value)}
           autoComplete="current-password"
@@ -113,7 +114,7 @@ export function LoginScreen({ onLogin, notice, defaultUsername = '' }: LoginScre
         {/* Submit */}
         <button
           type="submit"
-          disabled={loading || !username.trim() || !password.trim()}
+          disabled={loading || (!station && !username.trim()) || !password.trim()}
           className="w-full py-3 rounded-lg text-base font-semibold transition-opacity"
           style={{
             background: '#01A1FF',

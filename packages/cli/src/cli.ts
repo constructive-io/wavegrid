@@ -32,6 +32,7 @@ import { runSecretsInit, runSecretsList, runSecretsSet } from './commands/secret
 import { runServer } from './commands/server';
 import { runSettingsEnvironment, runSettingsInitialize } from './commands/settings';
 import { runStart } from './commands/start';
+import { runStations } from './commands/stations';
 import { runUsersAdd, runUsersList, runUsersRemove } from './commands/users';
 import type { Flags } from './project';
 
@@ -52,6 +53,7 @@ ${c.bold('Projects')} — manage and edit projects
   projects secrets list|init|set List / generate / set the project's secrets
   projects users list|add|rm    Manage UI login users
   projects keys ls|new|rm       Named access keys (per-person or shared passphrases)
+  stations list|add|set|remove  Manage station fixture groups (keys new <name> --station <slug>)
   projects devices list|assign  List / name / shard-assign devices that joined
   projects osc                  Set the OSC laser target (BEYOND/FB4) — wizard
   projects routing show|gen     One global routing spec → per-device configs
@@ -94,6 +96,7 @@ ${c.gray('Shortcuts: `init`, `open`, `config`, `secrets`, `users`, `devices`, `e
 /** Top-level menu (bare `wavegrid`). */
 const COMMANDS: SubCommand[] = [
   { value: 'projects', description: 'Manage projects: list, create, use, config, secrets, users, env' },
+  { value: 'stations', description: 'Manage project station fixture groups' },
   { value: 'settings', description: 'Global store: environment, initialize, clear all' },
   { value: 'start', description: 'Run the active project — server + UI + receiver (one laptop)' },
   { value: 'server', description: 'Run the brain only — server + UI + API + WebSocket (no receiver)' },
@@ -192,7 +195,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       const key = tok.slice(2);
       const next = argv[i + 1];
       if (next != null && !next.startsWith('-')) {
-        flags[key] = coerce(next);
+        flags[key] = key === 'station' ? next : coerce(next);
         i++;
       } else {
         flags[key] = true;
@@ -214,6 +217,7 @@ function coerce(value: string): string | number | boolean {
 }
 
 const KNOWN_COMMANDS = [
+  'stations',
   'init',
   'open',
   'start',
@@ -553,6 +557,9 @@ export async function run(argvInput: string[] = process.argv.slice(2)): Promise<
       break;
     case 'keys':
       await dispatchKeys(positionals.slice(1), flags, prompter, nonInteractive);
+      break;
+    case 'stations':
+      runStations(positionals.slice(1), flags);
       break;
     case 'devices':
       await dispatchDevices(positionals.slice(1), flags, prompter, nonInteractive);

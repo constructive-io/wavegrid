@@ -47,14 +47,16 @@ export function angleDelta(from: number, to: number): number {
  */
 export function tickFilter(
   grid: FilteredCannon[],
-  alpha: number = DEFAULT_RECEIVER_ALPHA
+  alpha: number = DEFAULT_RECEIVER_ALPHA,
+  brightnessScale: number = 1
 ): boolean {
   let changed = false;
   for (let i = 0; i < grid.length; i++) {
     const c = grid[i];
     const dh = angleDelta(c.h, c.targetH);
     const ds = c.targetS - c.s;
-    const db = c.targetB - c.b;
+    const targetB = c.targetB * brightnessScale;
+    const db = targetB - c.b;
 
     if (Math.abs(dh) > 0.3 || Math.abs(ds) > 0.3 || Math.abs(db) > 0.3) {
       c.h = (c.h + dh * alpha + 360) % 360;
@@ -64,7 +66,7 @@ export function tickFilter(
     } else {
       c.h = c.targetH;
       c.s = c.targetS;
-      c.b = c.targetB;
+      c.b = targetB;
     }
   }
   return changed;

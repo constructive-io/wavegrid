@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { parseArgs } from '../src/cli';
+import { parseArgs, run } from '../src/cli';
 import { buildConfig, CONFIG_FILENAME, serializeConfig } from '../src/config-file';
 import { runStart, servicesForMode } from '../src/commands/start';
+import { getStore } from '../src/project';
 
 describe('parseArgs', () => {
   it('extracts the command and flags', () => {
@@ -35,6 +36,27 @@ describe('servicesForMode', () => {
   it('flags the receiver as sharded for distributed mode', () => {
     expect(servicesForMode('distributed').map((s) => s.label)).toEqual(['server', 'receiver (shard)']);
   });
+});
+
+test('stations remove --help prints usage without removing a station', async () => {
+  const previous = process.env.APPSTASH_BASE_DIR;
+  const root = mkdtempSync(join(tmpdir(), 'wg-stations-help-'));
+  process.env.APPSTASH_BASE_DIR = root;
+  const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const store = getStore();
+    store.createProject('demo', { layout: { preset: 'ring-6' } });
+    await run(['stations', 'add', 'north', '0', '--project', 'demo']);
+    const config = store.getProjectConfig('demo');
+    await run(['stations', 'remove', 'north', '--project', 'demo', '--help']);
+    expect(store.getProjectConfig('demo')).toEqual(config);
+    expect(log).toHaveBeenCalledWith(expect.stringMatching(/Usage: wavegrid stations/));
+  } finally {
+    log.mockRestore();
+    if (previous === undefined) delete process.env.APPSTASH_BASE_DIR;
+    else process.env.APPSTASH_BASE_DIR = previous;
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 function scratchDir(preset: string): string {

@@ -328,7 +328,7 @@ export function useSessions({ project, rev }: ProjectScope): {
 export function useAccessKeys({ project, rev }: ProjectScope): {
   keys: AccessKeyInfo[];
   refresh: () => Promise<void>;
-  mint: (name: string, role: UserRole) => Promise<string>;
+  mint: (name: string, role: UserRole, station?: string) => Promise<string>;
   setEnabled: (name: string, enabled: boolean) => Promise<void>;
   setRole: (name: string, role: UserRole) => Promise<void>;
   remove: (name: string) => Promise<void>;
@@ -345,9 +345,9 @@ export function useAccessKeys({ project, rev }: ProjectScope): {
   }, [project, rev]);
 
   const mint = React.useCallback(
-    async (name: string, role: UserRole) => {
+    async (name: string, role: UserRole, station?: string) => {
       if (!project) return '';
-      const minted = await window.wavegrid.keys.mint(project, name, role);
+      const minted = await window.wavegrid.keys.mint(project, name, role, station);
       setKeys(minted.keys);
       return minted.passphrase;
     },

@@ -37,8 +37,10 @@
     "7x7"
   ],
   "dependencies": {
+    "@wavegrid/stations": "workspace:*",
     "@wavegrid/animations": "workspace:*",
     "@wavegrid/discovery": "workspace:*",
+    "@wavegrid/extensions": "workspace:*",
     "@wavegrid/layout": "workspace:*",
     "@wavegrid/pool": "workspace:*",
     "@wavegrid/settings": "workspace:*",

@@ -14,15 +14,15 @@ import * as fs from 'fs';
 import http from 'http';
 import { resolve } from 'path';
 import { URL } from 'url';
-import { WebSocket, WebSocketServer } from 'ws';
+import { type RawData, WebSocket, WebSocketServer } from 'ws';
 
 import { animations } from './animations';
+import { loadBrainExtensions } from './brain-extensions';
 import { computeCoverage } from './coverage';
 import type { BlendMode, CannonState, Orientation, Rotation } from './grid';
 import {compositeLayer, createGrid, DEFAULT_ALPHA, defaultOrientation, mapUiToGrid, remapGridForUi, resetGrid, setAllTargets, setCannonTarget, shiftGrid, tickGrid } from './grid';
 import { createHttpApp, lanVisitors, resolveUiDir } from './http-app';
 import { fanout, fanoutLossy, type LivenessState,selectRevokedSockets, sweepLiveness, WS_CLOSE_SESSION_REVOKED, WS_REASON_SESSION_REVOKED } from './hub';
-import type { JwtPayload } from './jwt';
 import { verifyJwt } from './jwt';
 import { LookStore } from './looks';
 import { ServerPatternEngine } from './pattern-engine';
@@ -155,6 +155,7 @@ function scheduleSave() {
 const grid = createGrid(NUM_CANNONS);
 let currentAlpha = DEFAULT_ALPHA;
 let currentAttack = 1.0;
+let masterBrightness = 100;
 let currentAnimation: string | null = null;
 let animationTick = 0;
 let animSpeed = 1.0;
@@ -228,7 +229,7 @@ function poolPayload(withCurrent = true): string {
 }
 
 function broadcastPool(withCurrent = true) {
-  fanoutLossy(wss.clients, poolPayload(withCurrent), dropClient);
+  fanoutLossy(fullClients(), poolPayload(withCurrent), dropClient);
 }
 
 /** One 60 fps step: run the field, sample the fixtures, write grid targets. */
@@ -309,8 +310,17 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ noServer: true });
-const verifiedPayloads = new WeakMap<http.IncomingMessage, JwtPayload>();
 const liveness = new Map<WebSocket, LivenessState>();
+const extensions: ReturnType<typeof loadBrainExtensions> = loadBrainExtensions(resolved, {
+  getProject: resolveSyncTarget,
+  publish: (audience, payload) => {
+    fanout([...wss.clients].filter(ws => extensions.audience(ws) === audience), JSON.stringify(payload), dropClient);
+  }
+});
+
+function* fullClients() {
+  for (const ws of wss.clients) if (!extensions.isScoped(ws)) yield ws;
+}
 
 const RECEIVER_KEY = process.env.WG_RECEIVER_KEY || '';
 
@@ -321,31 +331,29 @@ server.on('upgrade', (req, socket, head) => {
 
   // Require either a valid JWT token whose session is still live, or a valid
   // receiver key. Connections with neither are rejected.
-  if (token) {
-    const payload = verifyJwt(token);
-    if (!payload) {
+  const principal = token ? verifyJwt(token) : null;
+  if (token ? !principal : !key || key !== RECEIVER_KEY) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  if (principal?.sid) {
+    const target = resolveSyncTarget();
+    if (target && !target.store.getSession(target.project, principal.sid)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
     }
-    if (payload.sid) {
-      const target = resolveSyncTarget();
-      if (target && !target.store.getSession(target.project, payload.sid)) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-    }
-    verifiedPayloads.set(req, payload);
-  } else if (key && RECEIVER_KEY && key === RECEIVER_KEY) {
-    // valid receiver key — allow
-  } else {
-    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+  }
+  const peer = extensions.authorize({ request: req, url: reqUrl, principal });
+  if (!peer) {
+    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
     socket.destroy();
     return;
   }
 
   wss.handleUpgrade(req, socket, head, (ws) => {
+    extensions.attach(ws, peer);
     wss.emit('connection', ws, req);
   });
 });
@@ -387,10 +395,15 @@ function revokeClient(ws: WebSocket): void {
  */
 function disconnectRevokedSessions(): void {
   const target = resolveSyncTarget();
-  if (!target) return;
   try {
-    const live = new Set(target.store.listSessions(target.project).map((session) => session.id));
-    for (const ws of selectRevokedSockets(clients, (sid) => live.has(sid))) revokeClient(ws);
+    if (target) {
+      const live = new Set(target.store.listSessions(target.project).map((session) => session.id));
+      for (const ws of selectRevokedSockets(clients, (sid) => live.has(sid))) revokeClient(ws);
+    }
+    extensions.beforeRevalidate();
+    for (const ws of wss.clients) {
+      if (clients.has(ws) && !extensions.revalidate(ws)) revokeClient(ws);
+    }
   } catch {
     // Session checks are best-effort when the project store is unavailable.
   }
@@ -412,11 +425,16 @@ function broadcastState() {
       })(),
       GRID_COLUMNS, GRID_ROWS, orientation
     );
-  const payload = JSON.stringify({ type: 'state', grid: output });
+  const composite = calibrationMode ? output : extensions.compositeOutput(output);
+  const fullState = extensions.fullState(composite);
+  const payload = JSON.stringify(fullState);
   // Lossy: this goes out 60 times a second and each frame replaces the last, so
   // a client that cannot keep up must skip frames rather than build a backlog
   // that leaves it rendering the past while the rig runs on the present.
-  fanoutLossy(wss.clients, payload, dropClient);
+  for (const ws of wss.clients) {
+    const state = extensions.stateFor(ws, fullState, composite);
+    if (state) fanoutLossy([ws], state === fullState ? payload : JSON.stringify(state), dropClient);
+  }
 }
 
 function getCalibrationOutput(): CannonState[] {
@@ -455,12 +473,12 @@ function loadPhysicalLightMap(): number[] {
 
 function broadcastOrientation() {
   const payload = JSON.stringify({ type: 'orientation', ...orientation });
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 function broadcastCommand(cmd: Record<string, unknown>) {
   const payload = JSON.stringify({ type: 'command', ...cmd });
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 // What UIs need to keep in step with the running pattern (e.g. GracePaint on a
@@ -479,7 +497,7 @@ function looksPayload(): string {
 }
 
 function broadcastLooks() {
-  fanout(wss.clients, looksPayload(), dropClient);
+  fanout(fullClients(), looksPayload(), dropClient);
 }
 
 let lastPatternState = '';
@@ -487,7 +505,7 @@ function broadcastPatternStateIfChanged() {
   const payload = patternStatePayload();
   if (payload === lastPatternState) return;
   lastPatternState = payload;
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 function broadcastPlaylistState() {
@@ -497,7 +515,7 @@ function broadcastPlaylistState() {
     playlist: activePlaylist,
     currentStep: playlistCurrentStep
   });
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 /** Cancel any active playlist when another visual command arrives. */
@@ -568,7 +586,7 @@ function isSecretScope(scope: string): boolean {
 /** Broadcast an accepted config revision to every connected client. */
 function broadcastSync(update: SyncUpdateMessage): void {
   const payload = JSON.stringify(update);
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 /** Serialize + persist a client's config push, then broadcast the revision. */
@@ -663,7 +681,7 @@ function filterSecretScopes<T>(entries: Record<string, T>): Record<string, T> {
 /** Broadcast the full replicated document to every client (post-merge convergence). */
 function broadcastSyncStateTo(state: { revision: number; entries: unknown }): void {
   const payload = JSON.stringify({ type: 'sync_state', revision: state.revision, entries: state.entries });
-  fanout(wss.clients, payload, dropClient);
+  fanout(fullClients(), payload, dropClient);
 }
 
 /** Sync summary for `system_status` (revision + devices that lag it). */
@@ -711,11 +729,10 @@ function buildSystemStatus(): SystemStatus {
 
 wss.on('connection', (ws, req: http.IncomingMessage) => {
   const remote = req.socket.remoteAddress ?? 'unknown';
-  const payload = verifiedPayloads.get(req);
-  const isUi = payload !== undefined;
+  const payload = extensions.principal(ws);
   const now = Date.now();
   clients.set(ws, {
-    role: isUi ? 'ui' : 'unknown',
+    role: payload ? 'ui' : 'unknown',
     remote,
     connectedAt: now,
     lastSeen: now,
@@ -738,6 +755,13 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     const state = liveness.get(ws);
     if (state) state.alive = true;
   });
+
+  if (extensions.audience(ws) === 'receiver') {
+    sendToClient(ws, JSON.stringify({ type: 'command', action: 'setBrightness', value: masterBrightness }));
+  }
+  for (const packet of extensions.initialPayloads(ws)) sendToClient(ws, JSON.stringify(packet));
+  ws.on('message', receiveMessage);
+  if (extensions.isScoped(ws)) return;
 
   // Send the resolved layout first — the single source of truth for geometry —
   // so UI and receiver render/route from the same fixtures the server uses.
@@ -779,11 +803,17 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   sendToClient(ws, patternStatePayload());
   sendToClient(ws, looksPayload());
 
-  ws.on('message', (raw) => {
+  function receiveMessage(raw: RawData) {
     try {
       const msg = JSON.parse(raw.toString());
+      if (!msg || typeof msg !== 'object') return;
       const info = clients.get(ws);
       if (info) info.lastSeen = Date.now();
+      if (!extensions.revalidate(ws)) {
+        revokeClient(ws);
+        return;
+      }
+      if (extensions.scopedMessage(ws, msg)) return;
 
       if (msg.type === 'hello' && msg.role === 'receiver' && info) {
         const hello = msg as HelloMessage;
@@ -834,10 +864,11 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     } catch {
       // ignore malformed messages
     }
-  });
+  }
 });
 
 function handleMessage(msg: any, ws?: WebSocket) {
+  if (extensions.operatorMessage(msg, ws)) return;
   switch (msg.type) {
   case 'pool_touch': {
     if (typeof msg.x !== 'number' || typeof msg.y !== 'number') break;
@@ -926,8 +957,9 @@ function handleMessage(msg: any, ws?: WebSocket) {
     }
     break;
   case 'master_brightness':
-    setAllTargets(grid, undefined, undefined, msg.value * 100, currentAttack);
-    broadcastCommand({ action: 'setBrightness', value: msg.value * 100 });
+    masterBrightness = msg.value * 100;
+    setAllTargets(grid, undefined, undefined, masterBrightness, currentAttack);
+    broadcastCommand({ action: 'setBrightness', value: masterBrightness });
     scheduleSave();
     break;
   case 'scene':

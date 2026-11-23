@@ -1,3 +1,5 @@
+import type { BrainPrincipal } from '@wavegrid/extensions';
+import type { StationGrant } from '@wavegrid/stations';
 import { createHmac } from 'crypto';
 
 function getSecret(): string {
@@ -17,7 +19,7 @@ function base64urlDecode(str: string): string {
 
 export type Role = 'admin' | 'operator';
 
-export interface JwtPayload {
+export interface JwtPayload extends BrainPrincipal, StationGrant {
   /** Subject — the username. */
   sub: string;
   /** Issued-at (seconds). */
@@ -30,7 +32,7 @@ export interface JwtPayload {
   role?: Role;
 }
 
-export interface SignOptions {
+export interface SignOptions extends StationGrant {
   /** Session id to embed (`sid`). */
   sid?: string;
   /** Role to embed. */
@@ -46,6 +48,7 @@ export function signJwt(sub: string, opts: SignOptions = {}): string {
   if (opts.ttlSec != null) claims.exp = iat + opts.ttlSec;
   if (opts.sid) claims.sid = opts.sid;
   if (opts.role) claims.role = opts.role;
+  if (opts.station !== undefined) claims.station = opts.station;
   const header = base64url(Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
   const payload = base64url(Buffer.from(JSON.stringify(claims)));
   const data = `${header}.${payload}`;

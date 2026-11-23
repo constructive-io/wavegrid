@@ -1,3 +1,4 @@
+import { type StationGrant, stationSlug } from '@wavegrid/stations';
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -29,7 +30,7 @@ const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 /** Key names double as the login identity, so they're constrained like usernames. */
 const NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,30}$/;
 
-interface StoredKey {
+interface StoredKey extends StationGrant {
   name: string;
   role: UserRole;
   enabled: boolean;
@@ -40,7 +41,7 @@ interface StoredKey {
 }
 
 /** An access key as shown to admins — everything except the key material. */
-export interface AccessKeyInfo {
+export interface AccessKeyInfo extends StationGrant {
   name: string;
   role: UserRole;
   enabled: boolean;
@@ -106,7 +107,8 @@ function info(key: StoredKey): AccessKeyInfo {
     role: key.role,
     enabled: key.enabled,
     createdAt: key.createdAt,
-    lastUsedAt: key.lastUsedAt
+    lastUsedAt: key.lastUsedAt,
+    ...(key.station !== undefined ? { station: key.station } : {})
   };
 }
 
@@ -122,7 +124,7 @@ export function getAccessKeyRole(
   name: string
 ): UserRole | null {
   const key = readKeys(paths, project).find((k) => k.name === name);
-  return key && key.enabled ? key.role : null;
+  return key && key.enabled ? (key.station !== undefined ? 'operator' : key.role) : null;
 }
 
 /**
@@ -134,7 +136,8 @@ export function mintAccessKey(
   paths: StorePaths,
   project: string,
   name: string,
-  role: UserRole = 'operator'
+  role: UserRole = 'operator',
+  station?: string | null
 ): MintedAccessKey {
   if (!NAME_PATTERN.test(name)) {
     throw new Error(
@@ -146,6 +149,10 @@ export function mintAccessKey(
   const salt = randomBytes(16).toString('hex');
   const keys = readKeys(paths, project);
   const existing = keys.find((k) => k.name === name);
+  const grant = station === undefined ? existing?.station : station;
+  if (grant != null && (!stationSlug.test(grant) || role !== 'operator')) {
+    throw new Error('A station key must grant operator access to a valid station slug.');
+  }
 
   const next: StoredKey = {
     name,
@@ -154,7 +161,8 @@ export function mintAccessKey(
     salt,
     hash: hashPassphrase(passphrase, salt),
     createdAt: existing?.createdAt ?? Date.now(),
-    lastUsedAt: null
+    lastUsedAt: null,
+    ...(grant != null ? { station: grant } : {})
   };
 
   if (existing) keys[keys.indexOf(existing)] = next;
@@ -189,6 +197,7 @@ export function setAccessKeyRole(
   const keys = readKeys(paths, project);
   const key = keys.find((k) => k.name === name);
   if (!key) return null;
+  if (role === 'admin' && key.station !== undefined) throw new Error('A station key cannot grant admin access.');
   key.role = role;
   writeKeys(paths, project, keys);
   return info(key);
@@ -222,7 +231,7 @@ export function authenticateAccessKey(
   paths: StorePaths,
   project: string,
   passphrase: string
-): UserInfo | null {
+): (UserInfo & StationGrant) | null {
   const keys = readKeys(paths, project);
   for (const key of keys) {
     if (!key.enabled) continue;
@@ -233,7 +242,9 @@ export function authenticateAccessKey(
 
     key.lastUsedAt = Date.now();
     writeKeys(paths, project, keys);
-    return { username: key.name, role: key.role };
+    return key.station !== undefined
+      ? { username: key.name, role: 'operator', station: key.station }
+      : { username: key.name, role: key.role };
   }
   return null;
 }

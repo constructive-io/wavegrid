@@ -7,6 +7,8 @@
  * the server can resolve it once and broadcast it to every client over the wire.
  */
 
+import type { StationConfig } from '@wavegrid/stations';
+
 import type { UnifiedRouting } from './routing';
 
 export type Topology = 'grid' | 'ring' | 'filledRing' | 'rings';
@@ -224,6 +226,7 @@ export interface SyncConfig {
 
 export interface WavegridConfig {
   layout: LayoutSpec;
+  stations?: StationConfig;
   /**
    * 'auto' derives the run profile from the cannon count:
    * < `simpleModeMax` → 'simple' (one process, LAN-only, no sharding),

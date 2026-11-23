@@ -21,6 +21,7 @@ export default defineConfig({
         '@wavegrid/server',
         '@wavegrid/receiver',
         '@wavegrid/settings',
+        '@wavegrid/stations',
         '@wavegrid/layout',
         '@wavegrid/discovery',
         '@wavegrid/doctor',

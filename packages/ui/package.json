@@ -18,6 +18,7 @@
     "test": "jest --passWithNoTests"
   },
   "dependencies": {
+    "@wavegrid/stations": "workspace:*",
     "@wavegrid/animations": "workspace:*",
     "@wavegrid/layout": "workspace:*",
     "@wavegrid/pool": "workspace:*",

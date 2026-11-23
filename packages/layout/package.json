@@ -49,6 +49,7 @@
     "laser"
   ],
   "dependencies": {
+    "@wavegrid/stations": "workspace:*",
     "confstash": "^0.1.2"
   },
   "devDependencies": {

@@ -1,4 +1,5 @@
 import type { PoolSnapshot } from '@wavegrid/pool';
+import { isStationMode, type StationMode, type StationProjection } from '@wavegrid/stations';
 
 /** The server-run pool, as broadcast for viewers to draw. */
 export interface PoolState extends PoolSnapshot {
@@ -53,6 +54,9 @@ export interface Look {
 
 export interface SocketSnapshot {
   grid: CannonColor[];
+  stationLayout?: StationProjection;
+  stationMode?: StationMode;
+  stationOpen?: boolean;
   orientation: Orientation;
   playlistState: PlaylistState | null;
   settings: Settings | null;
@@ -105,9 +109,17 @@ export function applySocketMessage(
   if (!msg || typeof msg !== 'object') return snapshot;
   const message = msg as Record<string, unknown>;
   switch (message.type) {
+  case 'station_layout':
+    return { ...snapshot, stationLayout: message.layout as StationProjection, lastMessageAt: now };
   case 'state':
     if (!Array.isArray(message.grid)) return snapshot;
-    return { ...snapshot, grid: message.grid as CannonColor[], lastMessageAt: now };
+    return {
+      ...snapshot,
+      grid: message.grid as CannonColor[],
+      ...(isStationMode(message.stationMode) ? { stationMode: message.stationMode } : {}),
+      ...(typeof message.stationOpen === 'boolean' ? { stationOpen: message.stationOpen } : {}),
+      lastMessageAt: now
+    };
   case 'orientation':
     return {
       ...snapshot,
