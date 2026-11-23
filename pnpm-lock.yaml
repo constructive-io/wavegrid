@@ -292,6 +292,13 @@ importers:
         version: 0.3.1
     publishDirectory: dist
 
+  packages/extensions:
+    devDependencies:
+      makage:
+        specifier: ^0.3.0
+        version: 0.3.1
+    publishDirectory: dist
+
   packages/layout:
     dependencies:
       '@wavegrid/stations':
@@ -372,6 +379,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@wavegrid/extensions':
+        specifier: workspace:*
+        version: link:../extensions/dist
       '@wavegrid/stations':
         specifier: workspace:*
         version: link:../stations/dist
@@ -429,6 +439,10 @@ importers:
     publishDirectory: dist
 
   packages/stations:
+    dependencies:
+      '@wavegrid/extensions':
+        specifier: workspace:*
+        version: link:../extensions/dist
     devDependencies:
       makage:
         specifier: ^0.3.0

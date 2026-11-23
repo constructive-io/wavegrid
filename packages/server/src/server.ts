@@ -10,20 +10,19 @@ import {
   sameHsb
 } from '@wavegrid/pool';
 import { isValidScope, openStore, WAVEGRID_RUNTIME_VERSION } from '@wavegrid/settings';
-import { type BrainExtensionHooks, projectStationLayout, registerStations, type Station } from '@wavegrid/stations';
 import * as fs from 'fs';
 import http from 'http';
 import { resolve } from 'path';
 import { URL } from 'url';
-import { WebSocket, WebSocketServer } from 'ws';
+import { type RawData, WebSocket, WebSocketServer } from 'ws';
 
 import { animations } from './animations';
+import { loadBrainExtensions } from './brain-extensions';
 import { computeCoverage } from './coverage';
 import type { BlendMode, CannonState, Orientation, Rotation } from './grid';
 import {compositeLayer, createGrid, DEFAULT_ALPHA, defaultOrientation, mapUiToGrid, remapGridForUi, resetGrid, setAllTargets, setCannonTarget, shiftGrid, tickGrid } from './grid';
 import { createHttpApp, lanVisitors, resolveUiDir } from './http-app';
 import { fanout, fanoutLossy, type LivenessState,selectRevokedSockets, sweepLiveness, WS_CLOSE_SESSION_REVOKED, WS_REASON_SESSION_REVOKED } from './hub';
-import type { JwtPayload } from './jwt';
 import { verifyJwt } from './jwt';
 import { LookStore } from './looks';
 import { ServerPatternEngine } from './pattern-engine';
@@ -39,7 +38,6 @@ import type {
   SystemStatus
 } from './protocol';
 import { applyScene, scenes } from './scenes';
-import { projectStations } from './station-project';
 
 export interface ServerHandle {
   server: http.Server;
@@ -311,48 +309,16 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ noServer: true });
-const verifiedPayloads = new WeakMap<http.IncomingMessage, JwtPayload>();
-const requestedScopes = new WeakMap<http.IncomingMessage, Station>();
-const socketScopes = new WeakMap<WebSocket, Station>();
-const socketPayloads = new WeakMap<WebSocket, JwtPayload>();
 const liveness = new Map<WebSocket, LivenessState>();
-const messagePolicies: Parameters<BrainExtensionHooks['onOperatorMessage']>[0][] = [];
-const scopedPolicies: Parameters<BrainExtensionHooks['onScopedMessage']>[0][] = [];
-const projections: Parameters<BrainExtensionHooks['projectState']>[0][] = [];
-const compositors: Parameters<BrainExtensionHooks['compositeOutput']>[0][] = [];
-const stations = registerStations(resolved.config.stations, layout, {
-  onScopedMessage: handler => scopedPolicies.push(handler),
-  onOperatorMessage: handler => messagePolicies.push(handler),
-  projectState: handler => projections.push(handler),
-  compositeOutput: handler => compositors.push(handler),
-  publishOutput: cells => {
-    const payload = JSON.stringify({ type: 'command', action: 'stationOverlay', cells });
-    fanout([...wss.clients].filter(ws => !socketPayloads.has(ws)), payload, dropClient);
+const extensions: ReturnType<typeof loadBrainExtensions> = loadBrainExtensions(resolved, {
+  getProject: resolveSyncTarget,
+  publish: (audience, payload) => {
+    fanout([...wss.clients].filter(ws => extensions.audience(ws) === audience), JSON.stringify(payload), dropClient);
   }
 });
 
-function stationScopeCurrent(scope: Station): boolean {
-  const target = resolveSyncTarget();
-  if (!target) return false;
-  const config = target.store.getProjectConfig(target.project);
-  const current = projectStations(resolved, config).find(station => station.slug === scope.slug);
-  return current !== undefined && JSON.stringify(current.fixtures) === JSON.stringify(scope.fixtures);
-}
-
-function validStationPrincipal(payload: JwtPayload, scope?: Station): boolean {
-  if (scope && !stationScopeCurrent(scope)) return false;
-  if (!payload.station && !stations.stations.length) return true;
-  const target = resolveSyncTarget();
-  if (!target) return payload.station === undefined && !scope;
-  const key = target.store.listAccessKeys(target.project).find(item => item.name === payload.sub);
-  if (payload.station === undefined) return key?.station === undefined;
-  const session = payload.sid && target.store.getSession(target.project, payload.sid);
-  return !!session && session.username === payload.sub && session.station === payload.station &&
-    key?.enabled === true && key.station === payload.station && scope?.slug === payload.station;
-}
-
 function* fullClients() {
-  for (const ws of wss.clients) if (!socketScopes.has(ws)) yield ws;
+  for (const ws of wss.clients) if (!extensions.isScoped(ws)) yield ws;
 }
 
 const RECEIVER_KEY = process.env.WG_RECEIVER_KEY || '';
@@ -364,40 +330,29 @@ server.on('upgrade', (req, socket, head) => {
 
   // Require either a valid JWT token whose session is still live, or a valid
   // receiver key. Connections with neither are rejected.
-  if (token) {
-    const payload = verifyJwt(token);
-    if (!payload) {
+  const principal = token ? verifyJwt(token) : null;
+  if (token ? !principal : !key || key !== RECEIVER_KEY) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  if (principal?.sid) {
+    const target = resolveSyncTarget();
+    if (target && !target.store.getSession(target.project, principal.sid)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
     }
-    if (payload.sid) {
-      const target = resolveSyncTarget();
-      if (target && !target.store.getSession(target.project, payload.sid)) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-    }
-    const requested = reqUrl.searchParams.get('station');
-    const slug = requested ?? payload.station;
-    const scope = stations.stations.find(station => station.slug === slug);
-    if ((slug !== undefined && !scope) || !validStationPrincipal(payload, scope)) {
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-    if (scope) requestedScopes.set(req, scope);
-    verifiedPayloads.set(req, payload);
-  } else if (key && RECEIVER_KEY && key === RECEIVER_KEY) {
-    // valid receiver key — allow
-  } else {
-    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+  }
+  const peer = extensions.authorize({ request: req, url: reqUrl, principal });
+  if (!peer) {
+    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
     socket.destroy();
     return;
   }
 
   wss.handleUpgrade(req, socket, head, (ws) => {
+    extensions.attach(ws, peer);
     wss.emit('connection', ws, req);
   });
 });
@@ -439,15 +394,14 @@ function revokeClient(ws: WebSocket): void {
  */
 function disconnectRevokedSessions(): void {
   const target = resolveSyncTarget();
-  if (!target) return;
   try {
-    const live = new Set(target.store.listSessions(target.project).map((session) => session.id));
-    for (const ws of selectRevokedSockets(clients, (sid) => live.has(sid))) revokeClient(ws);
-    if (stations.stations.some(scope => !stationScopeCurrent(scope)) && stations.acceptsInput()) stations.suspend();
+    if (target) {
+      const live = new Set(target.store.listSessions(target.project).map((session) => session.id));
+      for (const ws of selectRevokedSockets(clients, (sid) => live.has(sid))) revokeClient(ws);
+    }
+    extensions.beforeRevalidate();
     for (const ws of wss.clients) {
-      const scope = socketScopes.get(ws);
-      const payload = socketPayloads.get(ws);
-      if (payload && !validStationPrincipal(payload, scope)) revokeClient(ws);
+      if (clients.has(ws) && !extensions.revalidate(ws)) revokeClient(ws);
     }
   } catch {
     // Session checks are best-effort when the project store is unavailable.
@@ -470,18 +424,15 @@ function broadcastState() {
       })(),
       GRID_COLUMNS, GRID_ROWS, orientation
     );
-  const composite = calibrationMode ? output : compositors.reduce((frame, apply) => apply(frame), output);
-  const payload = JSON.stringify({ type: 'state', grid: composite,
-    ...(stations.stations.length ? { stationMode: stations.mode(), stationOpen: stations.acceptsInput() } : {}) });
+  const composite = calibrationMode ? output : extensions.compositeOutput(output);
+  const fullState = extensions.fullState(composite);
+  const payload = JSON.stringify(fullState);
   // Lossy: this goes out 60 times a second and each frame replaces the last, so
   // a client that cannot keep up must skip frames rather than build a backlog
   // that leaves it rendering the past while the rig runs on the present.
-  fanoutLossy(fullClients(), payload, dropClient);
   for (const ws of wss.clients) {
-    const scope = socketScopes.get(ws);
-    if (!scope) continue;
-    const scopedGrid = projections.reduce((frame, project) => project(frame, scope), composite);
-    fanoutLossy([ws], JSON.stringify({ type: 'state', grid: scopedGrid, stationOpen: stations.acceptsInput() }), dropClient);
+    const state = extensions.stateFor(ws, fullState, composite);
+    if (state) fanoutLossy([ws], state === fullState ? payload : JSON.stringify(state), dropClient);
   }
 }
 
@@ -777,14 +728,10 @@ function buildSystemStatus(): SystemStatus {
 
 wss.on('connection', (ws, req: http.IncomingMessage) => {
   const remote = req.socket.remoteAddress ?? 'unknown';
-  const payload = verifiedPayloads.get(req);
-  const scope = requestedScopes.get(req);
-  if (scope) socketScopes.set(ws, scope);
-  if (payload) socketPayloads.set(ws, payload);
-  const isUi = payload !== undefined;
+  const payload = extensions.principal(ws);
   const now = Date.now();
   clients.set(ws, {
-    role: isUi ? 'ui' : 'unknown',
+    role: payload ? 'ui' : 'unknown',
     remote,
     connectedAt: now,
     lastSeen: now,
@@ -808,27 +755,9 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     if (state) state.alive = true;
   });
 
-  if (scope) {
-    sendToClient(ws, JSON.stringify({ type: 'station_layout', layout: projectStationLayout(layout, scope) }));
-    ws.on('message', raw => {
-      if (!payload || !validStationPrincipal(payload, scope)) {
-        revokeClient(ws);
-        return;
-      }
-      try {
-        const msg = JSON.parse(raw.toString());
-        if (!msg || typeof msg !== 'object') return;
-        scopedPolicies.some(handler => handler(msg, scope));
-      } catch {
-        // ignore malformed messages
-      }
-    });
-    return;
-  }
-
-  if (!payload && stations.stations.length) {
-    sendToClient(ws, JSON.stringify({ type: 'command', action: 'stationOverlay', cells: stations.snapshot() }));
-  }
+  for (const packet of extensions.initialPayloads(ws)) sendToClient(ws, JSON.stringify(packet));
+  ws.on('message', receiveMessage);
+  if (extensions.isScoped(ws)) return;
 
   // Send the resolved layout first — the single source of truth for geometry —
   // so UI and receiver render/route from the same fixtures the server uses.
@@ -870,15 +799,17 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   sendToClient(ws, patternStatePayload());
   sendToClient(ws, looksPayload());
 
-  ws.on('message', (raw) => {
+  function receiveMessage(raw: RawData) {
     try {
       const msg = JSON.parse(raw.toString());
+      if (!msg || typeof msg !== 'object') return;
       const info = clients.get(ws);
       if (info) info.lastSeen = Date.now();
-      if (payload && !validStationPrincipal(payload)) {
+      if (!extensions.revalidate(ws)) {
         revokeClient(ws);
         return;
       }
+      if (extensions.scopedMessage(ws, msg)) return;
 
       if (msg.type === 'hello' && msg.role === 'receiver' && info) {
         const hello = msg as HelloMessage;
@@ -929,11 +860,11 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     } catch {
       // ignore malformed messages
     }
-  });
+  }
 });
 
 function handleMessage(msg: any, ws?: WebSocket) {
-  if ((!ws || socketPayloads.has(ws)) && messagePolicies.some(handler => handler(msg))) return;
+  if (extensions.operatorMessage(msg, ws)) return;
   switch (msg.type) {
   case 'pool_touch': {
     if (typeof msg.x !== 'number' || typeof msg.y !== 'number') break;

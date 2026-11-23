@@ -14,5 +14,6 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --fix",
     "test": "jest --passWithNoTests"
   },
+  "dependencies": { "@wavegrid/extensions": "workspace:*" },
   "devDependencies": { "makage": "^0.3.0" }
 }

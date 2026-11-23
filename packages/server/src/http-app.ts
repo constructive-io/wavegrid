@@ -4,15 +4,14 @@
  * This is what collapses the old two-service (Next UI + wavegrid server) split
  * — same-origin means no `ui.port` / `simulatorUrl` to keep in sync.
  */
-import { type ResolvedConfig } from '@wavegrid/layout';
+import { type ResolvedConfig, resolveLayout } from '@wavegrid/layout';
 import { DEFAULT_SESSION_TTL_MS, loadProjectPlugins, openStore, readProjectPluginFile, type UserRole } from '@wavegrid/settings';
-import type { StationGrant } from '@wavegrid/stations';
+import { createStationProjectPolicy, type StationGrant, stationLoginError } from '@wavegrid/stations';
 import * as fs from 'fs';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { extname, join, normalize, resolve } from 'path';
 
 import { signJwt, verifyJwt } from './jwt';
-import { projectStations } from './station-project';
 
 export interface HttpAppOptions {
   /** Directory of the built UI (Vite `dist`). Static serving is skipped if unset/missing. */
@@ -227,6 +226,7 @@ function normalizeLightMap(
  */
 export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {}) {
   const layout = resolved.layout;
+  const stationPolicy = createStationProjectPolicy(resolved.config.stations, layout, resolveLayout);
   const sessionsRevoked = () => opts.onSessionsRevoked?.();
   const uiDir = opts.uiDir && fs.existsSync(opts.uiDir) ? opts.uiDir : null;
   const dims = { numCannons: layout.count, gridColumns: layout.cols };
@@ -347,13 +347,10 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
         sendJson(res, 401, { ok: false, error: 'Invalid username or password' });
         return;
       }
-      if (body.station !== undefined && user.station !== body.station) {
-        sendJson(res, 403, { ok: false, error: 'This passcode does not grant access to that station' });
-        return;
-      }
-      if (user.station !== undefined && !projectStations(resolved, store.getProjectConfig(project))
-        .some(station => station.slug === user.station)) {
-        sendJson(res, 403, { ok: false, error: 'Station unavailable' });
+      const stationError = stationLoginError(body.station, user, slug =>
+        stationPolicy.currentStations({ store, project }).some(station => station.slug === slug));
+      if (stationError) {
+        sendJson(res, 403, { ok: false, error: stationError });
         return;
       }
       // Record a cheap server-side session and bind the JWT to it, so admins
@@ -414,12 +411,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
         sendJson(res, 401, { ok: false, error: 'Session expired or revoked' });
         return;
       }
-      const key = store.listAccessKeys(project).find(key => key.name === payload.sub);
-      if ((key?.station !== undefined || payload.station !== undefined || session?.station !== undefined) &&
-          (!key?.enabled || !session || session.username !== payload.sub ||
-            key.station !== payload.station || key.station !== session.station ||
-            !projectStations(resolved, store.getProjectConfig(project))
-              .some(station => station.slug === key.station))) {
+      if (!stationPolicy.sessionValid({ store, project }, payload, session)) {
         sendJson(res, 401, { ok: false, error: 'Station session expired or revoked' });
         return;
       }
@@ -556,7 +548,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
       // to copy and hand over; only its hash is persisted.
       const store = openStore();
       try {
-        if (body.station !== undefined && !projectStations(resolved, store.getProjectConfig(caller.project))
+        if (body.station !== undefined && !stationPolicy.currentStations({ store, project: caller.project })
           .some(station => station.slug === body.station)) {
           sendJson(res, 400, { ok: false, error: 'Unknown station' });
           return;

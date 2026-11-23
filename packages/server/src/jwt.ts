@@ -1,3 +1,4 @@
+import type { BrainPrincipal } from '@wavegrid/extensions';
 import type { StationGrant } from '@wavegrid/stations';
 import { createHmac } from 'crypto';
 
@@ -18,7 +19,7 @@ function base64urlDecode(str: string): string {
 
 export type Role = 'admin' | 'operator';
 
-export interface JwtPayload extends StationGrant {
+export interface JwtPayload extends BrainPrincipal, StationGrant {
   /** Subject — the username. */
   sub: string;
   /** Issued-at (seconds). */

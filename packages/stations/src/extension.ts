@@ -1,20 +1,13 @@
-import { resolveStations, type Station } from './config';
+import type { BrainConnection, BrainExtensionRegistration, BrainMessage } from '@wavegrid/extensions';
+
+import { resolveStations, type Station, type StationConfig } from './config';
 import {
   compositeStationPaint,
   dispatchStationTool,
   isStationMode,
-  type StationCell,
-  type StationColor,
   StationPaint
 } from './paint';
-
-export interface BrainExtensionHooks {
-  onScopedMessage(handler: (message: Record<string, unknown>, scope: Station) => boolean): void;
-  onOperatorMessage(handler: (message: Record<string, unknown>) => boolean): void;
-  projectState(handler: (frame: StationColor[], scope: Station) => StationColor[]): void;
-  compositeOutput(handler: (frame: StationColor[]) => StationColor[]): void;
-  publishOutput(cells: StationCell[]): void;
-}
+import { createStationProjectPolicy, type StationStore } from './project';
 
 export interface StationFixture { index: number; u: number; v: number; label: string; kind: string }
 export interface StationProjection { id: string; name: string; fixtures: StationFixture[] }
@@ -45,43 +38,88 @@ export function projectStationLayout(
   };
 }
 
-export function registerStations(
-  config: Parameters<typeof resolveStations>[0],
+export function stationExtension<LayoutSpec>(
+  config: StationConfig | undefined,
   layout: StationLayout,
-  hooks: BrainExtensionHooks
-) {
-  const stations = resolveStations(config, layout);
-  const paint = new StationPaint();
-  const snapshot = () => paint.snapshot(layout.fixtures.length);
-  const publish = () => hooks.publishOutput(snapshot());
-  if (stations.length) {
-    hooks.onScopedMessage((message, scope) => {
-      if (!dispatchStationTool(message, scope, paint)) return false;
-      publish();
-      return true;
-    });
-    hooks.onOperatorMessage(message => {
-      if (message.type === 'station_mode' && isStationMode(message.mode)) {
-        paint.setMode(message.mode);
-        publish();
-        return true;
-      }
-      if (message.type === 'clear' || message.type === 'stopPattern' ||
-          (message.type === 'animation' && message.name === 'stop') ||
-          (message.type === 'calibration_mode' && message.enabled === true)) {
-        paint.stop();
-        publish();
-      }
-      return false;
-    });
-    hooks.projectState((frame, scope) => scope.fixtures.map(idx => frame[idx] ?? { h: 0, s: 0, b: 0 }));
-    hooks.compositeOutput(frame => compositeStationPaint(frame, snapshot()));
-  }
+  resolveLayout: (spec: LayoutSpec) => StationLayout
+): BrainExtensionRegistration<StationStore<LayoutSpec>> {
+  const scopeSlug = ({ principal, url }: BrainConnection) =>
+    principal ? url.searchParams.get('station') ?? principal.station : undefined;
   return {
-    stations,
-    snapshot,
-    mode: () => paint.currentMode,
-    acceptsInput: () => paint.acceptsInput,
-    suspend: () => { paint.stop(); publish(); }
+    enabled: config?.enabled === true,
+    requiresScope: connection => scopeSlug(connection) !== undefined,
+    extension: {
+      id: 'stations',
+      setup(ctx) {
+        const stations = resolveStations(config, layout);
+        if (!stations.length) return {};
+        const policy = createStationProjectPolicy(config, layout, resolveLayout);
+        const paint = new StationPaint();
+        const snapshot = () => paint.snapshot(layout.fixtures.length);
+        const overlay = (): BrainMessage => ({ type: 'command', action: 'stationOverlay', cells: snapshot() });
+        const publish = () => ctx.publish('receiver', overlay());
+        const isCurrent = (scope: Station) => {
+          const target = ctx.getProject();
+          const current = target && policy.currentStations(target).find(station => station.slug === scope.slug);
+          return !!current && JSON.stringify(current.fixtures) === JSON.stringify(scope.fixtures);
+        };
+        const validScope = (connection: BrainConnection, scope: Station) => {
+          const principal = connection.principal;
+          const target = ctx.getProject();
+          if (!principal?.sid || principal.station !== scope.slug || !target) return false;
+          return policy.sessionValid(
+            target, { ...principal, station: scope.slug }, target.store.getSession(target.project, principal.sid), scope
+          );
+        };
+        const validOperator = ({ principal }: BrainConnection) => {
+          if (!principal || principal.station !== undefined) return true;
+          const target = ctx.getProject();
+          return !target || !target.store.listAccessKeys(target.project)
+            .some(key => key.name === principal.sub && key.station !== undefined);
+        };
+        return {
+          authorize(connection) {
+            const slug = scopeSlug(connection);
+            if (slug === undefined) return validOperator(connection) ? undefined : false;
+            const scope = stations.find(station => station.slug === slug);
+            if (!scope || !validScope(connection, scope)) return false;
+            return {
+              onMessage(message) { if (dispatchStationTool(message, scope, paint)) publish(); },
+              onConnect: () => [{ type: 'station_layout', layout: projectStationLayout(layout, scope) }],
+              projectState: ({ grid }) => ({
+                type: 'state',
+                grid: scope.fixtures.map(idx => grid[idx] ?? { h: 0, s: 0, b: 0 }),
+                stationOpen: paint.acceptsInput
+              }),
+              revalidate: () => validScope(connection, scope)
+            };
+          },
+          onOperatorMessage(message) {
+            if (message.type === 'station_mode' && isStationMode(message.mode)) {
+              paint.setMode(message.mode);
+              publish();
+              return true;
+            }
+            if (message.type === 'clear' || message.type === 'stopPattern' ||
+                (message.type === 'animation' && message.name === 'stop') ||
+                (message.type === 'calibration_mode' && message.enabled === true)) {
+              paint.stop();
+              publish();
+            }
+            return false;
+          },
+          projectState: state => ({ ...state, stationMode: paint.currentMode, stationOpen: paint.acceptsInput }),
+          onConnect: ({ principal }) => principal ? [] : [overlay()],
+          compositeOutput: frame => compositeStationPaint(frame, snapshot()),
+          beforeRevalidate() {
+            if (paint.acceptsInput && stations.some(scope => !isCurrent(scope))) {
+              paint.stop();
+              publish();
+            }
+          },
+          revalidate: validOperator
+        };
+      }
+    }
   };
 }

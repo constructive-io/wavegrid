@@ -11,7 +11,7 @@ import { startServer, type ServerHandle } from '../src/server';
 const red = { h: 0, s: 100, b: 100 };
 const blue = { h: 240, s: 100, b: 100 };
 
-test('station sockets paint and clear isolated fixture sets without controlling the show', async () => {
+test('the brain extension host isolates station painting from other fixtures and the show', async () => {
   const saved = { ...process.env };
   const root = mkdtempSync(join(tmpdir(), 'wavegrid-stations-'));
   const sockets: WebSocket[] = [];
@@ -110,6 +110,9 @@ test('station sockets paint and clear isolated fixture sets without controlling 
     expect(receiver.frames.slice(first).filter(frame => frame.type === 'command')
       .map(frame => frame.action).filter(action => action !== 'keepalive')).toEqual(['stationOverlay', 'stationOverlay']);
     expect(clientA.frames.every(frame => ['station_layout', 'state'].includes(frame.type))).toBe(true);
+    const returningReceiver = await dial({ key: 'station-test-receiver' });
+    await waitFor(() => returningReceiver.overlay() !== undefined);
+    expect(returningReceiver.overlay()).toEqual(receiver.overlay());
 
     clientA.send({ type: 'clear' });
     await waitFor(() => clientA.state()?.grid[1]?.b === 0);
@@ -128,6 +131,9 @@ test('station sockets paint and clear isolated fixture sets without controlling 
     store.setAccessKeyEnabled('demo', 'north-key', false);
     await waitFor(() => clientA.ws.readyState === WebSocket.CLOSED);
     expect(clientB.ws.readyState).toBe(WebSocket.OPEN);
+    store.saveProjectConfig('demo', { ...config, stations: { ...config.stations, enabled: false } });
+    await waitFor(() => clientB.ws.readyState === WebSocket.CLOSED);
+    expect(full.ws.readyState).toBe(WebSocket.OPEN);
   } finally {
     for (const socket of sockets) socket.terminate();
     handle?.stop();
