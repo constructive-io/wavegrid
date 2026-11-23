@@ -94,6 +94,7 @@ export class Receiver {
   private _running = false;
   private _animState: AnimationState = createDefaultAnimationState();
   private stationOverlay: StationCell[] = [];
+  private stationBrightness = this._animState.brightness;
   private _sandbox: SandboxEngine | null = null;
   private _sandboxReady: Promise<SandboxEngine> | null = null;
   private _patternTime = 0;
@@ -127,7 +128,7 @@ export class Receiver {
       s: c.s,
       b: c.b
     }));
-    const brightnessScale = this._animState.brightness / 100;
+    const brightnessScale = this.stationBrightness / 100;
     const remapped = compositeStationPaint(
       remapGridForOutput(full, this.config.layout.cols, this.config.layout.rows, this._animState),
       Date.now() - this.lastDataAt > this.config.fallbackDelay
@@ -180,6 +181,7 @@ export class Receiver {
       // The receiver must produce zero output until a visual command arrives.
       if (cmd.action === 'keepalive') return;
       if (cmd.action === 'stationOverlay') {
+        if (!this.stationOverlay.length) this.stationBrightness = this._animState.brightness;
         this.stationOverlay = cmd.cells;
         if (cmd.cells.length) this.ensureGrid();
         return;
@@ -308,6 +310,10 @@ export class Receiver {
         // Always tick the low-pass filter — this ensures smooth output
         // whether receiving data, transitioning to fallback, or in fallback
         tickFilter(this.grid, this.config.alpha, this._fallbackActive ? 1 : this._animState.brightness / 100);
+        const brightnessDelta = this._animState.brightness - this.stationBrightness;
+        this.stationBrightness = Math.abs(brightnessDelta) > 0.3
+          ? this.stationBrightness + brightnessDelta * this.config.alpha
+          : this._animState.brightness;
 
         // Send filtered output to the output adapter
         this.config.output.send(this.getOutputState());

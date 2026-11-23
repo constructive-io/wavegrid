@@ -72,6 +72,7 @@ describe('Receiver', () => {
       jest.advanceTimersByTime(100);
       expect(levels).toEqual([]);
       input.emit('command', { type: 'command', action: 'stationOverlay', cells: [{ idx: 0, h: 240, s: 100, b: 80 }] });
+      expect(r.getOutputState()[0].b).toBe(16);
       jest.advanceTimersByTime(100);
       expect(levels.at(-1)).toEqual([16, 0]);
       input.emit('command', { type: 'command', action: 'paint', cells: [{ idx: 1, h: 60, s: 100, b: 75 }] });
@@ -87,7 +88,7 @@ describe('Receiver', () => {
     }
   });
 
-  it('smooths master brightness changes without changing operator paint targets', () => {
+  it('smooths master brightness changes for both operator and station paint in mixed output', () => {
     jest.useFakeTimers();
     const input = new WebSocketInput({ url: 'ws://example.com:9999' });
     jest.spyOn(input, 'connect').mockImplementation(() => {});
@@ -96,13 +97,15 @@ describe('Receiver', () => {
     try {
       input.emit('connected');
       input.emit('command', { type: 'command', action: 'paint', cells: [{ idx: 0, h: 60, s: 100, b: 80 }] });
+      input.emit('command', { type: 'command', action: 'stationOverlay', cells: [{ idx: 1, h: 240, s: 100, b: 80 }] });
       jest.advanceTimersByTime(1000);
-      expect(r.getOutputState()[0].b).toBe(80);
+      expect(r.getOutputState().slice(0, 2).map(c => c.b)).toEqual([80, 80]);
       input.emit('command', { type: 'command', action: 'setBrightness', value: 50 });
       jest.advanceTimersByTime(20);
-      expect(r.getOutputState()[0].b).toBe(60);
+      expect(r.getOutputState().slice(0, 2).map(c => c.b)).toEqual([60, 60]);
       jest.advanceTimersByTime(200);
       expect(r.getOutputState()[0].b).toBe(40);
+      expect(r.getOutputState()[1].b).toBeCloseTo(40, 1);
       expect(r.rawGrid?.[0].targetB).toBe(80);
     } finally {
       r.stop();
