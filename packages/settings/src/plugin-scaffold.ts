@@ -7,7 +7,8 @@ import { parseProjectFile } from './project-file';
 
 /** Add a new plugin without rewriting unrelated project fields or touching the store. */
 export function addProjectPlugin(file: string, plugin: PortablePlugin): void {
-  const folder = path.dirname(path.resolve(file));
+  file = fs.realpathSync(file);
+  const folder = path.dirname(file);
   const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   const document = parseProjectFile(raw);
   const refs = [...(document.plugins ?? []), { path: plugin.path }];
