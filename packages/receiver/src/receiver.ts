@@ -127,14 +127,15 @@ export class Receiver {
       s: c.s,
       b: c.b
     }));
+    const brightnessScale = this._animState.brightness / 100;
     const remapped = compositeStationPaint(
       remapGridForOutput(full, this.config.layout.cols, this.config.layout.rows, this._animState),
-      Date.now() - this.lastDataAt > this.config.fallbackDelay ? [] : this.stationOverlay
+      Date.now() - this.lastDataAt > this.config.fallbackDelay
+        ? []
+        : this.stationOverlay.map(cell => ({ ...cell, b: cell.b * brightnessScale }))
     );
     const shard = this.config.shard;
-    const frame = shard ? remapped.slice(shard.start, shard.end + 1) : remapped;
-    const scale = this._fallbackActive ? 1 : this._animState.brightness / 100;
-    return scale === 1 ? frame : frame.map(cell => ({ ...cell, b: cell.b * scale }));
+    return shard ? remapped.slice(shard.start, shard.end + 1) : remapped;
   }
 
   /** Start the receiver — connects input and begins the tick loop. */
@@ -306,7 +307,7 @@ export class Receiver {
 
         // Always tick the low-pass filter — this ensures smooth output
         // whether receiving data, transitioning to fallback, or in fallback
-        tickFilter(this.grid, this.config.alpha);
+        tickFilter(this.grid, this.config.alpha, this._fallbackActive ? 1 : this._animState.brightness / 100);
 
         // Send filtered output to the output adapter
         this.config.output.send(this.getOutputState());

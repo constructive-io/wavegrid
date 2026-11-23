@@ -87,6 +87,29 @@ describe('Receiver', () => {
     }
   });
 
+  it('smooths master brightness changes without changing operator paint targets', () => {
+    jest.useFakeTimers();
+    const input = new WebSocketInput({ url: 'ws://example.com:9999' });
+    jest.spyOn(input, 'connect').mockImplementation(() => {});
+    const r = new Receiver({ input, output: new CallbackOutput(() => {}), alpha: 0.5, tickMs: 20 });
+    r.start();
+    try {
+      input.emit('connected');
+      input.emit('command', { type: 'command', action: 'paint', cells: [{ idx: 0, h: 60, s: 100, b: 80 }] });
+      jest.advanceTimersByTime(1000);
+      expect(r.getOutputState()[0].b).toBe(80);
+      input.emit('command', { type: 'command', action: 'setBrightness', value: 50 });
+      jest.advanceTimersByTime(20);
+      expect(r.getOutputState()[0].b).toBe(60);
+      jest.advanceTimersByTime(200);
+      expect(r.getOutputState()[0].b).toBe(40);
+      expect(r.rawGrid?.[0].targetB).toBe(80);
+    } finally {
+      r.stop();
+      jest.useRealTimers();
+    }
+  });
+
   it('uses the fallback brightness even when the upstream master brightness was zero', () => {
     jest.useFakeTimers();
     const input = new WebSocketInput({ url: 'ws://example.com:9999' });
