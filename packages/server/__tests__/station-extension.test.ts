@@ -159,6 +159,11 @@ test('the brain extension host isolates station painting from other fixtures and
     await waitFor(() => full.frames.some(frame => frame.type === 'system_status'));
     expect(clientB.state().stationOpen).toBe(false);
     expect(preview()?.grid).toEqual(expectedPreview);
+    full.send({ type: 'clear' });
+    await waitFor(() => preview()?.grid?.every((cell: { b: number }) => cell.b === 0));
+    expect(receiver.frames.some(frame => frame.action === 'clear')).toBe(true);
+    handle.send({ type: 'physical_preview', physicalIndex: 1 });
+    await waitFor(() => preview()?.grid?.[1]?.b === 100);
     handle.send({ type: 'physical_preview_clear' });
     await waitFor(() => preview()?.grid?.every((cell: { b: number }) => cell.b === 0));
     handle.send({ type: 'calibration_mode', enabled: false });

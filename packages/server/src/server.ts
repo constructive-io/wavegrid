@@ -1098,7 +1098,9 @@ function handleMessage(msg: any, ws?: WebSocket) {
     deactivatePool();
     resetGrid(grid);
     broadcastCommand({ action: 'clear' });
-    broadcastState();
+    previewPhysicalIndex = null;
+    if (calibrationMode) broadcastCalibrationPreview();
+    else broadcastState();
     scheduleSave();
     break;
   case 'rotate': {
