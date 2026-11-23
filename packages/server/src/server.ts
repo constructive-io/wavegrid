@@ -451,11 +451,7 @@ function getCalibrationOutput(): CannonState[] {
 }
 
 function calibrationPreview() {
-  return JSON.stringify({
-    type: 'command',
-    action: 'calibrationPreview',
-    preview: calibrationMode ? { physicalIndex: previewPhysicalIndex } : null
-  });
+  return JSON.stringify({ type: 'command', action: 'calibrationPreview', grid: calibrationMode ? getCalibrationOutput() : null });
 }
 
 function broadcastCalibrationPreview() {

@@ -174,13 +174,14 @@ describe('Receiver', () => {
       jest.advanceTimersByTime(40);
       expect(r.getOutputState().map(c => c.b)).toEqual([0, 20]);
       input.emit('command', { type: 'command', action: 'stationOverlay', cells: [{ idx: 4, h: 0, s: 0, b: 0 }] });
-      input.emit('command', { type: 'command', action: 'calibrationPreview', preview: { physicalIndex: 3 } });
+      const grid = Array.from({ length: 49 }, (_, idx) => ({ h: 45, s: 0, b: idx === 3 ? 100 : 0 }));
+      input.emit('command', { type: 'command', action: 'calibrationPreview', grid });
       expect(r.getOutputState().map(c => c.b)).toEqual([20, 0]);
       input.emit('disconnected');
       expect(r.getOutputState().map(c => c.b)).toEqual([0, 0]);
       input.emit('connected');
       input.emit('command', { type: 'command', action: 'stationOverlay', cells: [{ idx: 4, h: 0, s: 0, b: 0 }] });
-      input.emit('command', { type: 'command', action: 'calibrationPreview', preview: null });
+      input.emit('command', { type: 'command', action: 'calibrationPreview', grid: null });
       expect(r.getOutputState().map(c => c.b)).toEqual([0, 0]);
     } finally {
       r.stop();

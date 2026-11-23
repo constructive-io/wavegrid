@@ -58,8 +58,6 @@ export interface ReceiverConfig {
    * affects which cannons are sent to the output adapter.
    */
   shard?: ShardConfig;
-  /** Logical-to-physical mapping used by the output adapter. Defaults to identity. */
-  physicalLightMap?: readonly number[];
   /** Resolved layout — the single source of geometry (fixtures, cols/rows, count). */
   layout: Layout;
 }
@@ -189,15 +187,8 @@ export class Receiver {
       // The receiver must produce zero output until a visual command arrives.
       if (cmd.action === 'keepalive') return;
       if (cmd.action === 'calibrationPreview') {
-        if (cmd.preview) {
-          const physicalIndex = cmd.preview.physicalIndex;
-          const index = physicalIndex === null ? -1 : (this.config.physicalLightMap?.indexOf(physicalIndex) ?? physicalIndex);
-          this.calibrationPreview = this.ensureGrid().map((_, i) =>
-            i === index ? { h: 45, s: 0, b: 100 } : { h: 0, s: 0, b: 0 }
-          );
-        } else {
-          this.calibrationPreview = null;
-        }
+        this.calibrationPreview = cmd.grid;
+        if (cmd.grid) this.ensureGrid();
         return;
       }
       if (cmd.action === 'stationOverlay') {
