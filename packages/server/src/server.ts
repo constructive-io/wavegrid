@@ -155,6 +155,7 @@ function scheduleSave() {
 const grid = createGrid(NUM_CANNONS);
 let currentAlpha = DEFAULT_ALPHA;
 let currentAttack = 1.0;
+let masterBrightness = 100;
 let currentAnimation: string | null = null;
 let animationTick = 0;
 let animSpeed = 1.0;
@@ -755,6 +756,9 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     if (state) state.alive = true;
   });
 
+  if (extensions.audience(ws) === 'receiver') {
+    sendToClient(ws, JSON.stringify({ type: 'command', action: 'setBrightness', value: masterBrightness }));
+  }
   for (const packet of extensions.initialPayloads(ws)) sendToClient(ws, JSON.stringify(packet));
   ws.on('message', receiveMessage);
   if (extensions.isScoped(ws)) return;
@@ -953,8 +957,9 @@ function handleMessage(msg: any, ws?: WebSocket) {
     }
     break;
   case 'master_brightness':
-    setAllTargets(grid, undefined, undefined, msg.value * 100, currentAttack);
-    broadcastCommand({ action: 'setBrightness', value: msg.value * 100 });
+    masterBrightness = msg.value * 100;
+    setAllTargets(grid, undefined, undefined, masterBrightness, currentAttack);
+    broadcastCommand({ action: 'setBrightness', value: masterBrightness });
     scheduleSave();
     break;
   case 'scene':

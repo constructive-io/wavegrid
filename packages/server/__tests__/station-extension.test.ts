@@ -110,9 +110,15 @@ test('the brain extension host isolates station painting from other fixtures and
     expect(receiver.frames.slice(first).filter(frame => frame.type === 'command')
       .map(frame => frame.action).filter(action => action !== 'keepalive')).toEqual(['stationOverlay', 'stationOverlay']);
     expect(clientA.frames.every(frame => ['station_layout', 'state'].includes(frame.type))).toBe(true);
+    full.send({ type: 'master_brightness', value: 0.2 });
+    await waitFor(() => receiver.frames.some(frame => frame.action === 'setBrightness' && frame.value === 20));
     const returningReceiver = await dial({ key: 'station-test-receiver' });
     await waitFor(() => returningReceiver.overlay() !== undefined);
     expect(returningReceiver.overlay()).toEqual(receiver.overlay());
+    const overlayIndex = returningReceiver.frames.findIndex(frame => frame.action === 'stationOverlay');
+    expect(returningReceiver.frames.slice(0, overlayIndex)).toContainEqual({
+      type: 'command', action: 'setBrightness', value: 20
+    });
 
     clientA.send({ type: 'clear' });
     await waitFor(() => clientA.state()?.grid[1]?.b === 0);

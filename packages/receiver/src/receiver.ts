@@ -204,7 +204,8 @@ export class Receiver {
         this.config.alpha = Math.max(0.01, Math.min(1, cmd.value));
         return;
       }
-      if (cmd.action === 'setAttack' || cmd.action === 'setOrientation' || cmd.action === 'setShift' || cmd.action === 'setSpeed') {
+      if (cmd.action === 'setAttack' || cmd.action === 'setOrientation' || cmd.action === 'setShift' ||
+          cmd.action === 'setSpeed' || cmd.action === 'setBrightness') {
         handleCommand(this._animState, cmd);
         return;
       }
