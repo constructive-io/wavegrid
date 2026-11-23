@@ -176,6 +176,9 @@ export function validatePlugin(ref: PortablePlugin): PluginSnapshot {
       ids.add(tab.id);
       const condition = tab.showWhen === undefined ? 'always' : tab.showWhen;
       if (!showWhen(condition)) throw new Error(`Invalid showWhen for tab ${tab.id}`);
+      if (tab.view !== undefined && (typeof tab.view !== 'string' || !tab.view.endsWith('.html'))) {
+        throw new Error(`Tab ${tab.id} view must end in lowercase .html`);
+      }
       const view = tab.view === undefined ? undefined : requireFile(tab.view);
       const paint = tab.paint;
       if (paint !== undefined && typeof paint !== 'boolean') throw new Error(`Tab ${tab.id} paint must be a boolean`);

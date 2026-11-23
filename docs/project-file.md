@@ -155,7 +155,8 @@ the brain preview; it needs no OSC hardware or receiver.
 ### Views
 
 A tab may have `"view": "view/index.html"`, cards, or both (the view comes first).
-The view file must exist inside the plugin, with the same path checks as patterns.
+The view file must end in lowercase `.html` and exist inside the plugin, with the
+same path checks as patterns. Extensions such as `.htm` and `.HTML` are rejected.
 `"paint": true` opts this tab into main-grid paint gestures while it is active.
 The example includes a **Pulse View** tab: fixture swatches, speed, start/stop,
 scoped saved Looks, and a paint-event log.

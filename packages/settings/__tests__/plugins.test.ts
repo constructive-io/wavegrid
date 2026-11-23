@@ -32,6 +32,14 @@ function fixture() {
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
 describe('project plugins', () => {
+  it.each(['view.htm', 'view.HTML', 'view.Html', 'view.js'])('rejects unsupported view extension: %s', view => {
+    const f = fixture();
+    fs.writeFileSync(path.join(f.plugin, view), '<h1>View</h1>');
+    json(path.join(f.plugin, 'tab.json'), { id: 'view', label: 'View', view });
+    expect(() => f.store.openProjectFile(f.file, f.doc)).toThrow(/view must end in lowercase \.html/);
+    expect(f.store.hasProject('venue')).toBe(false);
+  });
+
   it.each([false, true])('accepts view-only and combined tabs (cards: %s)', withCards => {
     const f = fixture();
     fs.writeFileSync(path.join(f.plugin, 'view.html'), '<h1>View</h1>');
