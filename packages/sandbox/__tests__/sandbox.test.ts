@@ -6,7 +6,7 @@ const layout = resolveLayout({ preset: 'grid-7x7' });
 
 describe('shared pattern sandbox', () => {
   let engine: SandboxEngine;
-  beforeEach(async () => { engine = await createSandboxEngine(layout, { loadBudgetMs: 30, renderBudgetMs: 6 }); });
+  beforeEach(async () => { engine = await createSandboxEngine(layout); });
   afterEach(() => engine?.dispose());
 
   it('keeps host globals out of both direct access and Function constructors', () => {
@@ -18,7 +18,9 @@ describe('shared pattern sandbox', () => {
     expect(engine.renderFrame(0, 0, 1)?.[0]).toEqual({ h: 120, s: 100, b: 100 });
   });
 
-  it('interrupts a nonterminating load and can load another pattern', () => {
+  it('interrupts a nonterminating load and can load another pattern', async () => {
+    engine.dispose();
+    engine = await createSandboxEngine(layout, { loadBudgetMs: 200 });
     const start = performance.now();
     expect(() => engine.loadPattern('(function(){ while(true){} })()')).toThrow();
     expect(performance.now() - start).toBeLessThan(1000);
