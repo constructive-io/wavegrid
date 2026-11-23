@@ -1,0 +1,19 @@
+{
+  "id": "pulse",
+  "label": "Plugin Pulse",
+  "showWhen": "always",
+  "cards": [
+    {
+      "title": "Pulse controls",
+      "controls": [
+        { "type": "slider", "param": "speed", "label": "Speed", "min": 0.1, "max": 4, "step": 0.1, "default": 1 },
+        { "type": "slider", "param": "hue", "label": "Hue", "min": 0, "max": 360, "default": 210 },
+        { "type": "toggle", "param": "enabled", "label": "Pulse enabled", "default": true },
+        { "type": "select", "param": "mode", "label": "Color mode", "options": ["Hue", "Tint"], "default": "Hue" },
+        { "type": "color", "param": "tint", "label": "Tint", "default": "#ff6633" },
+        { "type": "button", "label": "Start", "action": "start" },
+        { "type": "button", "label": "Stop", "action": "stop" }
+      ]
+    }
+  ]
+}

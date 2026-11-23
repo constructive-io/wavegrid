@@ -19,7 +19,7 @@ function fixture() {
   fs.mkdirSync(plugin);
   const manifest = { id: 'show', name: 'Show', version: '1.0.0', apiVersion: 1, pattern: 'pattern.js', tabs: ['tab.json'], presets: 'presets.json' };
   json(path.join(plugin, 'plugin.json'), manifest);
-  json(path.join(plugin, 'tab.json'), { id: 'paint', label: 'Paint', cards: [{ title: 'Color', controls: [{ future: true }] }] });
+  json(path.join(plugin, 'tab.json'), { id: 'paint', label: 'Paint', cards: [{ title: 'Color', controls: [{ type: 'toggle', param: 'enabled', default: true }] }] });
   json(path.join(plugin, 'presets.json'), { colors: ['red'] });
   fs.writeFileSync(path.join(plugin, 'pattern.js'), 'throw new Error("must never execute on host");');
   fs.writeFileSync(path.join(plugin, 'image.png'), Buffer.from([0, 255, 1, 128]));
@@ -52,7 +52,8 @@ describe('project plugins', () => {
     expect(fs.existsSync(path.join(f.copy, '.secret'))).toBe(false);
     expect(loadProjectPlugins(f.store.paths, 'venue')).toEqual({ errors: [], plugins: [{
       id: 'show', name: 'Show', version: '1.0.0', presets: { colors: ['red'] },
-      tabs: [{ id: 'paint', label: 'Paint', showWhen: 'always', pattern: 'pattern.js', cards: [{ title: 'Color', controls: [{ future: true }] }] }]
+      presetsFile: 'presets.json',
+      tabs: [{ id: 'paint', label: 'Paint', showWhen: 'always', pattern: 'pattern.js', cards: [{ title: 'Color', controls: [{ type: 'toggle', param: 'enabled', default: true }] }] }]
     }] });
     fs.writeFileSync(path.join(f.copy, 'stale.js'), 'stale');
     f.store.openProjectFile(f.file, f.doc);
@@ -100,6 +101,16 @@ describe('project plugins', () => {
     let message = '';
     try { f.store.openProjectFile(f.file, f.doc); } catch (e) { message = (e as Error).message; }
     for (const problem of ['apiVersion', 'missing.js', 'showWhen', 'absent.json']) expect(message).toContain(problem);
+    expect(f.store.hasProject('venue')).toBe(false);
+  });
+
+  it.each([
+    { type: 'unknown' }, { type: 'slider', param: 'bad-key', min: 0, max: 1, default: 0 },
+    ...['__proto__', 'constructor', 'prototype'].map(param => ({ type: 'toggle', param, default: true }))
+  ])('rejects invalid controls at open before writing: %j', control => {
+    const f = fixture();
+    json(path.join(f.plugin, 'tab.json'), { id: 'paint', label: 'Paint', cards: [{ title: 'Bad', controls: [control] }] });
+    expect(() => f.store.openProjectFile(f.file, f.doc)).toThrow(/Invalid control/);
     expect(f.store.hasProject('venue')).toBe(false);
   });
 

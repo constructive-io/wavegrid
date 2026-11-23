@@ -1,0 +1,5 @@
+[
+  { "name": "Slow blue", "params": { "speed": 0.4, "hue": 210, "enabled": true, "mode": "Hue", "tint": "#3366ff" } },
+  { "name": "Warm shimmer", "params": { "speed": 2, "hue": 30, "enabled": true, "mode": "Tint", "tint": "#ff6633" } },
+  { "name": "Steady green", "params": { "speed": 1, "hue": 120, "enabled": false, "mode": "Hue", "tint": "#33ff66" } }
+]

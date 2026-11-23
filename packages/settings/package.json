@@ -7,6 +7,11 @@
   "module": "esm/index.js",
   "types": "index.d.ts",
   "exports": {
+    "./plugin-controls": {
+      "types": "./plugin-controls.d.ts",
+      "import": "./esm/plugin-controls.js",
+      "require": "./plugin-controls.js"
+    },
     ".": {
       "types": "./index.d.ts",
       "import": "./esm/index.js",

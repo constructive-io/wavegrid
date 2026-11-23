@@ -421,6 +421,9 @@ importers:
       '@wavegrid/pool':
         specifier: workspace:*
         version: link:../pool/dist
+      '@wavegrid/settings':
+        specifier: workspace:*
+        version: link:../settings/dist
       react:
         specifier: ^19.1.0
         version: 19.2.7

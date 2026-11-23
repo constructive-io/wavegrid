@@ -1,6 +1,8 @@
 import { type Layout, presets } from '@wavegrid/layout/client';
 import { useEffect, useState } from 'react';
 
+import { coercePlugins, type UIPlugin } from './plugin-data';
+
 /** Same-origin WebSocket URL — the server serves this UI and the WS on one port. */
 function sameOriginWs(): string {
   if (typeof window === 'undefined') return 'ws://localhost:3000';
@@ -14,6 +16,7 @@ export interface GridConfig {
   layout: Layout;
   numCannons: number;
   gridColumns: number;
+  plugins: UIPlugin[];
 }
 
 /**
@@ -29,15 +32,16 @@ export function useConfig(refetchKey: number = 0): GridConfig | null {
 
   useEffect(() => {
     fetch('/api/config')
-      .then((r) => r.json())
-      .then((data: GridConfig) => setConfig(data))
+      .then((r) => { if (!r.ok) throw new Error(`Config: HTTP ${r.status}`); return r.json(); })
+      .then((data: GridConfig) => setConfig({ ...data, plugins: coercePlugins(data.plugins) }))
       .catch(() => {
         const layout = presets['grid-7x7']();
         setConfig({
           simulatorUrl: sameOriginWs(),
           layout,
           numCannons: layout.count,
-          gridColumns: layout.cols
+          gridColumns: layout.cols,
+          plugins: []
         });
       });
   }, [refetchKey]);

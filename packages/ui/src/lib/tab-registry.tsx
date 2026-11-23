@@ -18,12 +18,15 @@ import { PalaceTab } from '@/components/palace-tab';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
 import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
+import { PluginTab } from '@/components/plugin-tab';
 import { PoolTab } from '@/components/pool-tab';
 import { PrideTab } from '@/components/pride-tab';
 import { SequencesTab } from '@/components/sequences-tab';
 import { ShiftDial } from '@/components/shift-dial';
 import { UsaTab } from '@/components/usa-tab';
 import { VideoTab } from '@/components/video-tab';
+import type { UIPlugin } from '@/lib/plugin-data';
+import type { PatternState } from '@/lib/socket-state';
 import { useAudio } from '@/lib/use-audio';
 import type { GracePaintControls } from '@/lib/use-grace-paint';
 import type { PalaceControls } from '@/lib/use-palace';
@@ -65,6 +68,7 @@ export interface ToolContentProps {
   gracePaint: GracePaintControls;
   palace: PalaceControls;
   looks: Look[];
+  pattern: PatternState | null;
 }
 
 export interface TabDef {
@@ -350,10 +354,19 @@ export const allTabs: TabDef[] = [
   }
 ];
 
-export function tabById(id: string): TabDef | undefined {
-  return allTabs.find(tab => tab.id === id);
+export function registryFor(plugins: UIPlugin[]): TabDef[] {
+  return [...allTabs, ...plugins.flatMap(plugin => plugin.tabs.map(tab => ({
+    id: tab.id, label: tab.label, showWhen: tab.showWhen,
+    render: ({ send, pattern, onPatternSelect }: ToolContentProps) => (
+      <PluginTab key={tab.id} pluginId={plugin.id} tab={tab} presetsFile={plugin.presetsFile} send={send} pattern={pattern} onPatternSelect={onPatternSelect} />
+    )
+  })))];
 }
 
-export function tabsFor(layout: Layout): TabDef[] {
-  return allTabs.filter(tab => matchesShowWhen(tab.showWhen, layout));
+export function tabById(id: string, registry: TabDef[] = allTabs): TabDef | undefined {
+  return registry.find(tab => tab.id === id);
+}
+
+export function tabsFor(layout: Layout, registry: TabDef[] = allTabs): TabDef[] {
+  return registry.filter(tab => matchesShowWhen(tab.showWhen, layout));
 }

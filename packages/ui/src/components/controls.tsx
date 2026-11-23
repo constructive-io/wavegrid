@@ -14,6 +14,7 @@ export function Slider({ label, value, min = 0, max = 100, step = 1, displayValu
       <label className="text-sm text-text-2 min-w-20 font-medium">{label}</label>
       <input
         type="range"
+        aria-label={label}
         className="flex-1"
         min={min}
         max={max}

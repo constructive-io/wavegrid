@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { projectDir, type StorePaths, writeFileAtomic } from './paths';
+import { parsePluginControl, type PluginControl } from './plugin-controls';
 import { isProjectName } from './projects';
 
 export const WAVEGRID_RUNTIME_VERSION = '0.5.0';
@@ -16,7 +17,7 @@ export interface PluginTab {
   id: string;
   label: string;
   showWhen: ShowWhen;
-  cards: { title: string; controls: unknown[] }[];
+  cards: { title: string; controls: PluginControl[] }[];
   pattern?: string;
 }
 export interface ProjectPlugin {
@@ -25,6 +26,7 @@ export interface ProjectPlugin {
   version: string;
   tabs: PluginTab[];
   presets?: unknown;
+  presetsFile?: string;
 }
 export interface PortablePlugin extends ProjectPluginRef { files: Record<string, string> }
 export interface PluginSnapshot extends PortablePlugin { plugin: ProjectPlugin }
@@ -175,7 +177,20 @@ export function validatePlugin(ref: PortablePlugin): PluginSnapshot {
       if (!Array.isArray(tab.cards) || !tab.cards.every(card => object(card) && typeof card.title === 'string' && Array.isArray(card.controls))) {
         throw new Error(`Tab ${tab.id} cards need title and controls array`);
       }
-      return { id: tab.id, label: tab.label, showWhen: condition, cards: tab.cards as PluginTab['cards'],
+      const params = new Set<string>();
+      const cards = tab.cards.map(card => {
+        const controls = (card.controls as unknown[]).map(raw => {
+          const control = parsePluginControl(raw);
+          if (!control) throw new Error(`Invalid control in tab ${tab.id}: ${JSON.stringify(raw)}`);
+          if (control.type !== 'button') {
+            if (params.has(control.param)) throw new Error(`Duplicate control param in tab ${tab.id}: ${control.param}`);
+            params.add(control.param);
+          }
+          return control;
+        });
+        return { title: card.title as string, controls };
+      });
+      return { id: tab.id, label: tab.label, showWhen: condition, cards,
         ...(tab.pattern !== undefined || pattern !== undefined ? { pattern: tab.pattern === undefined ? pattern : requireFile(tab.pattern) } : {}) };
     });
     if (tab) tabs.push(tab);
@@ -183,7 +198,10 @@ export function validatePlugin(ref: PortablePlugin): PluginSnapshot {
   const presets = manifest.presets === undefined ? undefined : attempt('presets', () => json(manifest.presets));
   if (problems.length) throw new Error(problems.join('; '));
   const plugin: ProjectPlugin = { id: manifest.id as string, name: manifest.name as string, version: manifest.version as string, tabs };
-  if (manifest.presets !== undefined) plugin.presets = presets;
+  if (manifest.presets !== undefined) {
+    plugin.presets = presets;
+    plugin.presetsFile = requireFile(manifest.presets);
+  }
   return { path: ref.path, files: ref.files, plugin };
 }
 

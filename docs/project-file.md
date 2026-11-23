@@ -106,10 +106,51 @@ exist there. Presets contain arbitrary JSON.
 
 A tab JSON file contains `id`, `label`, optional `showWhen` (default `"always"`),
 optional `pattern` overriding the manifest's pattern, and `cards`:
-`[{ "title": "Color", "controls": [] }]`. Controls are carried as data; their
-schema and rendering come later. `showWhen` is `"always"`, `"never"`, or an object
+`[{ "title": "Color", "controls": [] }]`. `showWhen` is `"always"`, `"never"`, or an object
 whose `fixtureKind`, `topology`, `minFixtures` and `layoutId` conditions are ANDed.
 An empty object always matches. Tab ids in `/api/config` are `<pluginId>/<tabId>`.
+
+### Controls and presets
+
+Controls are JSON data, rendered as native Wavegrid cards; plugins never supply
+React or host-evaluated JavaScript. Each parameter name is a JavaScript-style
+identifier (`[A-Za-z_$][A-Za-z0-9_$]*`) and must be unique within a tab.
+`__proto__`, `constructor` and `prototype` are reserved parameter names. Labels are
+optional except on buttons. A tab's defaults form its initial pattern params.
+
+| `type` | Fields in addition to `type`, `param`, optional `label` |
+| --- | --- |
+| `slider` | finite `min`, `max`, `default` within the range; optional positive `step` (UI default: 1) |
+| `toggle` | boolean `default` |
+| `select` | nonempty `options`: strings or `{ label, value }` objects; `default` must match an option value (string, finite number or boolean) |
+| `color` | `default: "#rrggbb"`; params carry the hex string |
+| `button` | no `param` or `default`; required `label`, `action: "start"` or `"stop"` |
+
+Unknown types or invalid controls fail project open. The UI also filters malformed
+controls and coerces incoming params, clamping sliders and ignoring undeclared
+params. A tab fetches its `pattern` file (or inherits the manifest's); changing a
+control starts that pattern, or updates its live params if it is already running.
+Start and Stop buttons explicitly control playback. Brain-rendered frames appear
+in the main grid, as with Patterns. Saved plugin tab selections work after config
+loads; unavailable/hidden tabs fall back to Paint.
+
+If the manifest specifies `presets`, that JSON file should contain
+`[{ "name": "Slow blue", "params": { "speed": 0.4, "hue": 210 } }]`.
+The tab fetches it and renders a Presets card. A preset merges its declared params
+into the current values and starts the pattern if necessary. Pattern/preset fetch
+errors appear in the tab without taking down the UI. `/api/config` retains parsed
+`presets` data and exposes `presetsFile` for this fetch.
+
+Try the complete example (all five control types):
+
+```sh
+wavegrid projects open examples/plugins/pulse-demo.wavegrid --activate
+wavegrid projects users add --project plugin-demo
+wavegrid server --project plugin-demo
+```
+
+Open the printed URL, sign in, and choose **Plugin Pulse**. The example uses only
+the brain preview; it needs no OSC hardware or receiver.
 
 Opening validates all plugins before changing the project, then replaces store
 copies (including removal of unlisted plugins). Only regular files are copied;
@@ -128,7 +169,8 @@ carry plugin files as base64; older bundles without plugins still import.
 
 The server loads plugins at startup and serves their files at
 `/plugins/<id>/<file>` with traversal protection and `nosniff`. Plugin JavaScript
-is never evaluated on the host. This step adds no plugin UI rendering.
+is never evaluated on the host. Files also receive `Content-Security-Policy:
+sandbox allow-scripts`, keeping directly opened plugin pages off the UI's origin.
 
 ## Explicit fixture layouts
 
