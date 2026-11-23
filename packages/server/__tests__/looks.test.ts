@@ -1,6 +1,6 @@
-import * as fs from 'fs';
+import fs from 'fs';
 import * as os from 'os';
-import { join } from 'path';
+import { dirname, join } from 'path';
 
 import { LookStore, MAX_LOOK_NAME, MAX_LOOKS } from '../src/looks';
 
@@ -31,6 +31,44 @@ describe('LookStore', () => {
     expect(store.save('x', [1, 2])).toBeNull();
     for (let i = 0; i < MAX_LOOKS; i++) expect(store.save(`l${i}`, params)).not.toBeNull();
     expect(store.save('one too many', params)).toBeNull();
+  });
+
+  it('writes a complete same-directory temporary file before replacing the live file', () => {
+    const file = join(dir, 'looks.json');
+    const store = new LookStore(file);
+    store.save('First', params);
+    const original = fs.renameSync;
+    const rename = jest.spyOn(fs, 'renameSync').mockImplementation((temporary, target) => {
+      expect(dirname(String(temporary))).toBe(dirname(file));
+      expect(target).toBe(file);
+      expect(JSON.parse(fs.readFileSync(file, 'utf8')).looks).toHaveLength(1);
+      expect(JSON.parse(fs.readFileSync(temporary, 'utf8')).looks).toHaveLength(2);
+      original(temporary, target);
+    });
+    try {
+      store.save('Second', params);
+      expect(rename).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(fs.readFileSync(file, 'utf8')).looks).toHaveLength(2);
+      expect(fs.readdirSync(dir)).toEqual(['looks.json']);
+    } finally { rename.mockRestore(); }
+  });
+
+  it.each(['write', 'rename'])('preserves the live file and removes temporary files when %s fails', step => {
+    const file = join(dir, 'looks.json');
+    const store = new LookStore(file);
+    store.save('First', params);
+    const before = fs.readFileSync(file, 'utf8');
+    const original = fs.writeFileSync;
+    const failure = step === 'write'
+      ? jest.spyOn(fs, 'writeFileSync').mockImplementation(temporary => { original(temporary, 'partial'); throw new Error('disk full'); })
+      : jest.spyOn(fs, 'renameSync').mockImplementation(() => { throw new Error('rename denied'); });
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      store.save('Second', params);
+      expect(fs.readFileSync(file, 'utf8')).toBe(before);
+      expect(fs.readdirSync(dir)).toEqual(['looks.json']);
+      expect(error).toHaveBeenCalled();
+    } finally { failure.mockRestore(); error.mockRestore(); }
   });
 
   it('migrates legacy Palace Looks once, preserving recall params, IDs, order and timestamps', () => {

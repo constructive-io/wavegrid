@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import { dirname } from 'path';
 
@@ -108,12 +109,20 @@ export class LookStore {
   }
 
   private persist(): void {
+    this.write(`${JSON.stringify({ looks: this.looks }, null, 2)}\n`);
+  }
+
+  private write(contents: string): void {
     if (!this.file) return;
+    const temporary = `${this.file}.${randomUUID()}.tmp`;
     try {
       fs.mkdirSync(dirname(this.file), { recursive: true });
-      fs.writeFileSync(this.file, `${JSON.stringify({ looks: this.looks }, null, 2)}\n`, 'utf8');
+      fs.writeFileSync(temporary, contents, { encoding: 'utf8', flag: 'wx' });
+      fs.renameSync(temporary, this.file);
     } catch (e) {
       console.error('  ◈ Looks save error:', e instanceof Error ? e.message : String(e));
+    } finally {
+      try { fs.unlinkSync(temporary); } catch { /* Already renamed or never created. */ }
     }
   }
 }
