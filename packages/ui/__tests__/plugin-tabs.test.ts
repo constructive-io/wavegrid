@@ -74,21 +74,38 @@ describe('running plugin parameter updates', () => {
     ] }])[0].controls;
     const live = {};
     const displayed = coercePluginParams(controls, live);
-    const preset = coercePluginParams(controls, { ...displayed, speed: 1 });
+    const patch = { speed: 1 };
+    const preset = coercePluginParams(controls, { ...displayed, ...patch });
     expect(preset).toEqual(displayed);
-    expect(pluginParamUpdates(preset, live)).toEqual([{ type: 'setPatternParam', name: 'speed', value: 1 }]);
+    expect(pluginParamUpdates(patch, preset, live)).toEqual([{ type: 'setPatternParam', name: 'speed', value: 1 }]);
   });
 
   it('compares raw live values, not their coerced representation', () => {
-    expect(pluginParamUpdates({ speed: 1, enabled: false }, { speed: '1', enabled: false }))
+    const patch = { speed: 1, enabled: false };
+    expect(pluginParamUpdates(patch, patch, { speed: '1', enabled: false }))
       .toEqual([{ type: 'setPatternParam', name: 'speed', value: 1 }]);
-    expect(pluginParamUpdates({ speed: 1 }, { speed: 1 })).toEqual([]);
+    expect(pluginParamUpdates({ speed: 1 }, { speed: 1 }, { speed: 1 })).toEqual([]);
+  });
+
+  it('leaves untouched live params alone when another tab has narrower slider bounds', () => {
+    const controls = coerceCards([{ title: 'Controls', controls: [
+      { type: 'slider', param: 'speed', min: 0, max: 4, default: 1 },
+      { type: 'slider', param: 'hue', min: 0, max: 360, default: 210 }
+    ] }])[0].controls;
+    const live = { speed: 8, hue: 200 };
+    const displayed = coercePluginParams(controls, live);
+    expect(displayed).toEqual({ speed: 4, hue: 200 });
+    const patch = { hue: 210 };
+    const next = coercePluginParams(controls, { ...displayed, ...patch });
+    expect(pluginParamUpdates(patch, next, live)).toEqual([{ type: 'setPatternParam', name: 'hue', value: 210 }]);
+    expect(pluginParamUpdates({ speed: 4 }, next, live)).toEqual([{ type: 'setPatternParam', name: 'speed', value: 4 }]);
   });
 
   it('handles empty desired params and missing or invalid live params', () => {
-    expect(pluginParamUpdates({}, null)).toEqual([]);
+    expect(pluginParamUpdates({}, { speed: 1 }, null)).toEqual([]);
+    expect(pluginParamUpdates({ unknown: 1 }, {}, null)).toEqual([]);
     for (const live of [undefined, null, []]) {
-      expect(pluginParamUpdates({ enabled: false }, live)).toEqual([{ type: 'setPatternParam', name: 'enabled', value: false }]);
+      expect(pluginParamUpdates({ enabled: false }, { enabled: false }, live)).toEqual([{ type: 'setPatternParam', name: 'enabled', value: false }]);
     }
   });
 });

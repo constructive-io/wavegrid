@@ -20,9 +20,11 @@ export function parsePluginPresets(source: string): PluginPreset[] {
   return raw as PluginPreset[];
 }
 
-export function pluginParamUpdates(params: Record<string, unknown>, live: unknown) {
+export function pluginParamUpdates(patch: Record<string, unknown>, params: Record<string, unknown>, live: unknown) {
   const current = isRecord(live) ? live : {};
-  return Object.entries(params)
+  return Object.keys(patch)
+    .filter(name => Object.prototype.hasOwnProperty.call(params, name))
+    .map(name => [name, params[name]] as const)
     .filter(([name, value]) => !Object.prototype.hasOwnProperty.call(current, name) || current[name] !== value)
     .map(([name, value]) => ({ type: 'setPatternParam', name, value }));
 }
@@ -97,7 +99,7 @@ export function usePluginPattern(
     paramsRef.current = next;
     setParams(next);
     if (!runningRef.current) { start(); return; }
-    for (const message of pluginParamUpdates(next, pattern?.params)) send(message);
+    for (const message of pluginParamUpdates(patch, next, pattern?.params)) send(message);
   }, [source, controls, send, start, pattern]);
 
   const stop = useCallback(() => { runningRef.current = false; send({ type: 'stopPattern' }); }, [send]);
