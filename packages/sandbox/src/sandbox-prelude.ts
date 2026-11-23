@@ -15,7 +15,7 @@ import type { Layout } from '@wavegrid/layout';
 export function buildPrelude(layout: Layout): string {
   // Embed the resolved fixture geometry so patterns get true positions for
   // any topology (grid, ring, filled ring) instead of re-deriving from cols.
-  const fx = layout.fixtures.map(f => [f.u, f.v, f.x, f.y, f.radius, f.angle, f.col, f.row]);
+  const fx = layout.fixtures.map(f => [f.u, f.v, f.x, f.y, f.radius, f.angle, f.col, f.row, f.kind ?? 'cannon']);
   return `
 // ─── Layout geometry ───────────────────────────────────────────
 var COLS = ${layout.cols}, ROWS = ${layout.rows}, COUNT = ${layout.count};
@@ -83,6 +83,7 @@ function __buildCtx() {
     index: function(x, y) { return ((y | 0) * COLS) + (x | 0); },
     uv:    function(i) { var f = __FX[i]; return f ? [f[0], f[1]] : [0, 0]; },
     polar: function(i) { var f = __FX[i]; return f ? [f[4], f[5]] : [0, 0]; },
+    kind:  function(i) { var f = __FX[i]; return f ? f[8] : 'cannon'; },
 
     // Color setters — HSB: h=0-360, s=0-100, b=0-100
     set: set,

@@ -9,6 +9,30 @@ describe('shared pattern sandbox', () => {
   beforeEach(async () => { engine = await createSandboxEngine(layout); });
   afterEach(() => engine?.dispose());
 
+  it.each(['cannon', 'projector'] as const)('exposes interleaved fixture kinds with %s first', async (first) => {
+    const interleaved = resolveLayout({ kind: 'interleaved', cols: 3, rows: 2, first });
+    engine.dispose();
+    engine = await createSandboxEngine(interleaved);
+    engine.loadPattern(`({ render(ctx) {
+      for (var i = 0; i < ctx.count; i++) ctx.set(i, ctx.kind(i) === 'projector' ? 240 : 120, 100, 80);
+    } })`);
+    const other = first === 'cannon' ? 'projector' : 'cannon';
+    expect(engine.renderFrame(0, 0, 1)).toEqual([first, first, first, other, other, other]
+      .map(kind => ({ h: kind === 'projector' ? 240 : 120, s: 100, b: 80 })));
+  });
+
+  it('defaults missing fixture kinds and out-of-range indices to cannon', async () => {
+    const legacy = resolveLayout({ preset: 'interleaved-12x2' });
+    Reflect.deleteProperty(legacy.fixtures[12], 'kind');
+    engine.dispose();
+    engine = await createSandboxEngine(legacy);
+    engine.loadPattern(`({ render(ctx) {
+      var indices = [-1, ctx.count, ctx.count + 1, 0.5, NaN, Infinity, 12];
+      ctx.fill(indices.every(function(i) { return ctx.kind(i) === 'cannon'; }) ? 120 : 0, 100, 80);
+    } })`);
+    expect(engine.renderFrame(0, 0, 1)?.[0]).toEqual({ h: 120, s: 100, b: 80 });
+  });
+
   it('keeps host globals out of both direct access and Function constructors', () => {
     engine.loadPattern(`({ render(ctx) {
       var global = Function('return this')();

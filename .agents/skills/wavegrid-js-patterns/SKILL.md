@@ -113,6 +113,7 @@ __pattern = { render(ctx) { ctx.fill(0, 100, 50); } }
 | `ctx.index(x, y)` | number | Flat cell index for column/row |
 | `ctx.uv(i)` | `[u, v]` | Normalized 0-1 coordinates |
 | `ctx.polar(i)` | `[r, theta]` | Polar coords from grid center (r is 0-1) |
+| `ctx.kind(i)` | `'cannon'` or `'projector'` | Fixture kind from the resolved layout; missing kinds and out-of-range indices return `'cannon'` |
 
 Cells are indexed left-to-right, top-to-bottom: index 0 is top-left, index `count-1` is bottom-right.
 
