@@ -128,8 +128,8 @@ export interface BeyondOscConfig {
    * Only mapped cannons are sent; unmapped indices are skipped.
    */
   projectorMap: Record<number, number>;
-  /** Interpret calibration frames as shard-local zone numbers rather than show indices. */
-  directCalibrationZones?: boolean;
+  /** Number of shard-local zones addressable directly during calibration. */
+  directCalibrationZoneCount?: number;
   /**
    * Send rate throttle — only send every N frames.
    * At 60fps tick rate, sendEveryNFrames=2 gives 30Hz output.
@@ -263,20 +263,22 @@ export class BeyondOscOutput implements OutputAdapter {
     if (this.frameCount % this.sendInterval !== 0) return;
     if (!this.client) return;
 
-    const direct = calibration && !!this.config.directCalibrationZones;
+    const zoneCount = this.config.directCalibrationZoneCount;
+    const direct = calibration && zoneCount !== undefined;
     let projectorMap = this.config.projectorMap;
-    if (direct || this.wasDirectCalibration) {
+    if (zoneCount !== undefined && (direct || this.wasDirectCalibration)) {
       const previousMap = projectorMap;
       projectorMap = { ...previousMap };
-      const mappedZones = new Set(grid.map((_, i) => previousMap[i]));
       const black = { h: 0, s: 0, b: 0 };
-      const frame = grid.map((cell, i) => direct ? (grid[previousMap[i]] ?? black) : cell);
+      const boundedGrid = Array.from({ length: zoneCount }, (_, i) => grid[i] ?? black);
+      const mappedZones = new Set(boundedGrid.map((_, i) => previousMap[i]));
+      const frame = boundedGrid.map((cell, i) => direct ? (boundedGrid[previousMap[i]] ?? black) : cell);
       // A sliced column-major show may not address every shard-local zone.
       // Keep extra slots stable through the return to show so they receive black.
-      for (let zone = 0; zone < grid.length; zone++) {
+      for (let zone = 0; zone < zoneCount; zone++) {
         if (mappedZones.has(zone)) continue;
         projectorMap[frame.length] = zone;
-        frame.push(direct ? grid[zone] : black);
+        frame.push(direct ? boundedGrid[zone] : black);
       }
       grid = frame;
     }

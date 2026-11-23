@@ -11,7 +11,7 @@ jest.mock('fs', () => ({ ...jest.requireActual('fs'), appendFileSync: jest.fn() 
 
 const black = { h: 0, s: 0, b: 0 };
 const white = { h: 45, s: 0, b: 100 };
-const preview = (index: number) => Array.from({ length: 49 }, (_, i) => i === index ? white : black);
+const preview = (index: number, count = 49) => Array.from({ length: count }, (_, i) => i === index ? white : black);
 
 async function waitFor(predicate: () => boolean) {
   for (let i = 0; i < 100 && !predicate(); i++) await new Promise(resolve => setTimeout(resolve, 10));
@@ -118,5 +118,17 @@ describe('BEYOND Identify over OSC', () => {
     saved.identify(preview(7));
     await waitFor(() => saved.brightness.get(1) === 100);
     expect(saved.lit()).toEqual([[1, 100]]);
+  });
+
+  it('ignores an Identify zone beyond the receiver layout even when the brain has a larger layout', async () => {
+    const receiver = await launch('column');
+    receiver.paint(1);
+    await waitFor(() => receiver.brightness.get(7) === 100);
+    receiver.identify(preview(49, 64));
+    await waitFor(() => receiver.brightness.get(7) === 0);
+    receiver.identify(null);
+    await waitFor(() => receiver.brightness.get(7) === 100);
+    expect(receiver.brightness.get(49)).toBeUndefined();
+    expect(receiver.lit()).toEqual([[7, 100]]);
   });
 });
