@@ -8,6 +8,7 @@ const mockMemo = (fn: () => unknown, deps: unknown[]) => {
   return mockSlots[i].value;
 };
 jest.mock('react', () => ({
+  ...jest.requireActual('react'),
   useCallback: (fn: unknown, deps: unknown[]) => mockMemo(() => fn, deps),
   useRef: (value: unknown) => { const i = mockCursor++; return mockSlots[i] ||= { current: value }; },
   useState: (initial: unknown) => {
@@ -103,4 +104,27 @@ it('shows microphone rejection errors and clears them after a successful retry',
   getUserMedia.mockResolvedValue({ getTracks: () => [] });
   await audio.startMic(); audio = render();
   expect(audio.micUnavailableReason).toBeNull(); expect(audio.micError).toBeNull(); expect(audio.state.micActive).toBe(true);
+});
+
+it('stops and detaches an old looping source before reading its replacement', async () => {
+  let audio = render(); await audio.loadFile(file('old.wav')); audio.play(); audio = render();
+  const old = sources[0];
+  expect(old.onended).toEqual(expect.any(Function));
+  let finish!: (value: ArrayBuffer) => void;
+  const replacement = { name: 'new.wav', arrayBuffer: jest.fn(() => new Promise<ArrayBuffer>(resolve => { finish = resolve; })) } as unknown as File;
+  const loading = audio.loadFile(replacement);
+  expect(old.onended).toBeNull(); expect(old.stop).toHaveBeenCalledTimes(1); expect(old.disconnect).toHaveBeenCalledTimes(1);
+  expect(old.stop.mock.invocationCallOrder[0]).toBeLessThan((replacement.arrayBuffer as jest.Mock).mock.invocationCallOrder[0]);
+  expect(frames.size).toBe(0); expect(render().state.playing).toBe(false); expect(sources).toHaveLength(1);
+  finish(new ArrayBuffer(0)); await loading; audio = render();
+  expect(audio.state).toMatchObject({ playing: false, fileName: 'new.wav', currentTime: 0 });
+  expect(sources).toHaveLength(1);
+  audio.play(); expect(sources).toHaveLength(2); expect(render().state.playing).toBe(true);
+});
+
+it('keeps the old source detached when reading the new file fails', async () => {
+  const audio = render(); await audio.loadFile(file()); audio.play();
+  await expect(audio.loadFile({ name: 'broken.wav', arrayBuffer: async () => { throw new Error('read failed'); } } as unknown as File)).rejects.toThrow('read failed');
+  expect(sources[0].onended).toBeNull(); expect(sources[0].disconnect).toHaveBeenCalled();
+  expect(sources).toHaveLength(1); expect(render().state.playing).toBe(false); expect(frames.size).toBe(0);
 });

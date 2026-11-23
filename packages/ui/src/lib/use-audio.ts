@@ -735,6 +735,7 @@ export function useAudio(
         sourceRef.current.onended = null;
         sourceRef.current.stop();
       } catch { /* already stopped */ }
+      sourceRef.current.disconnect();
       sourceRef.current = null;
     }
     if (animFrameRef.current) {
@@ -916,14 +917,15 @@ export function useAudio(
 
   const loadFile = useCallback(async (file: File) => {
     // Stop mic if active
-    stopMic();
+    stopMic(false);
+    stopPlayback();
     if (!audioContextRef.current) audioContextRef.current = new AudioContext();
     const arrayBuffer = await file.arrayBuffer();
     const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
     audioBufferRef.current = audioBuffer;
     const bpm = detectBPM(audioBuffer);
     setAudioState({ playing: false, micActive: false, fileName: file.name, duration: audioBuffer.duration, currentTime: 0, bpm });
-  }, [detectBPM, stopMic]);
+  }, [detectBPM, stopMic, stopPlayback]);
 
   useEffect(() => {
     if (isAmbientMode(mode)) {
