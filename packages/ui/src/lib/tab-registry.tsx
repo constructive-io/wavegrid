@@ -19,7 +19,6 @@ import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
 import { PluginTab } from '@/components/plugin-tab';
 import { PoolTab } from '@/components/pool-tab';
-import { PrideTab } from '@/components/pride-tab';
 import { SequencesTab } from '@/components/sequences-tab';
 import { ShiftDial } from '@/components/shift-dial';
 import { UsaTab } from '@/components/usa-tab';
@@ -205,18 +204,6 @@ export const allTabs: TabDef[] = [
           </ControlGroup>
         </ControlGrid>
       </div>
-    )
-  },
-  {
-    id: 'pride', label: 'Pride', showWhen: 'never',
-    render: ({ animSpeed, onAnimSpeed, send, activePattern, onPatternSelect }) => (
-      <PrideTab
-        send={send}
-        activePattern={activePattern}
-        onPatternSelect={onPatternSelect}
-        animSpeed={animSpeed}
-        onAnimSpeed={onAnimSpeed}
-      />
     )
   },
   {
