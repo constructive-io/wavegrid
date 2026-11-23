@@ -20,7 +20,7 @@ export {
 } from './helpers';
 
 // Catalogue: what each look needs from the rig it runs on
-export type { Fits, LayoutFilter, LookDef, ShowWhen } from './catalog';
+export type { Fits, LayoutFilter, LookDef, ShowWhen, ShowWhenContext } from './catalog';
 export {
   catalogDrift,
   fitsLayout,

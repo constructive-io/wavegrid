@@ -113,7 +113,8 @@ function snapshotFolder(root: string): Record<string, string> {
 function showWhen(value: unknown): value is ShowWhen {
   if (value === 'always' || value === 'never') return true;
   if (!object(value)) return false;
-  return Object.keys(value).every(key => ['fixtureKind', 'topology', 'minFixtures', 'layoutId'].includes(key)) &&
+  return Object.keys(value).every(key => ['fixtureKind', 'topology', 'minFixtures', 'layoutId', 'pluginAudio'].includes(key)) &&
+    (value.pluginAudio === undefined || value.pluginAudio === true || (typeof value.pluginAudio === 'string' && value.pluginAudio.length > 0)) &&
     (value.fixtureKind === undefined || value.fixtureKind === 'cannon' || value.fixtureKind === 'projector') &&
     (value.topology === undefined || typeof value.topology === 'string') &&
     (value.minFixtures === undefined || (typeof value.minFixtures === 'number' && Number.isFinite(value.minFixtures))) &&

@@ -34,19 +34,27 @@ export type ShowWhen = 'always' | 'never' | {
   topology?: string;
   minFixtures?: number;
   layoutId?: string | string[];
+  pluginAudio?: true | string;
 };
+
+export interface ShowWhenContext {
+  pluginAudioModes?: readonly string[];
+}
 
 function matchesLayoutId(ids: string | string[], id: string): boolean {
   return typeof ids === 'string' ? ids === id : ids.includes(id);
 }
 
-export function matchesShowWhen(showWhen: ShowWhen, layout: Layout): boolean {
+export function matchesShowWhen(showWhen: ShowWhen, layout: Layout, context: ShowWhenContext = {}): boolean {
   if (showWhen === 'always') return true;
   if (showWhen === 'never') return false;
   return (showWhen.fixtureKind === undefined || layout.fixtures.some(f => (f.kind ?? 'cannon') === showWhen.fixtureKind)) &&
     (showWhen.topology === undefined || layout.topology === showWhen.topology) &&
     (showWhen.minFixtures === undefined || layout.fixtures.length >= showWhen.minFixtures) &&
-    (showWhen.layoutId === undefined || matchesLayoutId(showWhen.layoutId, layout.id));
+    (showWhen.layoutId === undefined || matchesLayoutId(showWhen.layoutId, layout.id)) &&
+    (showWhen.pluginAudio === undefined || (showWhen.pluginAudio === true
+      ? !!context.pluginAudioModes?.length
+      : !!context.pluginAudioModes?.includes(showWhen.pluginAudio)));
 }
 
 /** Human-readable reason a look does not suit a layout, or '' when it does. */

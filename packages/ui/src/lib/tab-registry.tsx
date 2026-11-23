@@ -67,6 +67,7 @@ export interface TabDef {
   id: string;
   label: string;
   showWhen: ShowWhen;
+  audioMode?: string;
   render: (props: ToolContentProps) => ReactNode;
 }
 
@@ -242,7 +243,7 @@ export const allTabs: TabDef[] = [
     )
   },
   {
-    id: 'audio', label: 'Audio', showWhen: 'never',
+    id: 'audio', label: 'Audio', showWhen: { pluginAudio: 'grace' },
     render: ({ audio }) => (
       <AudioTab audio={audio} />
     )
@@ -257,7 +258,7 @@ export const allTabs: TabDef[] = [
 
 export function registryFor(plugins: UIPlugin[]): TabDef[] {
   return [...allTabs, ...plugins.flatMap(plugin => plugin.tabs.map(tab => ({
-    id: tab.id, label: tab.label, showWhen: tab.showWhen,
+    id: tab.id, label: tab.label, showWhen: tab.showWhen, audioMode: tab.audio?.mode,
     render: ({ send, pattern, onPatternSelect, layout, looks, registerPluginPaint, hue, sat, bright, setHue, setSat, setBright }: ToolContentProps) => (
       <PluginTab key={tab.id} pluginId={plugin.id} tab={tab} presetsFile={plugin.presetsFile} send={send} pattern={pattern}
         onPatternSelect={onPatternSelect} layout={layout} looks={looks} registerPluginPaint={registerPluginPaint}
@@ -275,5 +276,6 @@ export function tabById(id: string, registry: TabDef[] = allTabs): TabDef | unde
 }
 
 export function tabsFor(layout: Layout, registry: TabDef[] = allTabs): TabDef[] {
-  return registry.filter(tab => matchesShowWhen(tab.showWhen, layout));
+  const pluginAudioModes = registry.flatMap(tab => tab.audioMode ? [tab.audioMode] : []);
+  return registry.filter(tab => matchesShowWhen(tab.showWhen, layout, { pluginAudioModes }));
 }

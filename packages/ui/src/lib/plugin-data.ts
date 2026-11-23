@@ -15,7 +15,8 @@ function assetPath(raw: unknown): string | undefined {
 function condition(raw: unknown): ShowWhen {
   if (raw === undefined || raw === 'always') return 'always';
   if (raw === 'never') return 'never';
-  if (!isRecord(raw) || Object.keys(raw).some(key => !['fixtureKind', 'topology', 'minFixtures', 'layoutId'].includes(key)) ||
+  if (!isRecord(raw) || Object.keys(raw).some(key => !['fixtureKind', 'topology', 'minFixtures', 'layoutId', 'pluginAudio'].includes(key)) ||
+    (raw.pluginAudio !== undefined && raw.pluginAudio !== true && !(typeof raw.pluginAudio === 'string' && raw.pluginAudio.length > 0)) ||
     (raw.fixtureKind !== undefined && raw.fixtureKind !== 'cannon' && raw.fixtureKind !== 'projector') ||
     (raw.topology !== undefined && typeof raw.topology !== 'string') ||
     (raw.minFixtures !== undefined && (typeof raw.minFixtures !== 'number' || !Number.isFinite(raw.minFixtures))) ||
