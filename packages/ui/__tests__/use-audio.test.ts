@@ -22,6 +22,7 @@ jest.mock('react', () => ({
 const send = jest.fn();
 const frames = new Map<number, FrameRequestCallback>();
 const sources: any[] = [];
+let audioTime = 0;
 const buffer = { duration: 10, sampleRate: 10000, getChannelData: () => new Float32Array(100) };
 const globals = ['AudioContext', 'requestAnimationFrame', 'cancelAnimationFrame', 'navigator'];
 let descriptors: (PropertyDescriptor | undefined)[];
@@ -37,11 +38,12 @@ function frame() {
   frames.delete(id); callback(0);
 }
 beforeEach(() => {
-  mockSlots = []; mockEffects = []; frames.clear(); sources.length = 0; send.mockClear();
+  mockSlots = []; mockEffects = []; frames.clear(); sources.length = 0; audioTime = 0; send.mockClear();
   descriptors = globals.map(key => Object.getOwnPropertyDescriptor(globalThis, key));
   let frameId = 0;
   const values = [class {
-    state = 'running'; currentTime = 0; destination = {};
+    state = 'running'; destination = {};
+    get currentTime() { return audioTime; }
     resume = jest.fn(async () => {});
     decodeAudioData = jest.fn(async () => buffer);
     createBufferSource() {
@@ -143,4 +145,17 @@ it('keeps ambient visuals running while replacing a file, without restarting the
   expect(audio.mode).toBe('galaxy'); expect(audio.state).toMatchObject({ playing: false, fileName: 'new.wav' });
   expect(sources).toHaveLength(1); expect(frames.size).toBe(1);
   send.mockClear(); frame(); expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'audio_layer' }));
+});
+
+it('leaves a stopped replacement position seek-owned while ambient frames continue', async () => {
+  let audio = render(); audio.setMode('galaxy'); audio = render();
+  await audio.loadFile(file('old.wav')); audio.play();
+  audioTime = 3; frame(); expect(render().state.currentTime).toBe(3);
+  await audio.loadFile(file('new.wav')); audioTime = 7; frame(); audio = render();
+  expect(audio.state).toMatchObject({ playing: false, currentTime: 0, fileName: 'new.wav' });
+  audio.seek(4); audioTime = 9; frame(); audio = render();
+  expect(audio.state).toMatchObject({ playing: false, currentTime: 4 });
+  expect(sources).toHaveLength(1);
+  audio.play(); audioTime = 10; frame();
+  expect(render().state).toMatchObject({ playing: true, currentTime: 1 });
 });

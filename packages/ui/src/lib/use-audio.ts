@@ -707,7 +707,7 @@ export function useAudio(
       grid: outputLayer
     });
 
-    if (audioContextRef.current) {
+    if (audioContextRef.current && sourceRef.current) {
       const elapsed = audioContextRef.current.currentTime - startTimeRef.current + offsetRef.current;
       const dur = audioBufferRef.current?.duration || 1;
       setAudioState((s) => ({
@@ -745,6 +745,7 @@ export function useAudio(
     analyserRef.current = null;
     resetVisualState();
     offsetRef.current = 0;
+    startTimeRef.current = 0;
     // Clear the audio overlay on the Simulator so base grid shows through
     sendRef.current({ type: 'audio_layer_clear' });
     setAudioState((s) => ({ ...s, playing: false, currentTime: 0 }));
