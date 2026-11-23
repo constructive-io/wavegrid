@@ -166,7 +166,7 @@ it('does not follow a symlinked plugins folder', () => {
   expect(document()).toEqual(original);
 });
 
-it('updates the real project and keeps a project-file symlink intact', () => {
+it('keeps a cross-directory project symlink intact and reopens through it', () => {
   const links = join(root, 'links');
   mkdirSync(links);
   const link = join(links, 'venue.wavegrid');
@@ -175,10 +175,12 @@ it('updates the real project and keeps a project-file symlink intact', () => {
   expect(process.exitCode).toBeUndefined();
   expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
   expect(document().plugins).toEqual([{ path: 'plugins/demo' }]);
-  expect(existsSync(join(root, 'plugins/demo/plugin.json'))).toBe(true);
-  expect(existsSync(join(links, 'plugins'))).toBe(false);
-  getStore().openProjectFile(file, document());
-  expect(loadProjectPlugins(getStore().paths, 'venue').errors).toEqual([]);
+  expect(existsSync(join(links, 'plugins/demo/plugin.json'))).toBe(true);
+  expect(existsSync(join(root, 'plugins'))).toBe(false);
+  getStore().openProjectFile(link, JSON.parse(readFileSync(link, 'utf8')));
+  const loaded = loadProjectPlugins(getStore().paths, 'venue');
+  expect(loaded.errors).toEqual([]);
+  expect(loaded.plugins[0].id).toBe('demo');
 });
 
 it('wires init, state, params and the shared brush with parent source checks', () => {
