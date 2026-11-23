@@ -149,7 +149,8 @@ export async function runSignalsSend(args: string[], flags: Flags): Promise<void
 function probeAdapter(
   target: Target,
   zones: number[],
-  serial: string | undefined
+  serial: string | undefined,
+  onSendError: (err: Error) => void
 ): OutputAdapter & { connect: () => void } {
   if (target.kind === 'fb4') {
     if (!serial) throw new Error('FB4 addressing needs a 5-digit serial: --serial 12345');
@@ -157,14 +158,16 @@ function probeAdapter(
       host: target.host,
       port: target.port,
       serialMap: Object.fromEntries(zones.map((z) => [z, serial])),
-      sendEveryNFrames: 1
+      sendEveryNFrames: 1,
+      onSendError
     });
   }
   return new BeyondOscOutput({
     host: target.host,
     port: target.port,
     projectorMap: Object.fromEntries(zones.map((z) => [z, z])),
-    sendEveryNFrames: 1
+    sendEveryNFrames: 1,
+    onSendError
   });
 }
 
@@ -201,7 +204,8 @@ export async function runSignalsProbe(flags: Flags): Promise<void> {
   console.log(c.yellow('  Lasers will output. Make sure the room is safe.'));
   console.log('');
 
-  const adapter = probeAdapter(target, zones, serial);
+  let sendError: Error | undefined;
+  const adapter = probeAdapter(target, zones, serial, (err) => { sendError ??= err; });
   adapter.connect();
   try {
     for (const zone of zones) {
@@ -215,6 +219,9 @@ export async function runSignalsProbe(flags: Flags): Promise<void> {
     await sleep(FLUSH_MS);
   } finally {
     adapter.close();
+  }
+  if (sendError) {
+    throw new Error(`OSC sends to ${target.host}:${target.port} failed: ${sendError.message}`);
   }
   console.log('');
   console.log(c.green('  ✓ done — everything blacked out'));

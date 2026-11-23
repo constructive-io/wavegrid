@@ -97,14 +97,20 @@ const sendErrorHandlers = new WeakMap<Client, (err: unknown) => void>();
  * must not take the receiver, and with it the server and UI, down. Each
  * distinct error is logged once per client so a bad host does not flood the log.
  */
-export function createOscClient(host: string, port: number, label = 'OSC'): Client {
+export function createOscClient(
+  host: string,
+  port: number,
+  label = 'OSC',
+  onSendError?: (err: Error) => void
+): Client {
   const client = new Client(host, port);
   const seen = new Set<string>();
   const report = (err: unknown): void => {
-    const message = err instanceof Error ? err.message : String(err);
-    if (seen.has(message)) return;
-    seen.add(message);
-    console.warn(`  [${label}] send to ${host}:${port} failed: ${message}`);
+    const error = err instanceof Error ? err : new Error(String(err));
+    onSendError?.(error);
+    if (seen.has(error.message)) return;
+    seen.add(error.message);
+    console.warn(`  [${label}] send to ${host}:${port} failed: ${error.message}`);
   };
   client.on('error', report);
   sendErrorHandlers.set(client, report);
@@ -169,6 +175,8 @@ export interface BeyondOscConfig {
    * Default: 2 (30Hz).
    */
   sendEveryNFrames?: number;
+  /** Called for every failed send (unresolvable host, socket error). Failures are logged either way. */
+  onSendError?: (err: Error) => void;
 }
 
 /**
@@ -288,7 +296,7 @@ export class BeyondOscOutput implements OutputAdapter {
 
   /** Initialize the UDP client. Call before receiver.start(). */
   connect(): void {
-    this.client = createOscClient(this.config.host, this.config.port, 'OSC→BEYOND');
+    this.client = createOscClient(this.config.host, this.config.port, 'OSC→BEYOND', this.config.onSendError);
   }
 
   send(grid: CannonState[], calibration = false): void {
@@ -378,6 +386,8 @@ export interface FB4OscConfig {
   serialMap: Record<number, string>;
   /** Send rate throttle. Default: 2 (30Hz at 60fps). */
   sendEveryNFrames?: number;
+  /** Called for every failed send (unresolvable host, socket error). Failures are logged either way. */
+  onSendError?: (err: Error) => void;
 }
 
 /**
@@ -419,7 +429,7 @@ export function encodeFB4Messages(
 
 export class FB4OscOutput implements OutputAdapter {
   private client: Client | null = null;
-  private config: Required<Pick<FB4OscConfig, 'host' | 'port' | 'serialMap'>> & Pick<FB4OscConfig, 'sendEveryNFrames'>;
+  private config: Required<Pick<FB4OscConfig, 'host' | 'port' | 'serialMap'>> & Pick<FB4OscConfig, 'sendEveryNFrames' | 'onSendError'>;
   private frameCount = 0;
   private sendInterval: number;
   private prevGrid: CannonState[] | undefined;
@@ -433,7 +443,7 @@ export class FB4OscOutput implements OutputAdapter {
   }
 
   connect(): void {
-    this.client = createOscClient(this.config.host, this.config.port, 'OSC→FB4');
+    this.client = createOscClient(this.config.host, this.config.port, 'OSC→FB4', this.config.onSendError);
   }
 
   send(grid: CannonState[]): void {

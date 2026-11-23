@@ -486,4 +486,23 @@ describe('unreachable OSC targets', () => {
     expect(warn.mock.calls[0][0]).toContain('wavegrid-placeholder-host.invalid');
     warn.mockRestore();
   });
+
+  it('reports every failed send to onSendError', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const errors: Error[] = [];
+    const adapter = new FB4OscOutput({
+      host: 'wavegrid-placeholder-host.invalid',
+      port: nextPort(),
+      serialMap: { 0: '12345' },
+      sendEveryNFrames: 1,
+      onSendError: (err) => errors.push(err)
+    });
+    adapter.connect();
+    adapter.send(makeSingleGrid(0, 0, 100, 100));
+    await new Promise((r) => setTimeout(r, 500));
+    adapter.close();
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toBeInstanceOf(Error);
+    warn.mockRestore();
+  });
 });
