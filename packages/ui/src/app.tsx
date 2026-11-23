@@ -21,7 +21,6 @@ import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
 import { type GracePaintControls, useGracePaint } from '@/lib/use-grace-paint';
 import { useIsPhone } from '@/lib/use-media-query';
-import { usePalace } from '@/lib/use-palace';
 import { useSocket } from '@/lib/use-socket';
 
 // Stands in only until /api/config answers, and matches useConfig's own fallback.
@@ -464,7 +463,6 @@ export default function Home() {
 
   const gracePaint = useGracePaint(NUM_CANNONS, send, pattern, handlePatternSelect);
   gracePaintRef.current = gracePaint;
-  const palace = usePalace(LAYOUT.fixtures, send, pattern, handlePatternSelect);
 
   // A tab saved on another rig (or hidden here) falls back to Paint.
   useEffect(() => {
@@ -481,16 +479,12 @@ export default function Home() {
         gracePaint.paint(index, h, s);
         return;
       }
-      if (tab === 'palace') {
-        palace.paint(index, h, s);
-        return;
-      }
       send({ type: 'cannon', index, h, s, b });
       if (trailFade && b > 0) {
         scheduleTrailFade(index, h, s, b);
       }
     },
-    [gracePaint, palace, scheduleTrailFade, send, tab, trailFade, pluginPaintEnabled]
+    [gracePaint, scheduleTrailFade, send, tab, trailFade, pluginPaintEnabled]
   );
 
   const flags = useFlagAnimation(send);
@@ -686,7 +680,6 @@ export default function Home() {
     playlistState,
     easing: previewEasing,
     gracePaint,
-    palace,
     looks
   };
 

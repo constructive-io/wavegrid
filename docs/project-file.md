@@ -209,6 +209,22 @@ exceed the message budget, the host includes the newest Looks that fit and sets
 `looksTruncated: true`. A single oversized Look is skipped; layout and pattern
 metadata retain their budget instead of being dropped along with the Looks.
 
+### Palace compatibility
+
+Palace is a project plugin, not a built-in tab. Open a Palace project from
+`illuminate-sf/wavegrid-projects` with its `plugins/palace` folder to get the
+Scenes, Colour, Motion and Paint view on projector layouts. A projector layout
+alone no longer adds a Palace tab.
+
+When the brain loads its Looks file, legacy Looks with `params.kind: 'palace'`
+and no `params.plugin` are tagged `palace/palace` and written back once. Saving
+an unscoped Palace Look applies the same migration. Existing scopes are never
+overwritten; IDs, names, timestamps, ordering and all other params are preserved.
+Project imports also pass through this migration when the brain next loads them.
+The plugin recalls the original stops, motion, trims and hue shift, and resizes
+paint to the current fixture count by padding or truncating at the same indices
+(not remapping by geometry or kind). The plugin must be installed to recall them.
+
 ### Plugin storage
 
 Opening validates all plugins before changing the project, then replaces store

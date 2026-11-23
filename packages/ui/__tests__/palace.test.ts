@@ -2,7 +2,7 @@ import { presets, resolveLayout } from '@wavegrid/layout';
 
 import { coerceParams } from '../src/lib/use-grace-paint';
 import {
-  ANIMS, defaultParams, emptyPaint, FLOWS, kindPaint, type PalaceParams, palacePattern, paintFixture, SCENES, SPANS, SPINS
+  ANIMS, defaultParams, emptyPaint, FLOWS, type PalaceParams, palacePattern, SCENES, SPANS, SPINS
 } from '../src/lib/palace';
 
 type Cell = [number, number, number];
@@ -18,7 +18,7 @@ function render(fixtures: { x: number; kind?: 'cannon' | 'projector' }[], params
 const zipper = presets['interleaved-12x2']().fixtures;
 const plain = resolveLayout({ kind: 'grid', cols: 12, rows: 2 }).fixtures;
 
-describe('palace pattern', () => {
+describe('legacy Palace pattern parity baseline', () => {
   it.each([['zipper', zipper], ['no projectors', plain]])('every motion × who stays finite and in range (%s)', (_, fixtures) => {
     for (const a of ANIMS) {
       for (const who of ['both', 'cannon', 'projector'] as const) {
@@ -50,18 +50,14 @@ describe('palace pattern', () => {
   });
 
   it('painted fixtures keep their colour under every flow; trims scale brightness', () => {
-    const paint = paintFixture(emptyPaint(24), 13, 123, 77);
+    const paint = emptyPaint(24);
+    paint[26] = 123; paint[27] = 77;
     for (const f of FLOWS) {
       const out = render(zipper, { flow: f.key, paint, anim: 'solid', cannon: 50 }, 7);
       expect(out[13].slice(0, 2)).toEqual([123, 77]);
       expect(out[0][2]).toBeCloseTo(50);
       expect(out[13][2]).toBeCloseTo(100);
     }
-  });
-
-  it('kindPaint fills only the requested kind', () => {
-    const p = kindPaint(emptyPaint(24), zipper, 'projector', 10, 20);
-    zipper.forEach((f, i) => expect(p[i * 2]).toBe(f.kind === 'projector' ? 10 : -1));
   });
 
   it('scenes use only existing flows, motions, spans and drifts', () => {
@@ -75,14 +71,5 @@ describe('palace pattern', () => {
 
   it('a Palace look is never taken as a GracePaint look', () => {
     expect(coerceParams(defaultParams(24) as unknown as Record<string, unknown>)).toBeNull();
-  });
-});
-
-describe('coercePalaceParams', () => {
-  it('drops malformed stops and rejects a look with none', async () => {
-    const { coercePalaceParams } = await import('../src/lib/palace');
-    const base = defaultParams(24) as unknown as Record<string, unknown>;
-    expect(coercePalaceParams({ ...base, stops: [null, 'x', [10, 20], [Number.NaN, 1]] }, 24)?.stops).toEqual([[10, 20]]);
-    expect(coercePalaceParams({ ...base, stops: [null] }, 24)).toBeNull();
   });
 });

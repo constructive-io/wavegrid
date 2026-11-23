@@ -59,9 +59,10 @@ To update, run `git pull && pnpm install && pnpm build` at the **same commit as 
 
 ## Palace tab
 
-It appears automatically when the layout has any projector (`tabsFor` in `packages/ui/src/app.tsx`). It sets colour and brightness only. It is one `evalPattern` (`palacePattern(fixtures)` in `packages/ui/src/lib/palace.ts`) with the geometry baked in (`X`, `RANK`, `PROJ`). Its parameters are `stops, flow, span, spin, anim, who, level, cannon, projector, paint`, and the UI (`use-palace.ts`, `palace-tab.tsx`) only ever sends `setPatternParam` while it runs.
+Palace ships in `illuminate-sf/wavegrid-projects`, under `2026-11-palace-of-fine-arts/plugins/palace`. Open one of that folder's projector projects with its plugin folder intact. The app has no built-in Palace tab: the plugin view appears only when referenced by the project and the layout has projectors. Its geometry-independent sandbox pattern derives positions from `ctx.uv(i)` and kinds from `ctx.kind(i)`. It sets colour and brightness only, using parameters `stops, flow, span, spin, anim, who, level, cannon, projector, paint` and optional `hueShift`.
 
-- Scenes, colour flows and motions are data tables in `palace.ts`. Add one there and the tests in `packages/ui/__tests__/palace.test.ts` cover it: every motion × `who` must stay finite and within 0–100.
+- Edit the plugin's JSON catalogs in `view/` for scenes, gradients, duos, motions and choices. Its plain HTML/JS/CSS view uses the sandboxed plugin bridge. `packages/ui/src/lib/palace.ts` is retained only as the old generator/catalog baseline for server and project-plugin parity tests; it is not imported by the app.
+- The brain tags legacy unscoped Palace Looks as `palace/palace` on load/save, preserving their params. Recall pads/truncates paint by index, not geometry. See `docs/project-file.md`.
 - Painting a fixture in Palace sets `paint[i]`, and the motion keeps running. A stroke in the plain Paint tab stops the pattern on the brain and the receivers.
 - A receiver that reconnects mid-pattern is sent the running code and params. A receiver given an `evalPattern` with identical code **and** params applies the params without resetting its clock.
 
