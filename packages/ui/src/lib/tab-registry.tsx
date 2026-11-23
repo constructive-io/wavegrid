@@ -18,7 +18,6 @@ import { PluginTab } from '@/components/plugin-tab';
 import { PoolTab } from '@/components/pool-tab';
 import { SequencesTab } from '@/components/sequences-tab';
 import { ShiftDial } from '@/components/shift-dial';
-import { UsaTab } from '@/components/usa-tab';
 import { VideoTab } from '@/components/video-tab';
 import type { UIPlugin } from '@/lib/plugin-data';
 import type { RegisterPluginPaint } from '@/lib/plugin-view-bridge';
@@ -199,18 +198,6 @@ export const allTabs: TabDef[] = [
           </ControlGroup>
         </ControlGrid>
       </div>
-    )
-  },
-  {
-    id: 'usa', label: 'USA', showWhen: 'never',
-    render: ({ animSpeed, onAnimSpeed, send, activePattern, onPatternSelect }) => (
-      <UsaTab
-        send={send}
-        activePattern={activePattern}
-        onPatternSelect={onPatternSelect}
-        animSpeed={animSpeed}
-        onAnimSpeed={onAnimSpeed}
-      />
     )
   },
   {
