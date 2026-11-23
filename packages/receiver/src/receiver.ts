@@ -133,7 +133,7 @@ export class Receiver {
     );
     const shard = this.config.shard;
     const frame = shard ? remapped.slice(shard.start, shard.end + 1) : remapped;
-    const scale = this._animState.brightness / 100;
+    const scale = this._fallbackActive ? 1 : this._animState.brightness / 100;
     return scale === 1 ? frame : frame.map(cell => ({ ...cell, b: cell.b * scale }));
   }
 

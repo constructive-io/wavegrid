@@ -87,6 +87,27 @@ describe('Receiver', () => {
     }
   });
 
+  it('uses the fallback brightness even when the upstream master brightness was zero', () => {
+    jest.useFakeTimers();
+    const input = new WebSocketInput({ url: 'ws://example.com:9999' });
+    jest.spyOn(input, 'connect').mockImplementation(() => {});
+    const r = new Receiver({ input, output: new CallbackOutput(() => {}), fallbackDelay: 30, alpha: 1 });
+    r.start();
+    try {
+      input.emit('connected');
+      input.emit('command', { type: 'command', action: 'setBrightness', value: 0 });
+      input.emit('command', { type: 'command', action: 'paint', cells: [{ idx: 0, h: 60, s: 100, b: 100 }] });
+      jest.advanceTimersByTime(17);
+      expect(r.getOutputState()[0].b).toBe(0);
+      jest.advanceTimersByTime(60);
+      expect(r.fallbackActive).toBe(true);
+      expect(r.getOutputState()[0].b).toBeGreaterThan(0);
+    } finally {
+      r.stop();
+      jest.useRealTimers();
+    }
+  });
+
   it.each([false, true])('restores the station snapshot on keepalive after a signal timeout (local animation: %s)', localAnimation => {
     jest.useFakeTimers();
     const input = new WebSocketInput({ url: 'ws://example.com:9999' });
