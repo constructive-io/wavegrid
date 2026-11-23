@@ -5,8 +5,7 @@ import type { Look } from '@/lib/socket-state';
 import { paramsFromLook } from '@/lib/use-grace-paint';
 
 import { ControlGroup } from './control-grid';
-import type { PreviewEasing } from './grace-tab';
-import { MiniGridPreview, type PreviewFixture } from './mini-grid-preview';
+import { MiniGridPreview, type PreviewEasing, type PreviewFixture } from './mini-grid-preview';
 
 const LOOK_TILE = 104;
 

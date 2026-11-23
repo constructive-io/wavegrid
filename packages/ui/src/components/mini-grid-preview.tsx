@@ -1,5 +1,11 @@
 import { useEffect, useRef } from 'react';
 
+/** The receiver's easing, as the previews need it (see MiniGridPreview). */
+export interface PreviewEasing {
+  attack: number;
+  alpha: number;
+}
+
 const COLS = 7;
 const ROWS = 7;
 const COUNT = COLS * ROWS;

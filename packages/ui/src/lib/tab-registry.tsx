@@ -10,10 +10,9 @@ import { ControlGrid, ControlGroup } from '@/components/control-grid';
 import { DropsControls } from '@/components/drops-tab';
 import { FlagsTab, useFlagAnimation } from '@/components/flags-tab';
 import { GracePaintTab } from '@/components/grace-paint-tab';
-import { GraceTab, type PreviewEasing } from '@/components/grace-tab';
 import { GradientBar, useGradient } from '@/components/gradient-tab';
 import { LooksTab } from '@/components/looks-tab';
-import type { PreviewFixture } from '@/components/mini-grid-preview';
+import type { PreviewEasing, PreviewFixture } from '@/components/mini-grid-preview';
 import { AnimationPalette, ScenePalette } from '@/components/palette';
 import { PatternsTab } from '@/components/patterns-tab';
 import { PlaylistTab } from '@/components/playlist-tab';
@@ -215,20 +214,6 @@ export const allTabs: TabDef[] = [
         onPatternSelect={onPatternSelect}
         animSpeed={animSpeed}
         onAnimSpeed={onAnimSpeed}
-      />
-    )
-  },
-  {
-    id: 'grace', label: 'Grace', showWhen: { topology: 'rings' },
-    render: ({ animSpeed, onAnimSpeed, send, fixtures, activePattern, onPatternSelect, easing }) => (
-      <GraceTab
-        send={send}
-        activePattern={activePattern}
-        onPatternSelect={onPatternSelect}
-        animSpeed={animSpeed}
-        onAnimSpeed={onAnimSpeed}
-        easing={easing}
-        fixtures={fixtures}
       />
     )
   },
