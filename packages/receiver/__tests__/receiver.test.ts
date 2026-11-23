@@ -59,6 +59,32 @@ describe('Receiver', () => {
     }
   });
 
+  it.each([false, true])('restores the station snapshot on keepalive after a signal timeout (local animation: %s)', localAnimation => {
+    jest.useFakeTimers();
+    const input = new WebSocketInput({ url: 'ws://example.com:9999' });
+    jest.spyOn(input, 'connect').mockImplementation(() => {});
+    const r = new Receiver({ input, output: new CallbackOutput(() => {}), fallbackDelay: 30 });
+    const color = { h: 240, s: 100, b: 80 };
+    r.start();
+    try {
+      input.emit('connected');
+      if (localAnimation) input.emit('command', { type: 'command', action: 'setAnimation', name: 'rainbow' });
+      input.emit('command', { type: 'command', action: 'stationOverlay', cells: [{ idx: 0, ...color }] });
+      expect(r.getOutputState()[0]).toEqual(color);
+      jest.advanceTimersByTime(60);
+      expect(r.getOutputState()[0]).not.toEqual(color);
+      input.emit('command', { type: 'command', action: 'keepalive' });
+      expect(r.getOutputState()[0]).toEqual(color);
+      input.emit('disconnected');
+      input.emit('connected');
+      input.emit('command', { type: 'command', action: 'keepalive' });
+      expect(r.getOutputState()[0]).not.toEqual(color);
+    } finally {
+      r.stop();
+      jest.useRealTimers();
+    }
+  });
+
   describe('sharding', () => {
     it('should return full grid when no shard config', () => {
       const r = new Receiver();

@@ -129,7 +129,9 @@ export class Receiver {
     }));
     const remapped = compositeStationPaint(
       remapGridForOutput(full, this.config.layout.cols, this.config.layout.rows, this._animState),
-      this.stationOverlay.map(cell => ({ ...cell, b: cell.b * this._animState.brightness / 100 }))
+      Date.now() - this.lastDataAt > this.config.fallbackDelay
+        ? []
+        : this.stationOverlay.map(cell => ({ ...cell, b: cell.b * this._animState.brightness / 100 }))
     );
     const shard = this.config.shard;
     if (!shard) return remapped;
@@ -284,7 +286,6 @@ export class Receiver {
           this._animState.patternActive;
 
         if (timeSinceData > this.config.fallbackDelay && !this._fallbackActive) {
-          this.stationOverlay = [];
           if (!hasLocalContent) {
             this._fallbackActive = true;
             this._status = 'fallback';
