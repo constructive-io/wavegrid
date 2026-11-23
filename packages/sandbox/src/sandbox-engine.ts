@@ -160,7 +160,8 @@ export async function createSandboxEngine(
     const stripped = stripExports(transformMixedFormat(code) ?? code);
     try {
       evalVoid('var __expr = (' + stripped + '\n);', cfg.loadBudgetMs);
-    } catch {
+    } catch (error) {
+      if (Date.now() > deadline) throw error;
       evalVoid('var __expr = null;', cfg.loadBudgetMs);
     }
     const wrapped =
