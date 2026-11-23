@@ -285,6 +285,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
       } catch { /* malformed URL or a broken store copy */ }
       if (!contents) { res.writeHead(404); res.end(); return; }
       res.writeHead(200, {
+        'Access-Control-Allow-Origin': '*',
         'Content-Type': MIME[extname(file)] || 'application/octet-stream',
         'Content-Length': contents.length,
         'X-Content-Type-Options': 'nosniff'
