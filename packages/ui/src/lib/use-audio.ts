@@ -275,6 +275,10 @@ export function useAudio(
   }, [resetGraceShift]);
 
   const setAudioMode = useCallback((nextMode: AudioMode) => {
+    if (modeRef.current !== nextMode && modeRef.current !== 'grace') {
+      sendRef.current({ type: 'audio_layer_clear' });
+    }
+    modeRef.current = nextMode;
     resetVisualState();
     setMode(nextMode);
   }, [resetVisualState]);
