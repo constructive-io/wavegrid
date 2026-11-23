@@ -40,6 +40,7 @@ describe('shared pattern sandbox', () => {
 
   it.each([
     '\n({ render(ctx) { ctx.fill(120, 80, 60); } })',
+    '({ render(ctx) { ctx.fill(120, 80, 60); } }); \n',
     ...['const', 'let', 'var'].map(kind => `${kind} hue = 120; function render(ctx) { ctx.fill(hue, 80, 60); }`)
   ])('loads expression and statement sources without return-prefix syntax restrictions: %s', (code) => {
     engine.loadPattern(code);

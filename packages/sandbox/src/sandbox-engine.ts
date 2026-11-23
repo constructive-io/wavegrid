@@ -159,7 +159,7 @@ export async function createSandboxEngine(
     //   2) Declaration: function render(ctx){...} — picked up from global scope
     const stripped = stripExports(transformMixedFormat(code) ?? code);
     try {
-      evalVoid('var __expr = (' + stripped + '\n);', cfg.loadBudgetMs);
+      evalVoid('var __expr = (' + stripped.replace(/;\s*$/, '') + '\n);', cfg.loadBudgetMs);
     } catch (error) {
       if (Date.now() > deadline) throw error;
       evalVoid('var __expr = null;', cfg.loadBudgetMs);
