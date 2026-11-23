@@ -329,9 +329,9 @@ importers:
       '@wavegrid/osc':
         specifier: workspace:*
         version: link:../osc/dist
-      quickjs-emscripten:
-        specifier: 0.31.0
-        version: 0.31.0
+      '@wavegrid/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/dist
       ws:
         specifier: ^8.18.0
         version: 8.21.0
@@ -344,8 +344,25 @@ importers:
         version: 0.3.1
     publishDirectory: dist
 
+  packages/sandbox:
+    dependencies:
+      '@wavegrid/layout':
+        specifier: workspace:*
+        version: link:../layout/dist
+      quickjs-emscripten:
+        specifier: 0.31.0
+        version: 0.31.0
+    devDependencies:
+      makage:
+        specifier: ^0.3.0
+        version: 0.3.1
+    publishDirectory: dist
+
   packages/server:
     dependencies:
+      '@wavegrid/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/dist
       '@wavegrid/animations':
         specifier: workspace:*
         version: link:../animations/dist

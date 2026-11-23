@@ -42,7 +42,7 @@ import { applyScene, scenes } from './scenes';
 export interface ServerHandle {
   server: http.Server;
   grid: ReturnType<typeof createGrid>;
-  /** Resolves once the port is bound, rejects with the bind error (e.g. a port
+  /** Resolves once QuickJS is initialized and the port is bound, rejects with the bind error (e.g. a port
    *  already in use). `listen` is async, so without awaiting this a caller
    *  would report a healthy show while nothing is listening. */
   ready: Promise<void>;
@@ -258,6 +258,13 @@ function tickPool(dt: number) {
 }
 let playlistCurrentStep = 0;
 const patternEngine = new ServerPatternEngine(layout);
+let stopped = false;
+let patternsReady = false;
+const pendingCommands: Record<string, unknown>[] = [];
+const patternReady = patternEngine.init().then(() => {
+  patternsReady = true;
+  if (!stopped) for (const command of pendingCommands.splice(0)) handleMessage(command);
+});
 const looks = new LookStore(LOOKS_FILE);
 
 // Restore persisted state on boot
@@ -1249,7 +1256,7 @@ const heartbeatTimer = setInterval(() => {
 
 let advertiseHandle: AdvertiseHandle | null = null;
 
-const ready = new Promise<void>((resolveReady, rejectReady) => {
+const ready = patternReady.then(() => new Promise<void>((resolveReady, rejectReady) => {
   server.once('listening', () => resolveReady());
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
@@ -1262,28 +1269,35 @@ const ready = new Promise<void>((resolveReady, rejectReady) => {
     }
     rejectReady(err);
   });
-});
+  if (stopped) { resolveReady(); return; }
+  server.listen(PORT, resolved.config.server.host, () => {
+    console.log('');
+    console.log('╔══════════════════════════════════════════╗');
+    console.log('║   Wavegrid Server                         ║');
+    console.log('╚══════════════════════════════════════════╝');
+    console.log('');
+    console.log(`  → http://localhost:${PORT}`);
+    console.log(`  → Layout: ${layout.name} (${layout.topology}, ${NUM_CANNONS} cannons)`);
+    console.log(`  → Run mode: ${RUN_MODE}`);
+    console.log('  → Mode: command relay');
+    // Announce over mDNS so `wavegrid receiver` can find us without an IP. Best
+    // effort: silently a no-op where multicast is blocked. Never bypasses auth.
+    if (opts.advertise) {
+      advertiseHandle = advertise({ port: PORT, ...opts.advertise });
+      console.log(`  → Discoverable: _wavegrid._tcp (project "${opts.advertise.project}")`);
+    }
+    console.log('');
+  });
 
-server.listen(PORT, resolved.config.server.host, () => {
-  console.log('');
-  console.log('╔══════════════════════════════════════════╗');
-  console.log('║   Wavegrid Server                         ║');
-  console.log('╚══════════════════════════════════════════╝');
-  console.log('');
-  console.log(`  → http://localhost:${PORT}`);
-  console.log(`  → Layout: ${layout.name} (${layout.topology}, ${NUM_CANNONS} cannons)`);
-  console.log(`  → Run mode: ${RUN_MODE}`);
-  console.log('  → Mode: command relay');
-  // Announce over mDNS so `wavegrid receiver` can find us without an IP. Best
-  // effort: silently a no-op where multicast is blocked. Never bypasses auth.
-  if (opts.advertise) {
-    advertiseHandle = advertise({ port: PORT, ...opts.advertise });
-    console.log(`  → Discoverable: _wavegrid._tcp (project "${opts.advertise.project}")`);
-  }
-  console.log('');
+})).catch((error) => {
+  stop();
+  throw error;
 });
 
 const stop = () => {
+  stopped = true;
+  pendingCommands.length = 0;
+  patternEngine.stop();
   clearInterval(tickTimer);
   clearInterval(heartbeatTimer);
   if (saveTimer) clearTimeout(saveTimer);
@@ -1293,7 +1307,9 @@ const stop = () => {
 };
 
 const send = (cmd: Record<string, unknown>) => {
-  handleMessage(cmd);
+  if (stopped) return;
+  if (!patternsReady) pendingCommands.push(cmd);
+  else handleMessage(cmd);
 };
 
 return { server, grid, ready, stop, send };

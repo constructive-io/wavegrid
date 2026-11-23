@@ -11,24 +11,32 @@ const PARAM_PATTERN = `({
 })`;
 
 describe('ServerPatternEngine params', () => {
-  it('exposes meta defaults on ctx.p', () => {
+  const engines: ServerPatternEngine[] = [];
+  afterEach(() => { for (const engine of engines.splice(0)) engine.stop(); });
+  it('exposes meta defaults on ctx.p', async () => {
     const engine = new ServerPatternEngine(LAYOUT);
+    await engine.init();
+    engines.push(engine);
     expect(engine.load(PARAM_PATTERN)).toBe(true);
     const g = grid();
     engine.render(g);
     expect(g[0]).toEqual({ h: 30, s: 100, b: 50 });
   });
 
-  it('initial params override defaults', () => {
+  it('initial params override defaults', async () => {
     const engine = new ServerPatternEngine(LAYOUT);
+    await engine.init();
+    engines.push(engine);
     engine.load(PARAM_PATTERN, { hue: 200, level: 80 });
     const g = grid();
     engine.render(g);
     expect(g[0]).toEqual({ h: 200, s: 100, b: 80 });
   });
 
-  it('setParam changes the next frame without reloading', () => {
+  it('setParam changes the next frame without reloading', async () => {
     const engine = new ServerPatternEngine(LAYOUT);
+    await engine.init();
+    engines.push(engine);
     engine.load(PARAM_PATTERN);
     engine.setParam('hue', 120);
     engine.setParam('level', 10);
@@ -37,8 +45,10 @@ describe('ServerPatternEngine params', () => {
     expect(g[0]).toEqual({ h: 120, s: 100, b: 10 });
   });
 
-  it('setParam calls onParam when the pattern has one', () => {
+  it('setParam calls onParam when the pattern has one', async () => {
     const engine = new ServerPatternEngine(LAYOUT);
+    await engine.init();
+    engines.push(engine);
     engine.load(`({
       seen: [],
       onParam(name, value) { this.seen.push(name + '=' + value); },
@@ -51,8 +61,10 @@ describe('ServerPatternEngine params', () => {
     expect(g[0].b).toBe(2);
   });
 
-  it('reports the loaded code and live params, cleared by stop', () => {
+  it('reports the loaded code and live params, cleared by stop', async () => {
     const engine = new ServerPatternEngine(LAYOUT);
+    await engine.init();
+    engines.push(engine);
     expect(engine.code).toBeNull();
     expect(engine.currentParams).toEqual({});
     engine.load(PARAM_PATTERN, { level: 80 });
@@ -64,8 +76,10 @@ describe('ServerPatternEngine params', () => {
     expect(engine.currentParams).toEqual({});
   });
 
-  it('setParam is a no-op with nothing loaded', () => {
+  it('setParam is a no-op with nothing loaded', async () => {
     const engine = new ServerPatternEngine(LAYOUT);
+    await engine.init();
+    engines.push(engine);
     expect(() => engine.setParam('x', 1)).not.toThrow();
   });
 });

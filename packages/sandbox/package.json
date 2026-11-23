@@ -1,0 +1,43 @@
+{
+  "name": "@wavegrid/sandbox",
+  "version": "1.0.0",
+  "author": "Dan Lynch <pyramation@gmail.com>",
+  "description": "Shared QuickJS pattern sandbox",
+  "main": "index.js",
+  "module": "esm/index.js",
+  "types": "index.d.ts",
+  "homepage": "https://github.com/constructive-io/wavegrid",
+  "license": "SEE LICENSE IN LICENSE",
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/constructive-io/wavegrid"
+  },
+  "bugs": {
+    "url": "https://github.com/constructive-io/wavegrid/issues"
+  },
+  "scripts": {
+    "clean": "makage clean",
+    "prepack": "npm run build",
+    "build": "makage build",
+    "build:dev": "makage build --dev",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --fix",
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --passWithNoTests",
+    "test:watch": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --watch"
+  },
+  "keywords": [
+    "wavegrid",
+    "quickjs",
+    "sandbox"
+  ],
+  "dependencies": {
+    "@wavegrid/layout": "workspace:*",
+    "quickjs-emscripten": "0.31.0"
+  },
+  "devDependencies": {
+    "makage": "^0.3.0"
+  }
+}

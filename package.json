@@ -27,7 +27,7 @@
     "dev:debug": "pnpm --filter @wavegrid/debug run dev",
     "gen:config": "node deploy/gen-config.js",
     "build:ui": "pnpm --filter @wavegrid/ui run build",
-    "build:receiver": "pnpm -r --filter @wavegrid/layout --filter @wavegrid/animations --filter @wavegrid/osc run build && pnpm -r --filter ./packages/receiver run build",
+    "build:receiver": "pnpm --filter @wavegrid/receiver... run build",
     "deps": "pnpm up -r -i -L"
   },
   "devDependencies": {
