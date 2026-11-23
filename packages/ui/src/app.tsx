@@ -1,43 +1,27 @@
-import { type Layout, presets } from '@wavegrid/layout/client';
+import { presets } from '@wavegrid/layout/client';
 import { DEFAULT_POOL_SETTINGS, type PoolColor, type PoolSettings } from '@wavegrid/pool';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { AudioTab } from '@/components/audio-tab';
 import { BottomSheet, type SnapPoint } from '@/components/bottom-sheet';
-import { BrightnessTab, useBrightnessAnimation } from '@/components/brightness-tab';
-import { ColorWheel } from '@/components/color-wheel';
-import { ControlGrid, ControlGroup } from '@/components/control-grid';
-import { DropsControls, useDrops } from '@/components/drops-tab';
-import { FlagsTab, useFlagAnimation } from '@/components/flags-tab';
-import { GracePaintTab } from '@/components/grace-paint-tab';
-import { GraceTab, type PreviewEasing } from '@/components/grace-tab';
-import { GradientBar, useGradient } from '@/components/gradient-tab';
-import type { GridMode } from '@/components/grid-display';
+import { useBrightnessAnimation } from '@/components/brightness-tab';
+import { useDrops } from '@/components/drops-tab';
+import { useFlagAnimation } from '@/components/flags-tab';
+import type { PreviewEasing } from '@/components/grace-tab';
+import { useGradient } from '@/components/gradient-tab';
 import { GridDisplay } from '@/components/grid-display';
 import { LoginScreen } from '@/components/login-screen';
-import { LooksTab } from '@/components/looks-tab';
-import type { PreviewFixture } from '@/components/mini-grid-preview';
 import { useMotion } from '@/components/motion-tab';
-import { PalaceTab } from '@/components/palace-tab';
-import { AnimationPalette, ScenePalette } from '@/components/palette';
-import { PatternsTab } from '@/components/patterns-tab';
-import { PlaylistTab } from '@/components/playlist-tab';
 import { PoolCanvas, type PoolTouchPhase } from '@/components/pool-canvas';
-import { PoolTab } from '@/components/pool-tab';
-import { PrideTab } from '@/components/pride-tab';
-import { SequencesTab } from '@/components/sequences-tab';
-import { ShiftDial } from '@/components/shift-dial';
 import { StatusDot } from '@/components/status-dot';
-import { UsaTab } from '@/components/usa-tab';
-import { VideoTab } from '@/components/video-tab';
 import type { GraceAudioOutput } from '@/lib/grace-audio';
+import { allTabs, tabById, type TabDef, tabsFor, type ToolContentProps } from '@/lib/tab-registry';
 import { useAudio } from '@/lib/use-audio';
 import { useAuth } from '@/lib/use-auth';
 import { useConfig } from '@/lib/use-config';
 import { type GracePaintControls, useGracePaint } from '@/lib/use-grace-paint';
 import { useIsPhone } from '@/lib/use-media-query';
-import { type PalaceControls, usePalace } from '@/lib/use-palace';
-import { type Look, type PlaylistState, useSocket } from '@/lib/use-socket';
+import { usePalace } from '@/lib/use-palace';
+import { useSocket } from '@/lib/use-socket';
 
 // Stands in only until /api/config answers, and matches useConfig's own fallback.
 const FALLBACK_LAYOUT = presets['grid-7x7']();
@@ -51,337 +35,8 @@ type TrailFadeEntry = {
   duration: number;
 };
 
-const allTabs: { key: GridMode; label: string }[] = [
-  { key: 'paint', label: 'Paint' },
-  { key: 'palace', label: 'Palace' },
-  { key: 'pool', label: 'Pool' },
-  { key: 'gradient', label: 'Gradient' },
-  { key: 'scenes', label: 'Scenes' },
-  { key: 'animations', label: 'Anim' },
-  { key: 'pride', label: 'Pride' },
-  { key: 'usa', label: 'USA' },
-  { key: 'grace', label: 'Grace' },
-  { key: 'gracepaint', label: 'GracePaint' },
-  { key: 'looks', label: 'Looks' },
-  { key: 'patterns', label: 'Patterns' },
-  { key: 'sequences', label: 'Sequences' },
-  { key: 'playlist', label: 'Playlist' },
-  { key: 'flags', label: 'Flags' },
-  { key: 'drops', label: 'Drops' },
-  { key: 'audio', label: 'Audio' },
-  { key: 'video', label: 'Video' }
-];
-
-type TabDef = { key: GridMode; label: string };
-
-// Tabs shown in the bar, chosen by the rig: Palace when the layout has
-// projectors, Grace and GracePaint on concentric rings. The rest stay wired up
-// (ToolContent, GridMode) and come back by adding their key here.
-function tabsFor(layout: { topology?: string; fixtures?: { kind?: string }[] }): TabDef[] {
-  const shown: GridMode[] = ['paint', 'pool', 'gradient'];
-  if (layout.fixtures?.some((f) => f.kind === 'projector')) shown.push('palace');
-  if (layout.topology === 'rings') shown.push('grace', 'gracepaint');
-  return allTabs.filter((t) => shown.includes(t.key));
-}
-
-/* ---------- Tool content (no tabs, just the active tool) ---------- */
-
-function ToolContent({
-  tab,
-  hue, sat, bright, brushSize, softEdge, trailFade,
-  setHue, setSat, setBright, setBrushSize, setSoftEdge, setTrailFade,
-  gradient, dropsConfig, setDropsConfig,
-  poolSettings, setPoolSettings, onPoolRelease, onPoolStop, poolBeamsOnly, setPoolBeamsOnly,
-  activeScene, handleScene,
-  activeAnim, handleAnim,
-  animSpeed, onAnimSpeed,
-  send,
-  flags, brightness, audio,
-  isPhone,
-  onShift,
-  numCannons, gridColumns, fixtures, layout,
-  activePattern, onPatternSelect,
-  playlistState,
-  easing, gracePaint, palace, looks
-}: {
-  tab: GridMode;
-  hue: number; sat: number; bright: number; brushSize: number; softEdge: boolean; trailFade: boolean;
-  setHue: (v: number) => void; setSat: (v: number) => void; setBright: (v: number) => void;
-  setBrushSize: (v: number) => void; setSoftEdge: (v: boolean) => void; setTrailFade: (v: boolean) => void;
-  gradient: ReturnType<typeof useGradient>;
-  dropsConfig: { spectrumStart: number; spectrumEnd: number; speed: number; decay: number; width: number };
-  setDropsConfig: (c: typeof dropsConfig) => void;
-  poolSettings: PoolSettings;
-  setPoolSettings: (s: PoolSettings) => void;
-  onPoolRelease: () => void;
-  onPoolStop: () => void;
-  poolBeamsOnly: boolean;
-  setPoolBeamsOnly: (v: boolean) => void;
-  activeScene: string | null;
-  handleScene: (name: string) => void;
-  activeAnim: string | null;
-  handleAnim: (name: string) => void;
-  animSpeed: number;
-  onAnimSpeed: (v: number) => void;
-  send: (msg: Record<string, unknown>) => void;
-  flags: ReturnType<typeof useFlagAnimation>;
-  brightness: ReturnType<typeof useBrightnessAnimation>;
-  audio: ReturnType<typeof useAudio>;
-  isPhone: boolean;
-  onShift: (vx: number, vy: number) => void;
-  numCannons: number;
-  gridColumns: number;
-  fixtures?: PreviewFixture[];
-  layout: Layout;
-  activePattern: string | null;
-  onPatternSelect: (id: string) => void;
-  playlistState: PlaylistState | null;
-  easing: PreviewEasing;
-  gracePaint: GracePaintControls;
-  palace: PalaceControls;
-  looks: Look[];
-}) {
-  return (
-    <>
-      {tab === 'paint' && (
-        <ColorWheel
-          hue={hue}
-          saturation={sat}
-          brightness={bright}
-          brushSize={brushSize}
-          softEdge={softEdge}
-          trailFade={trailFade}
-          onHueChange={setHue}
-          onSatChange={setSat}
-          onBrightChange={setBright}
-          onBrushSizeChange={setBrushSize}
-          onSoftEdgeChange={setSoftEdge}
-          onTrailFadeChange={setTrailFade}
-          compact={isPhone}
-        />
-      )}
-
-      {tab === 'pool' && (
-        <PoolTab
-          settings={poolSettings}
-          onSettings={setPoolSettings}
-          hue={hue}
-          sat={sat}
-          bright={bright}
-          onHue={setHue}
-          onSat={setSat}
-          onBright={setBright}
-          beamsOnly={poolBeamsOnly}
-          onBeamsOnly={setPoolBeamsOnly}
-          onRelease={onPoolRelease}
-          onStop={onPoolStop}
-          compact={isPhone}
-        />
-      )}
-
-      {tab === 'gradient' && (
-        <div className="space-y-3">
-          <GradientBar
-            stops={gradient.stops}
-            onAdd={(pos) => gradient.addStop(pos, hue, sat, bright)}
-          />
-          <button
-            onClick={gradient.reset}
-            className="px-4 py-2.5 rounded-lg text-sm transition-all"
-            style={{
-              background: '#12121a',
-              color: '#888898',
-              border: '1px solid #1a1a25'
-            }}
-          >
-            Reset
-          </button>
-        </div>
-      )}
-
-      {tab === 'drops' && (
-        <DropsControls config={dropsConfig} onChange={setDropsConfig} />
-      )}
-
-      {tab === 'scenes' && (
-        <ScenePalette active={activeScene} onSelect={handleScene} />
-      )}
-
-      {tab === 'animations' && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3 px-2">
-            <span className="text-xs font-medium shrink-0" style={{ color: '#888898', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
-              Speed
-            </span>
-            <input
-              type="range"
-              className="flex-1"
-              style={{ minWidth: 120, height: 28 }}
-              min={0}
-              max={1000}
-              value={Math.round(Math.log(animSpeed / 0.01) / Math.log(5.0 / 0.01) * 1000)}
-              onChange={(e) => {
-                const t = parseInt(e.target.value, 10) / 1000;
-                onAnimSpeed(0.01 * Math.pow(5.0 / 0.01, t));
-              }}
-            />
-            <span className="text-xs font-mono shrink-0" style={{ color: '#888898', minWidth: 36, textAlign: 'right' }}>
-              {animSpeed < 0.1 ? animSpeed.toFixed(3) : animSpeed < 1 ? animSpeed.toFixed(2) : animSpeed.toFixed(1)}x
-            </span>
-            <button
-              onClick={() => onAnimSpeed(1.0)}
-              title="Reset to 1.0x"
-              style={{
-                width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: Math.abs(animSpeed - 1.0) < 0.01 ? 'transparent' : 'rgba(59,130,246,0.15)',
-                border: 'none', cursor: 'pointer', opacity: Math.abs(animSpeed - 1.0) < 0.01 ? 0.3 : 1
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#888898" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
-            </button>
-          </div>
-          <ControlGrid minCellWidth={200}>
-            <ControlGroup label="Animations">
-              <AnimationPalette
-                active={activeAnim}
-                onSelect={handleAnim}
-                speed={animSpeed}
-              />
-            </ControlGroup>
-            <ControlGroup label="Brightness Effects">
-              <BrightnessTab
-                config={brightness.config}
-                onMode={brightness.setMode}
-                onSpeed={brightness.setSpeed}
-                onIntensity={brightness.setIntensity}
-                onResnapshot={brightness.resnapshot}
-              />
-            </ControlGroup>
-            <ControlGroup label="Shift">
-              <ShiftDial onShift={onShift} />
-            </ControlGroup>
-          </ControlGrid>
-        </div>
-      )}
-
-      {tab === 'pride' && (
-        <PrideTab
-          send={send}
-          activePattern={activePattern}
-          onPatternSelect={onPatternSelect}
-          animSpeed={animSpeed}
-          onAnimSpeed={onAnimSpeed}
-        />
-      )}
-
-      {tab === 'usa' && (
-        <UsaTab
-          send={send}
-          activePattern={activePattern}
-          onPatternSelect={onPatternSelect}
-          animSpeed={animSpeed}
-          onAnimSpeed={onAnimSpeed}
-        />
-      )}
-
-      {tab === 'grace' && (
-        <GraceTab
-          send={send}
-          activePattern={activePattern}
-          onPatternSelect={onPatternSelect}
-          animSpeed={animSpeed}
-          onAnimSpeed={onAnimSpeed}
-          easing={easing}
-          fixtures={fixtures}
-        />
-      )}
-
-      {tab === 'palace' && (
-        <PalaceTab
-          controls={palace}
-          looks={looks}
-          hue={hue}
-          sat={sat}
-          bright={bright}
-          onHue={setHue}
-          onSat={setSat}
-          onBright={setBright}
-          animSpeed={animSpeed}
-          easing={easing}
-          fixtures={fixtures}
-          compact={isPhone}
-        />
-      )}
-
-      {tab === 'gracepaint' && (
-        <GracePaintTab
-          controls={gracePaint}
-          hue={hue}
-          sat={sat}
-          bright={bright}
-          onHue={setHue}
-          onSat={setSat}
-          onBright={setBright}
-          animSpeed={animSpeed}
-          easing={easing}
-          fixtures={fixtures}
-          compact={isPhone}
-        />
-      )}
-
-      {tab === 'looks' && (
-        <LooksTab
-          looks={looks}
-          current={gracePaint.params}
-          speed={animSpeed}
-          easing={easing}
-          fixtures={fixtures}
-          onSave={gracePaint.saveLook}
-          onApply={gracePaint.applyLook}
-          onRename={gracePaint.renameLook}
-          onDelete={gracePaint.deleteLook}
-        />
-      )}
-
-      {tab === 'patterns' && (
-        <PatternsTab send={send} animSpeed={animSpeed} onAnimSpeed={onAnimSpeed} />
-      )}
-
-      {tab === 'sequences' && (
-        <SequencesTab send={send} playlistState={playlistState} layout={layout} />
-      )}
-
-      {tab === 'playlist' && (
-        <PlaylistTab
-          send={send}
-          playlistState={playlistState as Parameters<typeof PlaylistTab>[0]['playlistState']}
-          layout={layout}
-        />
-      )}
-
-      {tab === 'flags' && (
-        <FlagsTab
-          activeFlag={flags.activeFlag}
-          effect={flags.effect}
-          purpleBlack={flags.purpleBlack}
-          onSelectFlag={flags.selectFlag}
-          onEffect={flags.setEffect}
-          onPurpleBlack={flags.setPurpleBlack}
-        />
-      )}
-
-      {tab === 'audio' && (
-        <AudioTab audio={audio} />
-      )}
-
-      {tab === 'video' && (
-        <VideoTab send={send} numCannons={numCannons} gridColumns={gridColumns} />
-      )}
-
-    </>
-  );
+function ToolContent({ tab, ...props }: ToolContentProps & { tab: string }) {
+  return tabById(tab)?.render(props) ?? null;
 }
 
 /* ---------- Tab strip ---------- */
@@ -393,8 +48,8 @@ function TabStrip({
   variant
 }: {
   tabs: TabDef[];
-  tab: GridMode;
-  setTab: (t: GridMode) => void;
+  tab: string;
+  setTab: (t: string) => void;
   variant: 'phone' | 'bottom' | 'right';
 }) {
   const isPhone = variant === 'phone';
@@ -410,8 +65,8 @@ function TabStrip({
     >
       {tabs.map((t) => (
         <button
-          key={t.key}
-          onClick={() => setTab(t.key)}
+          key={t.id}
+          onClick={() => setTab(t.id)}
           className="whitespace-nowrap transition-all"
           style={{
             padding: isPhone ? '9px 14px' : isRight ? '7px 11px' : '8px 15px',
@@ -419,9 +74,9 @@ function TabStrip({
             fontSize: isPhone ? 14 : isRight ? 12 : 14,
             fontWeight: 600,
             letterSpacing: '0.02em',
-            background: tab === t.key ? '#12121a' : 'transparent',
-            border: tab === t.key ? '1px solid #1a1a25' : '1px solid transparent',
-            color: tab === t.key ? '#e8e8f0' : '#888898'
+            background: tab === t.id ? '#12121a' : 'transparent',
+            border: tab === t.id ? '1px solid #1a1a25' : '1px solid transparent',
+            color: tab === t.id ? '#e8e8f0' : '#888898'
           }}
         >
           {t.label}
@@ -441,8 +96,8 @@ function ToolPanel({
   toolContentProps
 }: {
   tabs: TabDef[];
-  tab: GridMode;
-  setTab: (t: GridMode) => void;
+  tab: string;
+  setTab: (t: string) => void;
   layout: PanelLayout;
   toolContentProps: Omit<React.ComponentProps<typeof ToolContent>, 'tab'>;
 }) {
@@ -613,10 +268,10 @@ export default function Home() {
   const LAYOUT = config?.layout ?? FALLBACK_LAYOUT;
   const tabs = useMemo(() => tabsFor(LAYOUT), [LAYOUT]);
 
-  const [tab, setTab] = useState<GridMode>(() => {
+  const [tab, setTab] = useState<string>(() => {
     if (typeof window === 'undefined') return 'paint';
     const saved = localStorage.getItem('wavegrid-tab');
-    if (saved && allTabs.some((t) => t.key === saved)) return saved as GridMode;
+    if (saved && allTabs.some((t) => t.id === saved)) return saved;
     return 'paint';
   });
   // Beside the grid, not under it: the parameters are read while looking at the
@@ -809,7 +464,7 @@ export default function Home() {
 
   // A tab saved on another rig (or hidden here) falls back to Paint.
   useEffect(() => {
-    if (config && !tabs.some((t) => t.key === tab)) setTab('paint');
+    if (config && !tabs.some((t) => t.id === tab)) setTab('paint');
   }, [config, tabs, tab]);
 
   const handleCannon = useCallback(
@@ -985,7 +640,7 @@ export default function Home() {
     [send, gradient]
   );
 
-  const handleTabChange = useCallback((t: GridMode) => {
+  const handleTabChange = useCallback((t: string) => {
     setTab(t);
     localStorage.setItem('wavegrid-tab', t);
     if (isPhone && sheetSnap === 'peek') {

@@ -29,6 +29,26 @@ export interface LookDef {
   fits: Fits;
 }
 
+export type ShowWhen = 'always' | 'never' | {
+  fixtureKind?: 'cannon' | 'projector';
+  topology?: string;
+  minFixtures?: number;
+  layoutId?: string | string[];
+};
+
+function matchesLayoutId(ids: string | string[], id: string): boolean {
+  return typeof ids === 'string' ? ids === id : ids.includes(id);
+}
+
+export function matchesShowWhen(showWhen: ShowWhen, layout: Layout): boolean {
+  if (showWhen === 'always') return true;
+  if (showWhen === 'never') return false;
+  return (showWhen.fixtureKind === undefined || layout.fixtures.some(f => (f.kind ?? 'cannon') === showWhen.fixtureKind)) &&
+    (showWhen.topology === undefined || layout.topology === showWhen.topology) &&
+    (showWhen.minFixtures === undefined || layout.fixtures.length >= showWhen.minFixtures) &&
+    (showWhen.layoutId === undefined || matchesLayoutId(showWhen.layoutId, layout.id));
+}
+
 /** Human-readable reason a look does not suit a layout, or '' when it does. */
 export function fitsReason(fits: Fits, layout: Layout): string {
   switch (fits.needs) {
@@ -43,7 +63,7 @@ export function fitsReason(fits: Fits, layout: Layout): string {
     // Grids have no ring to travel around; every other topology does.
     return layout.topology === 'grid' ? 'needs a ring' : '';
   case 'layout':
-    return fits.ids.includes(layout.id) ? '' : `made for ${fits.ids.join(', ')}`;
+    return matchesLayoutId(fits.ids, layout.id) ? '' : `made for ${fits.ids.join(', ')}`;
   }
 }
 

@@ -20,7 +20,7 @@ export {
 } from './helpers';
 
 // Catalogue: what each look needs from the rig it runs on
-export type { Fits, LayoutFilter, LookDef } from './catalog';
+export type { Fits, LayoutFilter, LookDef, ShowWhen } from './catalog';
 export {
   catalogDrift,
   fitsLayout,
@@ -28,7 +28,8 @@ export {
   layoutFilters,
   lookDef,
   LOOKS,
-  looksForLayout
+  looksForLayout,
+  matchesShowWhen
 } from './catalog';
 
 // Preset shows (sequences and playlist starting points)

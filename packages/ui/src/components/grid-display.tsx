@@ -31,7 +31,7 @@ interface GridDisplayProps {
   currentHue: number;
   currentSat: number;
   currentBright: number;
-  mode: GridMode;
+  mode: string;
   brushSize: number;
   softEdge: boolean;
   motionPath?: number[];
