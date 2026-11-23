@@ -1,4 +1,5 @@
 import { loadProjectPlugins, parseProjectFile, readProjectPluginFile } from '@wavegrid/settings';
+import { execFileSync } from 'child_process';
 import fs, { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -204,4 +205,35 @@ it('wires init, state, params and the shared brush with parent source checks', (
   expect(parent.postMessage).toHaveBeenLastCalledWith({ wg: 1, type: 'setParams', params: { hue: 240, saturation: 100, brightness: 40 } }, '*');
   receive({ source: {}, data: { wg: 1, type: 'state', running: false, params: { hue: 1 } } });
   expect(elements.hue.value).toBe(90);
+});
+
+it('scaffolds with the built ESM command without CommonJS globals', () => {
+  const build = join(__dirname, '../dist');
+  execFileSync(process.execPath, ['--experimental-vm-modules', '-e', `
+    const fs = require('fs');
+    const path = require('path');
+    const vm = require('vm');
+    const { pathToFileURL } = require('url');
+    (async () => {
+      const file = path.join(process.argv[2], 'esm/commands/plugins.js');
+      const context = vm.createContext({ console, process, Buffer });
+      const command = new vm.SourceTextModule(fs.readFileSync(file, 'utf8'), { context, identifier: file });
+      await command.link(async specifier => {
+        // Existing workspace ESM entrypoints use extensionless imports; link their CJS equivalents.
+        const target = specifier === '../project' ? path.join(process.argv[2], 'project.js')
+          : specifier.startsWith('.') ? path.resolve(path.dirname(file), specifier) : null;
+        const dependency = specifier.startsWith('@wavegrid/') ? require(specifier)
+          : await import(target ? pathToFileURL(target).href : specifier);
+        return new vm.SyntheticModule(Object.keys(dependency), function () {
+          for (const key of Object.keys(dependency)) this.setExport(key, dependency[key]);
+        }, { context });
+      });
+      await command.evaluate();
+      command.namespace.runPluginsNew({ project: process.argv[1], view: true, audio: 'grace' }, 'esm-demo');
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  `, file, build], { cwd: join(__dirname, '..'), stdio: 'pipe' });
+  expect(document().plugins).toEqual([{ path: 'plugins/esm-demo' }]);
+  expect(existsSync(join(root, 'plugins/esm-demo/view/index.html'))).toBe(true);
+  getStore().openProjectFile(file, document());
+  expect(loadProjectPlugins(getStore().paths, 'venue').errors).toEqual([]);
 });
