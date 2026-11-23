@@ -1,7 +1,7 @@
 import { resolveLayout } from '@wavegrid/layout/client';
 
 import { coercePlugins } from '../src/lib/plugin-data';
-import { jsonEqual, pluginParamUpdates, readViewMessage, VIEW_MESSAGE_MAX_BYTES, viewLayout, viewLookCommand, viewLooks, viewMessageFits } from '../src/lib/plugin-view-bridge';
+import { initialViewLoadState, jsonEqual, nextViewLoad, pluginParamUpdates, readViewMessage, VIEW_MESSAGE_MAX_BYTES, viewLayout, viewLookCommand, viewLooks, viewMessageFits } from '../src/lib/plugin-view-bridge';
 
 const source = {};
 const read = (data: unknown) => readViewMessage(data, source, source);
@@ -10,6 +10,39 @@ const looks = [
   { id: 'other', name: 'Other', params: { plugin: 'demo/other' }, createdAt: 2 },
   { id: 'legacy', name: 'Legacy', params: {}, createdAt: 3 }
 ];
+
+describe('plugin iframe load trust', () => {
+  it('trusts only the first load, then revokes trust and remounts with a fresh generation', () => {
+    const initial = initialViewLoadState();
+    expect(initial.loaded).toBe(false);
+    const loaded = nextViewLoad(initial, 1000);
+    expect(loaded).toEqual({ generation: 0, loaded: true, restarts: [], error: false });
+    const navigated = nextViewLoad(loaded, 1100);
+    expect(navigated).toEqual({ generation: 1, loaded: false, restarts: [1100], error: false });
+    expect(nextViewLoad(navigated, 1200)).toEqual({ ...navigated, loaded: true });
+    expect(initial.loaded).toBe(false);
+  });
+
+  it('stops after three remounts in ten seconds, without trusting a later load', () => {
+    let state = nextViewLoad(initialViewLoadState(), 0);
+    for (let i = 1; i <= 3; i++) {
+      state = nextViewLoad(state, i * 100);
+      expect(state.loaded).toBe(false);
+      expect(state.error).toBe(false);
+      state = nextViewLoad(state, i * 100 + 1);
+    }
+    state = nextViewLoad(state, 500);
+    expect(state).toMatchObject({ generation: 3, loaded: false, error: true });
+    expect(nextViewLoad(state, 20000)).toBe(state);
+  });
+
+  it('expires remounts outside the rolling ten-second window', () => {
+    let state = nextViewLoad(initialViewLoadState(), 0);
+    state = nextViewLoad(state, 100);
+    state = nextViewLoad(state, 101);
+    expect(nextViewLoad(state, 10100)).toEqual({ generation: 2, loaded: false, restarts: [10100], error: false });
+  });
+});
 
 describe('plugin view bridge boundary', () => {
   it('accepts messages only from the exact current iframe window', () => {

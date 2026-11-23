@@ -4,6 +4,20 @@ import { isRecord } from '@wavegrid/settings/plugin-controls';
 import type { Look } from './socket-state';
 
 export const VIEW_MESSAGE_MAX_BYTES = 256 * 1024;
+export interface ViewLoadState { generation: number; loaded: boolean; restarts: number[]; error: boolean }
+
+export function initialViewLoadState(): ViewLoadState {
+  return { generation: 0, loaded: false, restarts: [], error: false };
+}
+
+export function nextViewLoad(state: ViewLoadState, now: number): ViewLoadState {
+  if (state.error) return state;
+  if (!state.loaded) return { ...state, loaded: true };
+  const restarts = state.restarts.filter(time => time > now - 10000);
+  if (restarts.length >= 3) return { ...state, loaded: false, error: true };
+  return { generation: state.generation + 1, loaded: false, restarts: [...restarts, now], error: false };
+}
+
 export type PluginPaint = { index: number; h: number; s: number; b: number };
 export type RegisterPluginPaint = (handler: ((paint: PluginPaint) => void) | null) => void;
 export type ViewMessage =

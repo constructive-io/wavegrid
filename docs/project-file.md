@@ -163,7 +163,10 @@ scoped saved Looks, and a paint-event log.
 Views run in `<iframe sandbox="allow-scripts">` at `/plugins/<id>/<view>`.
 They have an opaque origin, never `allow-same-origin`, and receive no auth token,
 socket URL or unrestricted command channel. The plugin route's CSP sandbox still
-applies. Bundle scripts into the HTML or use classic scripts: opaque-origin
+applies, including `form-action 'none'`. The bridge trusts only the first load;
+later loads immediately revoke the bridge and remount the original view. More
+than three remounts in ten seconds stops the view with an error instead of looping.
+Bundle scripts into the HTML or use classic scripts: opaque-origin
 module/fetch requests need CORS and cannot access the parent application's APIs.
 
 Messages are structured objects with `{ wg: 1, type, ... }`. A view sends them
