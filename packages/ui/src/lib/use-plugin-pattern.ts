@@ -9,6 +9,8 @@ export { pluginParamUpdates } from './plugin-view-bridge';
 
 export interface PluginPreset { name: string; params: Record<string, unknown> }
 
+const lastParams = new Map<string, Record<string, unknown>>();
+
 export async function fetchPluginText(url: string): Promise<string> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
@@ -34,8 +36,13 @@ export function usePluginPattern(
   const controls = useMemo(() => tab.cards.flatMap(card => card.controls), [tab.cards]);
   const normalize = useCallback((raw: unknown) => tab.view
     ? { ...coercePluginParams(controls, {}), ...(isRecord(raw) ? raw : {}) } : coercePluginParams(controls, raw), [controls, tab.view]);
-  const [params, setParams] = useState(() => coercePluginParams(controls, {}));
+  const [params, setParams] = useState(() => normalize(lastParams.get(tab.id)));
   const paramsRef = useRef(params);
+  const rememberParams = useCallback((next: Record<string, unknown>) => {
+    lastParams.set(tab.id, next);
+    paramsRef.current = next;
+    setParams(next);
+  }, [tab.id]);
   const [source, setSource] = useState<string | null>(null);
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [presetsError, setPresetsError] = useState<string | null>(null);
@@ -45,10 +52,8 @@ export function usePluginPattern(
   runningRef.current = running;
 
   useEffect(() => {
-    const next = normalize({});
-    paramsRef.current = next;
-    setParams(next);
-  }, [normalize]);
+    rememberParams(normalize(lastParams.get(tab.id)));
+  }, [normalize, tab.id, rememberParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,31 +82,28 @@ export function usePluginPattern(
     if (!running || !pattern) return;
     const next = normalize(pattern.params);
     if (jsonEqual(next, paramsRef.current)) return;
-    paramsRef.current = next;
-    setParams(next);
-  }, [pattern, running, normalize]);
+    rememberParams(next);
+  }, [pattern, running, normalize, rememberParams]);
 
   const startWithParams = useCallback((initial?: Record<string, unknown>) => {
     if (source === null) return;
     if (initial !== undefined) {
-      paramsRef.current = normalize({ ...paramsRef.current, ...initial });
-      setParams(paramsRef.current);
+      rememberParams(normalize({ ...paramsRef.current, ...initial }));
     }
     onPatternSelect(tab.id);
     runningRef.current = true;
     send({ type: 'evalPattern', code: source, params: paramsRef.current });
-  }, [source, send, onPatternSelect, tab.id, normalize]);
+  }, [source, send, onPatternSelect, tab.id, normalize, rememberParams]);
   const start = useCallback(() => startWithParams(), [startWithParams]);
 
   const apply = useCallback((patch: Record<string, unknown>) => {
     if (source === null) return;
     const previous = paramsRef.current;
     const next = normalize({ ...previous, ...patch });
-    paramsRef.current = next;
-    setParams(next);
+    rememberParams(next);
     if (!runningRef.current) { start(); return; }
     for (const message of pluginParamUpdates(patch, next, pattern?.params)) send(message);
-  }, [source, normalize, send, start, pattern]);
+  }, [source, normalize, send, start, pattern, rememberParams]);
 
   const stop = useCallback(() => { runningRef.current = false; send({ type: 'stopPattern' }); }, [send]);
   return { params, presets, running, loading: source === null && !sourceError,

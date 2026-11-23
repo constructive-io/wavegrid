@@ -61,7 +61,7 @@ export function PluginView({ pluginId, tab, layout, looks, pattern, state, send,
 
   useEffect(() => {
     if (frame.loaded) post({ wg: 1, type: 'state', ...patternSnapshot() });
-  }, [pattern, state.running, frame.loaded, post, patternSnapshot]);
+  }, [pattern, state.running, state.params, frame.loaded, post, patternSnapshot]);
 
   useEffect(() => {
     if (frame.loaded) post(viewLooksMessage({ wg: 1, type: 'looks' }, looks, scope));
