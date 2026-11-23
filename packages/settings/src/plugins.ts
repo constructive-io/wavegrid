@@ -19,6 +19,8 @@ export interface PluginTab {
   showWhen: ShowWhen;
   cards: { title: string; controls: PluginControl[] }[];
   pattern?: string;
+  view?: string;
+  paint?: boolean;
 }
 export interface ProjectPlugin {
   id: string;
@@ -174,11 +176,16 @@ export function validatePlugin(ref: PortablePlugin): PluginSnapshot {
       ids.add(tab.id);
       const condition = tab.showWhen === undefined ? 'always' : tab.showWhen;
       if (!showWhen(condition)) throw new Error(`Invalid showWhen for tab ${tab.id}`);
-      if (!Array.isArray(tab.cards) || !tab.cards.every(card => object(card) && typeof card.title === 'string' && Array.isArray(card.controls))) {
+      const view = tab.view === undefined ? undefined : requireFile(tab.view);
+      const paint = tab.paint;
+      if (paint !== undefined && typeof paint !== 'boolean') throw new Error(`Tab ${tab.id} paint must be a boolean`);
+      if (tab.cards === undefined && view === undefined) throw new Error(`Tab ${tab.id} needs cards or a view`);
+      const rawCards = tab.cards === undefined ? [] : tab.cards;
+      if (!Array.isArray(rawCards) || !rawCards.every(card => object(card) && typeof card.title === 'string' && Array.isArray(card.controls))) {
         throw new Error(`Tab ${tab.id} cards need title and controls array`);
       }
       const params = new Set<string>();
-      const cards = tab.cards.map(card => {
+      const cards = rawCards.map(card => {
         const controls = (card.controls as unknown[]).map(raw => {
           const control = parsePluginControl(raw);
           if (!control) throw new Error(`Invalid control in tab ${tab.id}: ${JSON.stringify(raw)}`);
@@ -191,6 +198,7 @@ export function validatePlugin(ref: PortablePlugin): PluginSnapshot {
         return { title: card.title as string, controls };
       });
       return { id: tab.id, label: tab.label, showWhen: condition, cards,
+        ...(view === undefined ? {} : { view }), ...(typeof paint === 'boolean' ? { paint } : {}),
         ...(tab.pattern !== undefined || pattern !== undefined ? { pattern: tab.pattern === undefined ? pattern : requireFile(tab.pattern) } : {}) };
     });
     if (tab) tabs.push(tab);

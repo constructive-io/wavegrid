@@ -2,7 +2,10 @@ import { isRecord } from '@wavegrid/settings/plugin-controls';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { coercePluginParams, pluginAssetUrl,type PluginTabData } from './plugin-data';
+import { jsonEqual, pluginParamUpdates } from './plugin-view-bridge';
 import type { PatternState } from './socket-state';
+
+export { pluginParamUpdates } from './plugin-view-bridge';
 
 export interface PluginPreset { name: string; params: Record<string, unknown> }
 
@@ -20,15 +23,6 @@ export function parsePluginPresets(source: string): PluginPreset[] {
   return raw as PluginPreset[];
 }
 
-export function pluginParamUpdates(patch: Record<string, unknown>, params: Record<string, unknown>, live: unknown) {
-  const current = isRecord(live) ? live : {};
-  return Object.keys(patch)
-    .filter(name => Object.prototype.hasOwnProperty.call(params, name))
-    .map(name => [name, params[name]] as const)
-    .filter(([name, value]) => !Object.prototype.hasOwnProperty.call(current, name) || current[name] !== value)
-    .map(([name, value]) => ({ type: 'setPatternParam', name, value }));
-}
-
 export function usePluginPattern(
   pluginId: string,
   tab: PluginTabData,
@@ -38,6 +32,8 @@ export function usePluginPattern(
   onPatternSelect: (id: string) => void
 ) {
   const controls = useMemo(() => tab.cards.flatMap(card => card.controls), [tab.cards]);
+  const normalize = useCallback((raw: unknown) => tab.view
+    ? { ...coercePluginParams(controls, {}), ...(isRecord(raw) ? raw : {}) } : coercePluginParams(controls, raw), [controls, tab.view]);
   const [params, setParams] = useState(() => coercePluginParams(controls, {}));
   const paramsRef = useRef(params);
   const [source, setSource] = useState<string | null>(null);
@@ -49,10 +45,10 @@ export function usePluginPattern(
   runningRef.current = running;
 
   useEffect(() => {
-    const next = coercePluginParams(controls, {});
+    const next = normalize({});
     paramsRef.current = next;
     setParams(next);
-  }, [controls]);
+  }, [normalize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,30 +75,35 @@ export function usePluginPattern(
 
   useEffect(() => {
     if (!running || !pattern) return;
-    const next = coercePluginParams(controls, pattern.params);
-    if (JSON.stringify(next) === JSON.stringify(paramsRef.current)) return;
+    const next = normalize(pattern.params);
+    if (jsonEqual(next, paramsRef.current)) return;
     paramsRef.current = next;
     setParams(next);
-  }, [pattern, running, controls]);
+  }, [pattern, running, normalize]);
 
-  const start = useCallback(() => {
+  const startWithParams = useCallback((initial?: Record<string, unknown>) => {
     if (source === null) return;
+    if (initial !== undefined) {
+      paramsRef.current = normalize({ ...paramsRef.current, ...initial });
+      setParams(paramsRef.current);
+    }
     onPatternSelect(tab.id);
     runningRef.current = true;
     send({ type: 'evalPattern', code: source, params: paramsRef.current });
-  }, [source, send, onPatternSelect, tab.id]);
+  }, [source, send, onPatternSelect, tab.id, normalize]);
+  const start = useCallback(() => startWithParams(), [startWithParams]);
 
   const apply = useCallback((patch: Record<string, unknown>) => {
     if (source === null) return;
     const previous = paramsRef.current;
-    const next = coercePluginParams(controls, { ...previous, ...patch });
+    const next = normalize({ ...previous, ...patch });
     paramsRef.current = next;
     setParams(next);
     if (!runningRef.current) { start(); return; }
     for (const message of pluginParamUpdates(patch, next, pattern?.params)) send(message);
-  }, [source, controls, send, start, pattern]);
+  }, [source, normalize, send, start, pattern]);
 
   const stop = useCallback(() => { runningRef.current = false; send({ type: 'stopPattern' }); }, [send]);
   return { params, presets, running, loading: source === null && !sourceError,
-    ready: source !== null, errors: [sourceError, presetsError].filter(Boolean), start, stop, apply };
+    ready: source !== null, errors: [sourceError, presetsError].filter(Boolean), start, startWithParams, stop, apply };
 }

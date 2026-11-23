@@ -152,6 +152,54 @@ wavegrid server --project plugin-demo
 Open the printed URL, sign in, and choose **Plugin Pulse**. The example uses only
 the brain preview; it needs no OSC hardware or receiver.
 
+### Views
+
+A tab may have `"view": "view/index.html"`, cards, or both (the view comes first).
+The view file must exist inside the plugin, with the same path checks as patterns.
+`"paint": true` opts this tab into main-grid paint gestures while it is active.
+The example includes a **Pulse View** tab: fixture swatches, speed, start/stop,
+scoped saved Looks, and a paint-event log.
+
+Views run in `<iframe sandbox="allow-scripts">` at `/plugins/<id>/<view>`.
+They have an opaque origin, never `allow-same-origin`, and receive no auth token,
+socket URL or unrestricted command channel. The plugin route's CSP sandbox still
+applies. Bundle scripts into the HTML or use classic scripts: opaque-origin
+module/fetch requests need CORS and cannot access the parent application's APIs.
+
+Messages are structured objects with `{ wg: 1, type, ... }`. A view sends them
+using `parent.postMessage(message, '*')` and should verify `event.source === parent`
+on receipt. The host accepts messages **only** from that iframe's `contentWindow`;
+it replies with target origin `'*'` because the view has an opaque origin. Origin
+`'null'` alone is not an identity check. Every inbound/outbound message is capped
+at **256 KiB of UTF-8 JSON**. Malformed/oversized messages are dropped with a
+console warning; unknown types are ignored. JSON params permit nested objects and
+arrays (up to 64 levels); non-finite numbers, non-JSON values and reserved top-level
+keys `__proto__`, `constructor`, `prototype` are rejected.
+
+| Direction | `type` | Fields / behavior |
+|---|---|---|
+| Host → view | `init` | `pluginId`, namespaced `tabId`, `layout`, `pattern: { running, params }`, scoped `looks`; sent on iframe load |
+| Host → view | `state` | `running`, `params`; updated with pattern state, never another pattern's params |
+| Host → view | `looks` | `looks` belonging to this tab |
+| Host → view | `paint` | `index`, `h`, `s`, `b`; only for the active `paint: true` view, instead of a `cannon` command |
+| View → host | `start` | Optional `params`; starts the host-fetched, tab-configured pattern, not arbitrary submitted code |
+| View → host | `stop` | Stops the running pattern |
+| View → host | `setParams` | `params` JSON object; merges the patch, starts if stopped, otherwise deep-diffs only patch keys against live params and sends changed keys |
+| View → host | `saveLook` | `name`, `params`; host overwrites `params.plugin` with `<pluginId>/<tabId>` |
+| View → host | `renameLook` | `id`, `name`; allowed only for a Look tagged for this tab |
+| View → host | `deleteLook` | `id`; same ownership check |
+| View → host | `resize` | Finite numeric `height`, clamped to 120–1600 px (default 480). `{ wg: 'resize', height }` is also accepted |
+
+`layout` includes `id`, `topology`, `count`, `cols`, `rows`, and fixture geometry
+including `kind`, `u`, `v`, and `uv: [u, v]`. No routing or user configuration is
+included. Running means an active pattern whose source equals this tab's fetched
+source. `start` params merge into the tab's current/default params; `setParams`
+preserves untouched values. Views retain arbitrary JSON params, while native card
+controls still display defensively coerced values. Presets on view tabs may also
+contain structured params. The bridge forwards no view-provided code or URLs.
+
+### Plugin storage
+
 Opening validates all plugins before changing the project, then replaces store
 copies (including removal of unlisted plugins). Only regular files are copied;
 dotfiles/directories are skipped and symlinks are rejected, even hidden ones.

@@ -3,7 +3,7 @@ import { isRecord, parsePluginControl, type PluginControl } from '@wavegrid/sett
 
 export type { PluginControl } from '@wavegrid/settings/plugin-controls';
 export interface PluginCard { title: string; controls: PluginControl[] }
-export interface PluginTabData { id: string; label: string; showWhen: ShowWhen; pattern?: string; cards: PluginCard[] }
+export interface PluginTabData { id: string; label: string; showWhen: ShowWhen; pattern?: string; view?: string; paint?: boolean; cards: PluginCard[] }
 export interface UIPlugin { id: string; name: string; tabs: PluginTabData[]; presetsFile?: string }
 
 function assetPath(raw: unknown): string | undefined {
@@ -50,6 +50,7 @@ export function coercePlugins(raw: unknown): UIPlugin[] {
       if (ids.has(tabId)) return [];
       ids.add(tabId);
       return [{ id: tabId, label: tab.label, showWhen: condition(tab.showWhen),
+        view: assetPath(tab.view), paint: tab.paint === true,
         pattern: assetPath(tab.pattern ?? plugin.pattern), cards: coerceCards(tab.cards) }];
     });
     return [{ id, name: typeof plugin.name === 'string' ? plugin.name : id, tabs, presetsFile: assetPath(plugin.presetsFile) }];

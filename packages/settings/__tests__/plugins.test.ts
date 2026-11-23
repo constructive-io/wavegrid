@@ -32,6 +32,27 @@ function fixture() {
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
 describe('project plugins', () => {
+  it.each([false, true])('accepts view-only and combined tabs (cards: %s)', withCards => {
+    const f = fixture();
+    fs.writeFileSync(path.join(f.plugin, 'view.html'), '<h1>View</h1>');
+    json(path.join(f.plugin, 'tab.json'), { id: 'view', label: 'View', view: 'view.html', paint: true,
+      ...(withCards ? { cards: [{ title: 'Empty', controls: [] }] } : {}) });
+    f.store.openProjectFile(f.file, f.doc);
+    expect(loadProjectPlugins(f.store.paths, 'venue').plugins[0].tabs[0]).toMatchObject({
+      view: 'view.html', paint: true, cards: withCards ? [{ title: 'Empty', controls: [] }] : []
+    });
+  });
+
+  it.each([
+    { view: '../escape.html' }, { view: '/absolute.html' }, { view: 'missing.html' }, { view: 1 },
+    { paint: 'true', cards: [] }, {}, { cards: null }
+  ])('rejects invalid view tab metadata before writes: %j', changes => {
+    const f = fixture();
+    json(path.join(f.plugin, 'tab.json'), { id: 'view', label: 'View', ...changes });
+    expect(() => f.store.openProjectFile(f.file, f.doc)).toThrow();
+    expect(f.store.hasProject('venue')).toBe(false);
+  });
+
   it.each(['/absolute', '../escape', 'show/../../escape', 'C:\\escape', 'show\\..\\escape', 'show/../other', ''])('rejects unsafe ref %s', ref => {
     expect(() => parseProjectFile({ wavegrid: 'project', version: 1, name: 'venue', config: {}, plugins: [{ path: ref }] })).toThrow(/plugins/);
   });

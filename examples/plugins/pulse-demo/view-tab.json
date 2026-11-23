@@ -1,0 +1,6 @@
+{
+  "id": "view",
+  "label": "Pulse View",
+  "view": "view.html",
+  "paint": true
+}
