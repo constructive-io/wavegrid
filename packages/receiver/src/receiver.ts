@@ -95,6 +95,7 @@ export class Receiver {
   private _animState: AnimationState = createDefaultAnimationState();
   private stationOverlay: StationCell[] = [];
   private stationBrightness = this._animState.brightness;
+  private calibrationPreview: CannonState[] | null = null;
   private _sandbox: SandboxEngine | null = null;
   private _sandboxReady: Promise<SandboxEngine> | null = null;
   private _patternTime = 0;
@@ -122,6 +123,15 @@ export class Receiver {
 
   /** Get the current output state (after filtering, orientation remap, station compositing, and sharding). */
   getOutputState(): CannonState[] {
+    const live = Date.now() - this.lastDataAt <= this.config.fallbackDelay;
+    const frame = this.calibrationPreview
+      ? this.calibrationPreview.map(cell => ({ ...cell, b: live ? cell.b * this._animState.brightness / 100 : 0 }))
+      : this.getShowFrame(live);
+    const shard = this.config.shard;
+    return shard ? frame.slice(shard.start, shard.end + 1) : frame;
+  }
+
+  private getShowFrame(live: boolean): CannonState[] {
     const g = this.ensureGrid();
     const full = g.map(c => ({
       h: c.h,
@@ -129,14 +139,10 @@ export class Receiver {
       b: c.b
     }));
     const brightnessScale = this.stationBrightness / 100;
-    const remapped = compositeStationPaint(
+    return compositeStationPaint(
       remapGridForOutput(full, this.config.layout.cols, this.config.layout.rows, this._animState),
-      Date.now() - this.lastDataAt > this.config.fallbackDelay
-        ? []
-        : this.stationOverlay.map(cell => ({ ...cell, b: cell.b * brightnessScale }))
+      live ? this.stationOverlay.map(cell => ({ ...cell, b: cell.b * brightnessScale })) : []
     );
-    const shard = this.config.shard;
-    return shard ? remapped.slice(shard.start, shard.end + 1) : remapped;
   }
 
   /** Start the receiver — connects input and begins the tick loop. */
@@ -180,6 +186,11 @@ export class Receiver {
       // Config-only commands: update state but do NOT create the grid.
       // The receiver must produce zero output until a visual command arrives.
       if (cmd.action === 'keepalive') return;
+      if (cmd.action === 'calibrationPreview') {
+        this.calibrationPreview = cmd.grid;
+        if (cmd.grid) this.ensureGrid();
+        return;
+      }
       if (cmd.action === 'stationOverlay') {
         if (!this.stationOverlay.length) this.stationBrightness = this._animState.brightness;
         this.stationOverlay = cmd.cells;
@@ -259,6 +270,9 @@ export class Receiver {
 
     input.on('disconnected', () => {
       this.stationOverlay = [];
+      if (this.calibrationPreview) {
+        this.calibrationPreview = this.calibrationPreview.map(cell => ({ ...cell, b: 0 }));
+      }
       this._status = 'reconnecting';
       console.log('\n  \u25C8 Input disconnected');
     });

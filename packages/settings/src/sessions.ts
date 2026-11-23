@@ -1,5 +1,6 @@
 import type { StationGrant } from '@wavegrid/stations';
 import { randomBytes } from 'crypto';
+import fs from 'fs';
 import path from 'path';
 
 import { projectDir, readJsonFile, type StorePaths, writeFileAtomic } from './paths';
@@ -9,7 +10,7 @@ import type { UserRole } from './users';
  * A lightweight, server-visible record of a logged-in UI user. This is *not* a
  * new auth protocol — the JWT minted at login stays the credential. A session
  * is just a cheap, bounded row so an admin can answer "who's logged in?" and
- * revoke access. Deleting the row is what revocation means: the server rejects
+ * revoke access. On revocation the server rejects
  * requests carrying the matching `sid` and closes the socket opened with it.
  */
 export interface Session extends StationGrant {
@@ -34,8 +35,39 @@ function sessionsFile(paths: StorePaths, project: string): string {
   return path.join(projectDir(paths, project), 'sessions.json');
 }
 
+function revocationsDir(paths: StorePaths, project: string): string {
+  return path.join(projectDir(paths, project), 'session-revocations');
+}
+
+function revocationName(session: Session): string {
+  return `${session.id}.${session.expiresAt}`;
+}
+
+function markRevoked(paths: StorePaths, project: string, sessions: Session[]): void {
+  const dir = revocationsDir(paths, project);
+  fs.mkdirSync(dir, { recursive: true });
+  // A stale writer may replace sessions.json, but cannot remove these markers.
+  for (const session of sessions) {
+    fs.writeFileSync(path.join(dir, revocationName(session)), '', { flag: 'a', mode: FILE_MODE });
+  }
+}
+
 function readAll(paths: StorePaths, project: string): Session[] {
-  return readJsonFile<Session[]>(sessionsFile(paths, project)) ?? [];
+  const sessions = readJsonFile<Session[]>(sessionsFile(paths, project)) ?? [];
+  const dir = revocationsDir(paths, project);
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return sessions;
+    throw e;
+  }
+  const revoked = new Set(names);
+  const now = Date.now();
+  for (const name of names) {
+    if (Number(name.split('.')[1]) <= now) fs.rmSync(path.join(dir, name), { force: true });
+  }
+  return sessions.filter(session => !revoked.has(revocationName(session)));
 }
 
 function writeAll(paths: StorePaths, project: string, sessions: Session[]): void {
@@ -108,10 +140,7 @@ export function touchSession(
 ): Session | null {
   const all = readAll(paths, project).filter(notExpired(now));
   const target = all.find((s) => s.id === id);
-  if (!target) {
-    writeAll(paths, project, all);
-    return null;
-  }
+  if (!target) return null;
   target.lastSeen = now;
   writeAll(paths, project, all);
   return target;
@@ -120,16 +149,19 @@ export function touchSession(
 /** Revoke a single session by id. Returns true if one was removed. */
 export function revokeSession(paths: StorePaths, project: string, id: string): boolean {
   const all = readAll(paths, project);
-  const next = all.filter((s) => s.id !== id);
-  if (next.length === all.length) return false;
-  writeAll(paths, project, next);
+  const session = all.find(s => s.id === id);
+  if (!session) return false;
+  markRevoked(paths, project, [session]);
+  writeAll(paths, project, all.filter(s => s.id !== id));
   return true;
 }
 
 /** Revoke every session belonging to a user. Returns the count removed. */
 export function revokeUserSessions(paths: StorePaths, project: string, username: string): number {
   const all = readAll(paths, project);
-  const next = all.filter((s) => s.username !== username);
-  writeAll(paths, project, next);
-  return all.length - next.length;
+  const revoked = all.filter(s => s.username === username);
+  if (!revoked.length) return 0;
+  markRevoked(paths, project, revoked);
+  writeAll(paths, project, all.filter(s => s.username !== username));
+  return revoked.length;
 }
