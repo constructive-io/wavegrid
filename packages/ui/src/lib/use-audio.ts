@@ -919,13 +919,14 @@ export function useAudio(
     // Stop mic if active
     stopMic(false);
     stopPlayback();
+    startAmbientLoop();
     if (!audioContextRef.current) audioContextRef.current = new AudioContext();
     const arrayBuffer = await file.arrayBuffer();
     const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
     audioBufferRef.current = audioBuffer;
     const bpm = detectBPM(audioBuffer);
     setAudioState({ playing: false, micActive: false, fileName: file.name, duration: audioBuffer.duration, currentTime: 0, bpm });
-  }, [detectBPM, stopMic, stopPlayback]);
+  }, [detectBPM, stopMic, stopPlayback, startAmbientLoop]);
 
   useEffect(() => {
     if (isAmbientMode(mode)) {

@@ -128,3 +128,19 @@ it('keeps the old source detached when reading the new file fails', async () => 
   expect(sources[0].onended).toBeNull(); expect(sources[0].disconnect).toHaveBeenCalled();
   expect(sources).toHaveLength(1); expect(render().state.playing).toBe(false); expect(frames.size).toBe(0);
 });
+
+it('keeps ambient visuals running while replacing a file, without restarting the old track', async () => {
+  let audio = render(); audio.setMode('galaxy'); audio = render();
+  await audio.loadFile(file('old.wav')); audio.play(); audio = render();
+  const old = sources[0];
+  let finish!: (value: ArrayBuffer) => void;
+  const replacement = { name: 'new.wav', arrayBuffer: () => new Promise<ArrayBuffer>(resolve => { finish = resolve; }) } as unknown as File;
+  const loading = audio.loadFile(replacement);
+  expect(old.onended).toBeNull(); expect(old.stop).toHaveBeenCalled(); expect(old.disconnect).toHaveBeenCalled();
+  expect(frames.size).toBe(1); send.mockClear(); frame();
+  expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'audio_layer' }));
+  finish(new ArrayBuffer(0)); await loading; audio = render();
+  expect(audio.mode).toBe('galaxy'); expect(audio.state).toMatchObject({ playing: false, fileName: 'new.wav' });
+  expect(sources).toHaveLength(1); expect(frames.size).toBe(1);
+  send.mockClear(); frame(); expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'audio_layer' }));
+});
