@@ -158,8 +158,12 @@ export async function createSandboxEngine(
     //   1) Expression: ({ render(ctx){...}, meta:{...} }) — result is assigned directly
     //   2) Declaration: function render(ctx){...} — picked up from global scope
     const stripped = stripExports(transformMixedFormat(code) ?? code);
+    try {
+      evalVoid('var __expr = (' + stripped + '\n);', cfg.loadBudgetMs);
+    } catch {
+      evalVoid('var __expr = null;', cfg.loadBudgetMs);
+    }
     const wrapped =
-      'var __expr = (function(){ try { return ' + stripped + '; } catch(e) { return null; } })();\n' +
       'if (__expr && typeof __expr === "object" && typeof __expr.render === "function") {\n' +
       '  __pattern = __expr;\n' +
       '} else {\n' +

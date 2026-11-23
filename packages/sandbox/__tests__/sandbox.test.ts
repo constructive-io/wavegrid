@@ -37,4 +37,12 @@ describe('shared pattern sandbox', () => {
     expect(() => engine.loadPattern('({')).toThrow();
     expect(() => engine.loadPattern('({ meta: {} })')).toThrow(/render/);
   });
+
+  it.each([
+    '\n({ render(ctx) { ctx.fill(120, 80, 60); } })',
+    ...['const', 'let', 'var'].map(kind => `${kind} hue = 120; function render(ctx) { ctx.fill(hue, 80, 60); }`)
+  ])('loads expression and statement sources without return-prefix syntax restrictions: %s', (code) => {
+    engine.loadPattern(code);
+    expect(engine.renderFrame(0, 0, 1)?.[0]).toEqual({ h: 120, s: 80, b: 60 });
+  });
 });
