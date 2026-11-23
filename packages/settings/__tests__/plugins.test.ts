@@ -32,6 +32,41 @@ function fixture() {
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
 describe('project plugins', () => {
+  it('loads validated audio metadata and keeps only the first binding with a warning', () => {
+    const f = fixture();
+    const audio = { mode: 'grace', params: { hueShift: 'hueShift', satShift: 'satShift' },
+      step: { param: 'stops', values: { file: 'presets.json', key: 'stops' }, set: { paint: [] as number[] } } };
+    json(path.join(f.plugin, 'presets.json'), [{ stops: [[20, 100]] }]);
+    json(path.join(f.plugin, 'tab.json'), { id: 'first', label: 'First', cards: [], audio });
+    json(path.join(f.plugin, 'second.json'), { id: 'second', label: 'Second', cards: [], audio });
+    json(path.join(f.plugin, 'plugin.json'), { ...f.manifest, tabs: ['tab.json', 'second.json'] });
+    const other = path.join(f.folder, 'other');
+    fs.cpSync(f.plugin, other, { recursive: true });
+    json(path.join(other, 'plugin.json'), { ...f.manifest, id: 'other' });
+    f.store.openProjectFile(f.file, { ...f.doc, plugins: [...f.doc.plugins, { path: 'other' }] });
+    const loaded = loadProjectPlugins(f.store.paths, 'venue');
+    expect(loaded.plugins[0].tabs[0].audio).toEqual(audio);
+    expect(loaded.plugins[0].tabs[1].audio).toBeUndefined();
+    expect(loaded.plugins[1].tabs[0].audio).toBeUndefined();
+    expect(loaded.warnings).toEqual([expect.stringContaining('first binding show/first wins'), expect.stringContaining('first binding show/first wins')]);
+    expect(loaded.errors).toEqual([]);
+  });
+
+  it.each(['missing.json', '../outside.json', '/absolute.json'])('rejects an unavailable or escaping audio values file: %s', file => {
+    const f = fixture();
+    json(path.join(f.plugin, 'tab.json'), { id: 'audio', label: 'Audio', cards: [],
+      audio: { mode: 'grace', step: { param: 'stops', values: { file } } } });
+    expect(() => f.store.openProjectFile(f.file, f.doc)).toThrow();
+    expect(f.store.hasProject('venue')).toBe(false);
+  });
+
+  it('rejects malformed audio catalog contents before writing the project', () => {
+    const f = fixture();
+    json(path.join(f.plugin, 'tab.json'), { id: 'audio', label: 'Audio', cards: [],
+      audio: { mode: 'grace', step: { param: 'stops', values: { file: 'presets.json', key: 'stops' } } } });
+    expect(() => f.store.openProjectFile(f.file, f.doc)).toThrow(/nonempty JSON array/);
+    expect(f.store.hasProject('venue')).toBe(false);
+  });
   it.each(['view.htm', 'view.HTML', 'view.Html', 'view.js'])('rejects unsupported view extension: %s', view => {
     const f = fixture();
     fs.writeFileSync(path.join(f.plugin, view), '<h1>View</h1>');

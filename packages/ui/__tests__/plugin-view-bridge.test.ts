@@ -12,6 +12,18 @@ const looks = [
 ];
 
 describe('plugin iframe load trust', () => {
+  it('accepts partial brush updates only from the expected view, with finite clamped channels', () => {
+    expect(read({ wg: 1, type: 'setBrush', h: 400, s: -2, b: 70, code: 'ignored' }).message)
+      .toEqual({ wg: 1, type: 'setBrush', h: 360, s: 0, b: 70 });
+    expect(read({ wg: 1, type: 'setBrush', h: -1, b: 200 }).message).toEqual({ wg: 1, type: 'setBrush', h: 0, b: 100 });
+    expect(read({ wg: 1, type: 'setBrush', s: 45 }).message).toEqual({ wg: 1, type: 'setBrush', s: 45 });
+    for (const fields of [{}, { h: NaN }, { s: Infinity }, { b: '50' }, { h: null }]) {
+      expect(read({ wg: 1, type: 'setBrush', ...fields }).warning).toBeDefined();
+    }
+    expect(readViewMessage({ wg: 1, type: 'setBrush', h: 120 }, {}, source)).toEqual({});
+    expect(readViewMessage({ wg: 1, type: 'setBrush', h: 120 }, source, null)).toEqual({});
+    expect(read({ wg: 1, type: 'setBrush', h: 120, text: 'x'.repeat(VIEW_MESSAGE_MAX_BYTES) }).message).toBeUndefined();
+  });
   it('trusts only the first load, then revokes trust and remounts with a fresh generation', () => {
     const initial = initialViewLoadState();
     expect(initial.loaded).toBe(false);

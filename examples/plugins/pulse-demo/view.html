@@ -24,6 +24,9 @@
 <label>Speed <input id="speed" aria-label="View speed" type="range" min="0.1" max="4" step="0.1" value="1"><output id="speed-value">1</output></label>
 <p><button id="start">Start</button> <button id="stop">Stop</button></p>
 <p id="paint">Touch the main grid to send paint here.</p>
+<p id="brush">Waiting for brush…</p>
+<button id="set-brush">Set shared brush to green</button>
+<p>Audio Grace binding: hue/saturation shifts; strong beats cycle Warm/Cool.</p>
 <label>Look <input id="look-name" type="text" value="View look" aria-label="Look name"><button id="save">Save look</button></label>
 <div id="looks"></div>
 <script>
@@ -31,6 +34,10 @@
   let params = { speed: 1, hue: 210, enabled: true, mode: 'Hue', tint: '#ff6633' };
   let scope = '', count = 0;
   const send = (type, data = {}) => parent.postMessage({ wg: 1, type, ...data }, '*');
+  function showBrush(brush) {
+    $('brush').textContent = `Shared brush: H ${brush.h}, S ${brush.s}, B ${brush.b}`;
+    $('brush').style.color = `hsl(${brush.h} ${brush.s}% 60%)`;
+  }
   function state(pattern) {
     params = { ...params, ...pattern.params };
     $('speed').value = params.speed;
@@ -60,9 +67,11 @@
         return swatch;
       }));
       state(message.pattern);
+      showBrush(message.brush);
       showLooks(message.looks);
-      send('resize', { height: 420 });
+      send('resize', { height: 540 });
     } else if (message.type === 'state') state(message);
+    else if (message.type === 'brush') showBrush(message);
     else if (message.type === 'looks') showLooks(message.looks);
     else if (message.type === 'paint') {
       console.log('Plugin paint received', message);
@@ -79,5 +88,6 @@
   $('start').onclick = () => send('start', { params });
   $('stop').onclick = () => send('stop');
   $('save').onclick = () => send('saveLook', { name: $('look-name').value, params });
+  $('set-brush').onclick = () => send('setBrush', { h: 120, s: 80, b: 65 });
 </script>
 </html>

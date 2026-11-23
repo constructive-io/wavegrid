@@ -19,8 +19,10 @@ export function nextViewLoad(state: ViewLoadState, now: number): ViewLoadState {
 }
 
 export type PluginPaint = { index: number; h: number; s: number; b: number };
+export type PluginBrush = { h: number; s: number; b: number };
 export type RegisterPluginPaint = (handler: ((paint: PluginPaint) => void) | null) => void;
 export type ViewMessage =
+  | ({ wg: 1; type: 'setBrush' } & Partial<PluginBrush>)
   | { wg: 1; type: 'start'; params?: Record<string, unknown> }
   | { wg: 1; type: 'stop' }
   | { wg: 1; type: 'setParams'; params: Record<string, unknown> }
@@ -58,6 +60,16 @@ export function readViewMessage(data: unknown, source: unknown, expectedSource: 
     if (!isRecord(data) || data.wg !== 1 || typeof data.type !== 'string') return { warning: 'Invalid plugin view envelope' };
     const invalid = { warning: `Invalid plugin view ${data.type} message` };
     switch (data.type) {
+    case 'setBrush': {
+      const brush: Partial<PluginBrush> = {};
+      for (const key of ['h', 's', 'b'] as const) {
+        if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+        const value = data[key];
+        if (typeof value !== 'number' || !Number.isFinite(value)) return invalid;
+        brush[key] = Math.max(0, Math.min(key === 'h' ? 360 : 100, value));
+      }
+      return Object.keys(brush).length ? { message: { wg: 1, type: 'setBrush', ...brush } } : invalid;
+    }
     case 'start':
       return data.params === undefined || params(data.params)
         ? { message: { wg: 1, type: 'start', ...(data.params === undefined ? {} : { params: data.params }) } } : invalid;

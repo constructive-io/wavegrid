@@ -2,11 +2,11 @@ import type { Layout } from '@wavegrid/layout/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { pluginAssetUrl, type PluginTabData } from '@/lib/plugin-data';
-import { initialViewLoadState, nextViewLoad, readViewMessage, type RegisterPluginPaint, viewLayout, viewLookCommand, viewLooksMessage, viewMessageFits } from '@/lib/plugin-view-bridge';
+import { initialViewLoadState, nextViewLoad, type PluginBrush, readViewMessage, type RegisterPluginPaint, viewLayout, viewLookCommand, viewLooksMessage, viewMessageFits } from '@/lib/plugin-view-bridge';
 import type { Look, PatternState } from '@/lib/socket-state';
 import type { usePluginPattern } from '@/lib/use-plugin-pattern';
 
-export function PluginView({ pluginId, tab, layout, looks, pattern, state, send, registerPluginPaint }: {
+export function PluginView({ pluginId, tab, layout, looks, pattern, state, send, registerPluginPaint, brush, setBrush }: {
   pluginId: string;
   tab: PluginTabData;
   layout: Layout;
@@ -15,6 +15,8 @@ export function PluginView({ pluginId, tab, layout, looks, pattern, state, send,
   state: ReturnType<typeof usePluginPattern>;
   send: (message: Record<string, unknown>) => void;
   registerPluginPaint: RegisterPluginPaint;
+  brush: PluginBrush;
+  setBrush: (brush: Partial<PluginBrush>) => void;
 }) {
   const iframe = useRef<HTMLIFrameElement>(null);
   const ready = useRef(false);
@@ -22,8 +24,8 @@ export function PluginView({ pluginId, tab, layout, looks, pattern, state, send,
   const loadState = useRef(frame);
   const [height, setHeight] = useState(480);
   const scope = tab.id;
-  const snapshot = useRef({ state, looks, pattern, layout });
-  snapshot.current = { state, looks, pattern, layout };
+  const snapshot = useRef({ state, looks, pattern, layout, brush, setBrush });
+  snapshot.current = { state, looks, pattern, layout, brush, setBrush };
 
   const post = useCallback((message: Record<string, unknown>) => {
     if (!ready.current) return;
@@ -45,6 +47,7 @@ export function PluginView({ pluginId, tab, layout, looks, pattern, state, send,
       if (!message) return;
       const current = snapshot.current;
       switch (message.type) {
+      case 'setBrush': current.setBrush(message); break;
       case 'resize': setHeight(message.height); break;
       case 'start': current.state.startWithParams(message.params); break;
       case 'stop': current.state.stop(); break;
@@ -56,8 +59,12 @@ export function PluginView({ pluginId, tab, layout, looks, pattern, state, send,
       }
     };
     window.addEventListener('message', receive);
-    return () => window.removeEventListener('message', receive);
+    return () => { ready.current = false; window.removeEventListener('message', receive); };
   }, [scope, send]);
+
+  useEffect(() => {
+    if (frame.loaded) post({ wg: 1, type: 'brush', ...brush });
+  }, [brush.h, brush.s, brush.b, frame.loaded, post]);
 
   useEffect(() => {
     if (frame.loaded) post({ wg: 1, type: 'state', ...patternSnapshot() });
@@ -87,6 +94,6 @@ export function PluginView({ pluginId, tab, layout, looks, pattern, state, send,
       ready.current = true;
       const current = snapshot.current;
       post(viewLooksMessage({ wg: 1, type: 'init', pluginId, tabId: tab.id, layout: viewLayout(current.layout),
-        pattern: patternSnapshot() }, current.looks, scope));
+        pattern: patternSnapshot(), brush: current.brush }, current.looks, scope));
     }} />;
 }

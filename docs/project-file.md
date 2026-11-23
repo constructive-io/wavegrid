@@ -184,13 +184,15 @@ keys `__proto__`, `constructor`, `prototype` are rejected.
 
 | Direction | `type` | Fields / behavior |
 |---|---|---|
-| Host → view | `init` | `pluginId`, namespaced `tabId`, `layout`, `pattern: { running, params }`, scoped `looks`; sent on iframe load |
+| Host → view | `init` | `pluginId`, namespaced `tabId`, `layout`, `pattern: { running, params }`, `brush: { h, s, b }`, scoped `looks`; sent on iframe load |
+| Host → view | `brush` | `h`, `s`, `b`; sent when the shared app brush changes |
 | Host → view | `state` | `running`, `params`; updated with pattern state, never another pattern's params |
 | Host → view | `looks` | `looks` belonging to this tab |
 | Host → view | `paint` | `index`, `h`, `s`, `b`; only for the active `paint: true` view, instead of a `cannon` command |
 | View → host | `start` | Optional `params`; starts the host-fetched, tab-configured pattern, not arbitrary submitted code |
 | View → host | `stop` | Stops the running pattern |
 | View → host | `setParams` | `params` JSON object; merges the patch, starts if stopped, otherwise deep-diffs only patch keys against live params and sends changed keys |
+| View → host | `setBrush` | At least one of `h`, `s`, `b`; finite numbers, clamped to 0–360 for hue and 0–100 for saturation/brightness; changes the same brush used by Paint |
 | View → host | `saveLook` | `name`, `params`; host overwrites `params.plugin` with `<pluginId>/<tabId>` |
 | View → host | `renameLook` | `id`, `name`; allowed only for a Look tagged for this tab |
 | View → host | `deleteLook` | `id`; same ownership check |
@@ -208,6 +210,52 @@ contain structured params. The bridge forwards no view-provided code or URLs.
 exceed the message budget, the host includes the newest Looks that fit and sets
 `looksTruncated: true`. A single oversized Look is skipped; layout and pattern
 metadata retain their budget instead of being dropped along with the Looks.
+
+### Declarative audio bindings
+
+A tab can declare host-owned audio control, independent of whether its view or
+cards are mounted. Currently only `mode: "grace"` is supported:
+
+```json
+"audio": {
+  "mode": "grace",
+  "params": { "hueShift": "hueShift", "satShift": "satShift" },
+  "step": {
+    "param": "stops",
+    "values": { "file": "view/gradients.json", "key": "stops" },
+    "set": { "paint": [] }
+  }
+}
+```
+
+`params` maps `GraceAudioOutput` fields (`hueShift`, `satShift`, or boolean `step`)
+to pattern parameter names. `params` and `step` are individually optional; at
+least one is required. On a strong-beat step, the host compares the live value of
+`step.param` with the catalog using JSON equality, advances with wraparound, or
+uses the first value if none matches. Each `step.set` entry is sent in the same
+update (default `{}`). `values.file` must be a JSON file inside the plugin with a
+nonempty array; optional `key` extracts that own property from every object in
+the array. Without `key`, the array items themselves are the values. Values are
+fetched as public plugin assets, like presets; invalid fetches disable stepping
+and warn in the console without clearing paint. Parameter names and `key` follow
+control identifier rules; `__proto__`, `constructor`, and `prototype` are rejected.
+
+The first binding for each mode wins in plugin/tab load order; later bindings
+are ignored with a doctor warning. A binding requires a configured pattern.
+The host only updates an active brain pattern with the exact fetched source,
+including when another tab sharing that source started it; no plugin tag is
+needed.
+A beat never starts a plugin pattern. The transition from playing Grace audio to
+stopped audio or another mode resets mapped shifts to zero only if the binding
+sent an update during that run and its pattern is still active. Manual params
+are left alone when Grace audio has not controlled the pattern. The existing
+built-in GracePaint consumer remains; a running bound plugin takes priority over
+its legacy beat auto-start behavior. These updates need neither an iframe nor
+its message bridge.
+
+Brush messages, unlike audio bindings, are only available to the trusted mounted
+view of the active tab, under the same source, navigation and size checks as all
+other bridge messages. A brush update does not start a pattern or paint fixtures.
 
 ### Palace compatibility
 

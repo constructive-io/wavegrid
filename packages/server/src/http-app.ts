@@ -232,6 +232,7 @@ export function createHttpApp(resolved: ResolvedConfig, opts: HttpAppOptions = {
   const pluginProject = activeProject();
   const projectPlugins = pluginProject ? loadProjectPlugins(pluginStore.paths, pluginProject) : { plugins: [], errors: [] };
   for (const error of projectPlugins.errors) console.error(`Plugin load error: ${error}`);
+  for (const warning of ('warnings' in projectPlugins ? projectPlugins.warnings : []) ?? []) console.warn(`Plugin: ${warning}`);
   const plugins = projectPlugins.plugins.map(plugin => ({
     ...plugin, tabs: plugin.tabs.map(tab => ({ ...tab, id: `${plugin.id}/${tab.id}` }))
   }));
