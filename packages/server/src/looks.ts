@@ -30,6 +30,47 @@ function migrateParams(params: Record<string, unknown>): Record<string, unknown>
   return params.kind === 'palace' && params.plugin === undefined ? { ...params, plugin: 'palace/palace' } : params;
 }
 
+interface JsonRange {
+  end: number;
+  fields?: Map<string, JsonRange>;
+  items?: JsonRange[];
+}
+
+function jsonRanges(source: string): JsonRange {
+  const tokens = source.matchAll(/"(?:\\.|[^"\\])*"|[{}[\]:,]|[^\s{}[\]:,]+/g);
+  let token = tokens.next().value!;
+  const next = () => { token = tokens.next().value!; };
+  const value = (): JsonRange => {
+    const first = token;
+    next();
+    if (first[0] === '{') {
+      const fields = new Map<string, JsonRange>();
+      while (token[0] !== '}') {
+        const key = JSON.parse(token[0]) as string;
+        next();
+        next();
+        fields.set(key, value());
+        if (token[0] === ',') next();
+      }
+      const end = token.index;
+      next();
+      return { end, fields };
+    }
+    if (first[0] === '[') {
+      const items: JsonRange[] = [];
+      while (token[0] !== ']') {
+        items.push(value());
+        if (token[0] === ',') next();
+      }
+      const end = token.index;
+      next();
+      return { end, items };
+    }
+    return { end: first.index + first[0].length };
+  };
+  return value();
+}
+
 export class LookStore {
   private looks: Look[] = [];
 
@@ -86,23 +127,35 @@ export class LookStore {
   private load(): void {
     if (!this.file || !fs.existsSync(this.file)) return;
     try {
-      const raw = JSON.parse(fs.readFileSync(this.file, 'utf8')) as { looks?: unknown };
+      let contents = fs.readFileSync(this.file, 'utf8');
+      const raw = JSON.parse(contents) as { looks?: unknown };
       if (!Array.isArray(raw.looks)) return;
-      let migrated = false;
+      const migrated: number[] = [];
+      raw.looks.forEach((l, index) => {
+        if (!isParams(l) || typeof l.id !== 'string' || !isParams(l.params)) return;
+        const params = migrateParams(l.params);
+        if (params !== l.params) {
+          l.params = params;
+          migrated.push(index);
+        }
+      });
+      if (migrated.length) {
+        const ranges = jsonRanges(contents).fields!.get('looks')!.items!;
+        const offsets = migrated.map(index => ranges[index].fields!.get('params')!.end).sort((a, b) => b - a);
+        for (const end of offsets) {
+          contents = `${contents.slice(0, end)},"plugin":"palace/palace"${contents.slice(end)}`;
+        }
+        this.write(contents);
+      }
       this.looks = raw.looks.filter(
         (l): l is Look =>
           !!l && typeof l === 'object' && typeof (l as Look).id === 'string' && isParams((l as Look).params)
-      ).map((l) => {
-        const params = migrateParams(l.params);
-        if (params !== l.params) migrated = true;
-        return {
-          id: l.id,
-          name: cleanName(l.name, 'Look'),
-          params,
-          createdAt: typeof l.createdAt === 'number' ? l.createdAt : 0
-        };
-      });
-      if (migrated) this.persist();
+      ).map((l) => ({
+        id: l.id,
+        name: cleanName(l.name, 'Look'),
+        params: l.params,
+        createdAt: typeof l.createdAt === 'number' ? l.createdAt : 0
+      }));
     } catch (e) {
       console.error('  ◈ Looks load error:', e instanceof Error ? e.message : String(e));
     }

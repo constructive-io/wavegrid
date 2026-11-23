@@ -101,6 +101,44 @@ describe('LookStore', () => {
     expect(store.save('Grace', params)?.params).toEqual(params);
   });
 
+  it('changes only legacy params.plugin bytes, preserving long names, raw records and document metadata', () => {
+    const file = join(dir, 'looks.json');
+    const longName = `  ${'Long unrelated name '.repeat(4)}  `;
+    const legacyParams = '{ "kind" : "palace", "paint": [1e2, 50], "nested": { "params": { "kind": "palace" } } }';
+    const source = String.raw`{
+  "revision": 1e+3, "note": "braces } ] and \"quotes\" and \u0061",
+  "looks" : [
+    {"id":"other", "name":${JSON.stringify(longName)}, "params":{"flow":"cw"}, "createdAt":"keep", "extra": [null, {"keep":true}]},
+    {"id":"legacy", "name":${JSON.stringify(longName)}, "params":${legacyParams}, "createdAt":123, "extra": "retain"},
+    {"id":"scoped", "name":"Scoped", "params":{"kind":"palace","plugin":"other/tab"}, "createdAt":456},
+    null, {"id":5,"params":{"kind":"palace"}},
+    {"id":"second", "params":${legacyParams}}
+  ],
+  "tail": { "looks": [{"params":{"kind":"palace"}}] }
+}
+`;
+    fs.writeFileSync(file, source);
+    const store = new LookStore(file);
+    const expected = source.split(legacyParams).join(`${legacyParams.slice(0, -1)},"plugin":"palace/palace"}`);
+    expect(fs.readFileSync(file, 'utf8')).toBe(expected);
+    expect(JSON.parse(expected).looks[0].name).toBe(longName);
+    expect(store.list()[0].name).toBe(longName.trim().slice(0, MAX_LOOK_NAME));
+    expect(store.list().filter(l => l.params.plugin === 'palace/palace').map(l => l.id)).toEqual(['legacy', 'second']);
+    fs.utimesSync(file, 1234, 1234);
+    expect(new LookStore(file).list()).toEqual(store.list());
+    expect(fs.readFileSync(file, 'utf8')).toBe(expected);
+    expect(fs.statSync(file).mtimeMs).toBe(1234000);
+  });
+
+  it.each(['{"looks":[]}', '{"looks":[{"id":"other","params":{}}]}'])('does not rewrite a file without legacy Looks: %s', source => {
+    const file = join(dir, 'looks.json');
+    fs.writeFileSync(file, source);
+    fs.utimesSync(file, 1234, 1234);
+    new LookStore(file);
+    expect(fs.readFileSync(file, 'utf8')).toBe(source);
+    expect(fs.statSync(file).mtimeMs).toBe(1234000);
+  });
+
   it('renames (trimmed, capped), deletes and reorders by id', () => {
     const store = new LookStore(null);
     const a = store.save('A', params)!;
